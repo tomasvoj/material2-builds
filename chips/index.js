@@ -10,6 +10,12 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 import { NgModule } from '@angular/core';
 import { MdChipList } from './chip-list';
 import { MdChip } from './chip';
+import { MdChipInput } from './chip-input';
+import { MdChipRemove } from './chip-remove';
+export * from './chip-list';
+export * from './chip';
+export * from './chip-input';
+export * from './chip-remove';
 export var MdChipsModule = (function () {
     function MdChipsModule() {
     }
@@ -23,13 +29,11 @@ export var MdChipsModule = (function () {
     MdChipsModule = __decorate([
         NgModule({
             imports: [],
-            exports: [MdChipList, MdChip],
-            declarations: [MdChipList, MdChip]
+            exports: [MdChipList, MdChip, MdChipInput, MdChipRemove],
+            declarations: [MdChipList, MdChip, MdChipInput, MdChipRemove]
         }), 
         __metadata('design:paramtypes', [])
     ], MdChipsModule);
     return MdChipsModule;
 }());
-export * from './chip-list';
-export * from './chip';
 //# sourceMappingURL=index.js.map

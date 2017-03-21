@@ -9,6 +9,7 @@ export declare const END: number;
 export declare const ENTER: number;
 export declare const SPACE: number;
 export declare const TAB: number;
+export declare const COMMA: number;
 export declare const ESCAPE: number;
 export declare const BACKSPACE: number;
 export declare const DELETE: number;
