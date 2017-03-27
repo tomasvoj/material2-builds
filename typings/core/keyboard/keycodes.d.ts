@@ -9,6 +9,7 @@ export declare const END = 35;
 export declare const ENTER = 13;
 export declare const SPACE = 32;
 export declare const TAB = 9;
+export declare const COMMA = 188;
 export declare const ESCAPE = 27;
 export declare const BACKSPACE = 8;
 export declare const DELETE = 46;
