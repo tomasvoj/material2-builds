@@ -1,13 +1,21 @@
-import { ElementRef, NgZone, OnChanges, SimpleChanges, OnDestroy, OpaqueToken } from '@angular/core';
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+import { ElementRef, NgZone, OnChanges, SimpleChanges, OnDestroy, InjectionToken } from '@angular/core';
 import { RippleConfig } from './ripple-renderer';
-import { ViewportRuler } from '../overlay/position/viewport-ruler';
 import { RippleRef } from './ripple-ref';
-/** OpaqueToken that can be used to specify the global ripple options. */
-export declare const MD_RIPPLE_GLOBAL_OPTIONS: OpaqueToken;
+import { ViewportRuler } from '../overlay/position/viewport-ruler';
+import { Platform } from '../platform/platform';
 export interface RippleGlobalOptions {
     disabled?: boolean;
     baseSpeedFactor?: number;
 }
+/** Injection token that can be used to specify the global ripple options. */
+export declare const MD_RIPPLE_GLOBAL_OPTIONS: InjectionToken<RippleGlobalOptions>;
 export declare class MdRipple implements OnChanges, OnDestroy {
     /**
      * The element that triggers the ripple when click events are received. Defaults to the
@@ -20,8 +28,8 @@ export declare class MdRipple implements OnChanges, OnDestroy {
      */
     centered: boolean;
     /**
-     * Whether click events will not trigger the ripple. It can still be triggered by manually
-     * calling createRipple()
+     * Whether click events will not trigger the ripple. Ripples can be still launched manually
+     * by using the `launch()` method.
      */
     disabled: boolean;
     /**
@@ -44,7 +52,7 @@ export declare class MdRipple implements OnChanges, OnDestroy {
     private _rippleRenderer;
     /** Options that are set globally for all ripples. */
     private _globalOptions;
-    constructor(elementRef: ElementRef, ngZone: NgZone, ruler: ViewportRuler, globalOptions: RippleGlobalOptions);
+    constructor(elementRef: ElementRef, ngZone: NgZone, ruler: ViewportRuler, platform: Platform, globalOptions: RippleGlobalOptions);
     ngOnChanges(changes: SimpleChanges): void;
     ngOnDestroy(): void;
     /** Launches a manual ripple at the specified position. */
@@ -54,5 +62,5 @@ export declare class MdRipple implements OnChanges, OnDestroy {
     /** Ripple configuration from the directive's input values. */
     readonly rippleConfig: RippleConfig;
     /** Updates the ripple renderer with the latest ripple configuration. */
-    private _updateRippleRenderer();
+    _updateRippleRenderer(): void;
 }

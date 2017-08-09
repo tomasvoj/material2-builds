@@ -1,6 +1,6 @@
 {
   "name": "@angular/material",
-  "version": "2.0.0-beta.5-chips-1",
+  "version": "2.0.0-beta.8-chips-2",
   "description": "Angular Material",
   "main": "./bundles/material.umd.js",
   "module": "./@angular/material.es5.js",
@@ -22,8 +22,11 @@
   },
   "homepage": "https://github.com/angular/material2#readme",
   "peerDependencies": {
+    "@angular/cdk": "2.0.0-beta.8-chips-2",
     "@angular/core": "^4.0.0",
-    "@angular/common": "^4.0.0",
-    "@angular/http": "^4.0.0"
+    "@angular/common": "^4.0.0"
+  },
+  "dependencies": {
+    "tslib": "^1.7.1"
   }
 }

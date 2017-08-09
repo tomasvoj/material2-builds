@@ -1,13 +1,18 @@
-import { ModuleWithProviders, OpaqueToken, ElementRef } from '@angular/core';
-import { MdError } from '../errors/error';
-export declare const MATERIAL_COMPATIBILITY_MODE: OpaqueToken;
 /**
- * Exception thrown if the consumer has used an invalid Material prefix on a component.
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+import { ElementRef, InjectionToken } from '@angular/core';
+export declare const MATERIAL_COMPATIBILITY_MODE: InjectionToken<boolean>;
+/**
+ * Returns an exception to be thrown if the consumer has used
+ * an invalid Material prefix on a component.
  * @docs-private
  */
-export declare class MdCompatibilityInvalidPrefixError extends MdError {
-    constructor(prefix: string, nodeName: string);
-}
+export declare function getMdCompatibilityInvalidPrefixError(prefix: string, nodeName: string): Error;
 /** Selector that matches all elements that may have style collisions with AngularJS Material. */
 export declare const MAT_ELEMENTS_SELECTOR: string;
 /** Selector that matches all elements that may have style collisions with AngularJS Material. */
@@ -26,11 +31,6 @@ export declare class MdPrefixRejector {
  * there are any uses of the `mat-` prefix.
  */
 export declare class CompatibilityModule {
-    private _document;
-    static forRoot(): ModuleWithProviders;
-    constructor(_document: any);
-    private _checkDoctype();
-    private _checkTheme();
 }
 /**
  * Module that enforces "no-conflict" compatibility mode settings. When this module is loaded,

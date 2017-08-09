@@ -1,8 +1,26 @@
-import { ModuleWithProviders, EventEmitter, TemplateRef, ViewContainerRef, OnDestroy, ElementRef, Renderer2 } from '@angular/core';
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+import { EventEmitter, TemplateRef, ViewContainerRef, OnDestroy, ElementRef, Renderer2, OnChanges, SimpleChanges, InjectionToken } from '@angular/core';
 import { Overlay } from './overlay';
 import { OverlayRef } from './overlay-ref';
 import { ConnectionPositionPair, ConnectedOverlayPositionChange } from './position/connected-position';
-import { Dir, LayoutDirection } from '../rtl/dir';
+import { Directionality, Direction } from '../bidi/index';
+import { ScrollStrategy, RepositionScrollStrategy } from './scroll/index';
+/** Injection token that determines the scroll handling while the connected overlay is open. */
+export declare const MD_CONNECTED_OVERLAY_SCROLL_STRATEGY: InjectionToken<() => ScrollStrategy>;
+/** @docs-private */
+export declare function MD_CONNECTED_OVERLAY_SCROLL_STRATEGY_PROVIDER_FACTORY(overlay: Overlay): () => RepositionScrollStrategy;
+/** @docs-private */
+export declare const MD_CONNECTED_OVERLAY_SCROLL_STRATEGY_PROVIDER: {
+    provide: InjectionToken<() => ScrollStrategy>;
+    deps: typeof Overlay[];
+    useFactory: (overlay: Overlay) => () => RepositionScrollStrategy;
+};
 /**
  * Directive applied to an element to make it usable as an origin for an Overlay using a
  * ConnectedPositionStrategy.
@@ -14,13 +32,13 @@ export declare class OverlayOrigin {
 /**
  * Directive to facilitate declarative creation of an Overlay using a ConnectedPositionStrategy.
  */
-export declare class ConnectedOverlayDirective implements OnDestroy {
+export declare class ConnectedOverlayDirective implements OnDestroy, OnChanges {
     private _overlay;
     private _renderer;
+    private _scrollStrategy;
     private _dir;
     private _overlayRef;
     private _templatePortal;
-    private _open;
     private _hasBackdrop;
     private _backdropSubscription;
     private _positionSubscription;
@@ -46,9 +64,36 @@ export declare class ConnectedOverlayDirective implements OnDestroy {
     minHeight: number | string;
     /** The custom class to be set on the backdrop element. */
     backdropClass: string;
+    /** Strategy to be used when handling scroll events while the overlay is open. */
+    scrollStrategy: ScrollStrategy;
+    /** Whether the overlay is open. */
+    open: boolean;
     /** Whether or not the overlay should attach a backdrop. */
     hasBackdrop: any;
-    open: boolean;
+    /** @deprecated */
+    _deprecatedOrigin: OverlayOrigin;
+    /** @deprecated */
+    _deprecatedPositions: ConnectionPositionPair[];
+    /** @deprecated */
+    _deprecatedOffsetX: number;
+    /** @deprecated */
+    _deprecatedOffsetY: number;
+    /** @deprecated */
+    _deprecatedWidth: number | string;
+    /** @deprecated */
+    _deprecatedHeight: number | string;
+    /** @deprecated */
+    _deprecatedMinWidth: number | string;
+    /** @deprecated */
+    _deprecatedMinHeight: number | string;
+    /** @deprecated */
+    _deprecatedBackdropClass: string;
+    /** @deprecated */
+    _deprecatedScrollStrategy: ScrollStrategy;
+    /** @deprecated */
+    _deprecatedOpen: boolean;
+    /** @deprecated */
+    _deprecatedHasBackdrop: any;
     /** Event emitted when the backdrop is clicked. */
     backdropClick: EventEmitter<void>;
     /** Event emitted when the position has changed. */
@@ -57,12 +102,13 @@ export declare class ConnectedOverlayDirective implements OnDestroy {
     attach: EventEmitter<void>;
     /** Event emitted when the overlay has been detached. */
     detach: EventEmitter<void>;
-    constructor(_overlay: Overlay, _renderer: Renderer2, templateRef: TemplateRef<any>, viewContainerRef: ViewContainerRef, _dir: Dir);
+    constructor(_overlay: Overlay, _renderer: Renderer2, templateRef: TemplateRef<any>, viewContainerRef: ViewContainerRef, _scrollStrategy: any, _dir: Directionality);
     /** The associated overlay reference. */
     readonly overlayRef: OverlayRef;
     /** The element's layout direction. */
-    readonly dir: LayoutDirection;
+    readonly dir: Direction;
     ngOnDestroy(): void;
+    ngOnChanges(changes: SimpleChanges): void;
     /** Creates an overlay */
     private _createOverlay();
     /** Builds the overlay config based on the directive's inputs */
@@ -78,8 +124,4 @@ export declare class ConnectedOverlayDirective implements OnDestroy {
     private _destroyOverlay();
     /** Sets the event listener that closes the overlay when pressing Escape. */
     private _initEscapeListener();
-}
-export declare class OverlayModule {
-    /** @deprecated */
-    static forRoot(): ModuleWithProviders;
 }

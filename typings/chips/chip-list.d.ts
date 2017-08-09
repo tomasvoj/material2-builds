@@ -1,7 +1,14 @@
-import { AfterContentInit, ElementRef, QueryList, Renderer } from '@angular/core';
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+import { AfterContentInit, QueryList, OnDestroy, ElementRef, Renderer2 } from '@angular/core';
 import { MdChip } from './chip';
 import { FocusKeyManager } from '../core/a11y/focus-key-manager';
-import { Dir } from '../core/rtl/dir';
+import { Directionality } from '@angular/cdk/bidi';
 /**
  * A material design chips component (named ChipList for it's similarity to the List component).
  *
@@ -12,39 +19,42 @@ import { Dir } from '../core/rtl/dir';
  *       <md-chip>Chip 2<md-chip>
  *     </md-chip-list>
  */
-export declare class MdChipList implements AfterContentInit {
-    protected _renderer: Renderer;
+export declare class MdChipList implements AfterContentInit, OnDestroy {
+    protected _renderer: Renderer2;
     protected _elementRef: ElementRef;
-    protected _dir: Dir;
+    private _dir;
     /** When a chip is destroyed, we track the index so we can focus the appropriate next chip. */
-    protected _destroyedIndex: number;
+    protected _lastDestroyedIndex: number | null;
     /** Track which chips we're listening to for focus/destruction. */
-    protected _subscribed: WeakMap<MdChip, boolean>;
-    /** Holds our current input if provided. */
+    protected _chipSet: WeakMap<MdChip, boolean>;
+    /** Subscription to tabbing out from the chip list. */
+    private _tabOutSubscription;
+    /** Whether or not the chip is selectable. */
+    protected _selectable: boolean;
     protected _inputElement: HTMLInputElement;
-    /** Whether or not the chip list is currently focusable via keyboard interaction. */
+    /** Tab index for the chip list. */
     _tabIndex: number;
     /** The FocusKeyManager which handles focus. */
     _keyManager: FocusKeyManager;
     /** The chip components contained within this chip list. */
     chips: QueryList<MdChip>;
-    constructor(_renderer: Renderer, _elementRef: ElementRef, _dir: Dir);
+    constructor(_renderer: Renderer2, _elementRef: ElementRef, _dir: Directionality);
     ngAfterContentInit(): void;
+    ngOnDestroy(): void;
     /**
-     * Associates an HTML input element with this chip list.
-     *
-     * @param inputElement The input to associate.
+     * Whether or not this chip is selectable. When a chip is not selectable,
+     * it's selected state is always ignored.
      */
+    selectable: boolean;
+    /** Associates an HTML input element with this chip list. */
     registerInput(inputElement: HTMLInputElement): void;
     /**
-     * Programmatically focus the chip list. This in turn focuses the first non-disabled chip in this
-     * chip list, or the input if available and there are 0 chips.
-     *
-     * TODO: ARIA says this should focus the first `selected` chip if any are selected.
+     * Focuses the the first non-disabled chip in this chip list, or the associated input when there
+     * are no eligible chips.
      */
-    focus(event?: Event): void;
+    focus(): void;
     /** Attempt to focus an input if we have one. */
-    focusInput(): void;
+    _focusInput(): void;
     /**
      * Pass events to the keyboard manager. Available here for tests.
      */
@@ -59,7 +69,7 @@ export declare class MdChipList implements AfterContentInit {
     /**
      * Check the tab index as you should not be allowed to focus an empty list.
      */
-    protected _checkTabIndex(): void;
+    protected _updateTabIndex(): void;
     /**
      * Add a specific chip to our subscribed list. If the chip has
      * already been subscribed, this ensures it is only subscribed
@@ -73,7 +83,7 @@ export declare class MdChipList implements AfterContentInit {
      * Checks to see if a focus chip was recently destroyed so that we can refocus the next closest
      * one.
      */
-    protected _checkDestroyedFocus(): void;
+    protected _updateFocusForDestroyedChips(): void;
     /**
      * Utility to ensure all indexes are valid.
      *
@@ -81,6 +91,5 @@ export declare class MdChipList implements AfterContentInit {
      * @returns True if the index is valid for our list of chips.
      */
     private _isValidIndex(index);
-    /** Utility to check if an input element has no value. */
-    private static _isInputEmpty(element);
+    private _isInputEmpty(element);
 }

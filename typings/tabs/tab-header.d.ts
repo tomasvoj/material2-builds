@@ -1,18 +1,26 @@
-import { QueryList, ElementRef, EventEmitter, AfterContentChecked, AfterContentInit, OnDestroy, NgZone } from '@angular/core';
-import { Dir, LayoutDirection } from '../core';
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+import { QueryList, ElementRef, EventEmitter, AfterContentChecked, AfterContentInit, OnDestroy, NgZone, Renderer2, ChangeDetectorRef } from '@angular/core';
+import { Directionality, Direction } from '../core';
 import { MdTabLabelWrapper } from './tab-label-wrapper';
 import { MdInkBar } from './ink-bar';
-import 'rxjs/add/operator/map';
-import 'rxjs/add/operator/auditTime';
-import 'rxjs/add/observable/of';
-import 'rxjs/add/observable/merge';
-import 'rxjs/add/operator/startWith';
+import { CanDisableRipple } from '../core/common-behaviors/disable-ripple';
+import { Platform } from '@angular/cdk/platform';
 /**
  * The directions that scrolling can go in when the header's tabs exceed the header width. 'After'
  * will scroll the header towards the end of the tabs list and 'before' will scroll towards the
  * beginning of the list.
  */
 export declare type ScrollDirection = 'after' | 'before';
+/** @docs-private */
+export declare class MdTabHeaderBase {
+}
+export declare const _MdTabHeaderMixinBase: (new (...args: any[]) => CanDisableRipple) & typeof MdTabHeaderBase;
 /**
  * The header of the tab group which displays a list of all the tabs in the tab group. Includes
  * an ink bar that follows the currently selected tab. When the tabs list's width exceeds the
@@ -20,9 +28,11 @@ export declare type ScrollDirection = 'after' | 'before';
  * left and right across the header.
  * @docs-private
  */
-export declare class MdTabHeader implements AfterContentChecked, AfterContentInit, OnDestroy {
+export declare class MdTabHeader extends _MdTabHeaderMixinBase implements AfterContentChecked, AfterContentInit, OnDestroy, CanDisableRipple {
     private _elementRef;
     private _ngZone;
+    private _renderer;
+    private _changeDetectorRef;
     private _dir;
     _labelWrappers: QueryList<MdTabLabelWrapper>;
     _inkBar: MdInkBar;
@@ -50,13 +60,15 @@ export declare class MdTabHeader implements AfterContentChecked, AfterContentIni
     /** Whether the scroll distance has changed and should be applied after the view is checked. */
     private _scrollDistanceChanged;
     private _selectedIndex;
+    /** subscription for the window resize handler */
+    private _resizeSubscription;
     /** The index of the active tab. */
     selectedIndex: number;
     /** Event emitted when the option is selected. */
     selectFocusedIndex: EventEmitter<{}>;
     /** Event emitted when a label is focused. */
     indexFocused: EventEmitter<{}>;
-    constructor(_elementRef: ElementRef, _ngZone: NgZone, _dir: Dir);
+    constructor(_elementRef: ElementRef, _ngZone: NgZone, _renderer: Renderer2, _changeDetectorRef: ChangeDetectorRef, _dir: Directionality, platform: Platform);
     ngAfterContentChecked(): void;
     _handleKeydown(event: KeyboardEvent): void;
     /**
@@ -95,7 +107,7 @@ export declare class MdTabHeader implements AfterContentChecked, AfterContentIni
     /** Decrement the focus index by 1 until a valid tab is found. */
     _focusPreviousTab(): void;
     /** The layout direction of the containing app. */
-    _getLayoutDirection(): LayoutDirection;
+    _getLayoutDirection(): Direction;
     /** Performs the CSS transformation on the tab list that will cause the list to scroll. */
     _updateTabScrollPosition(): void;
     /** Sets the distance in pixels that the tab header should be transformed in the X-axis. */

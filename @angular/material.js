@@ -1,89 +1,85 @@
 /**
-  * @license Angular Material v2.0.0-beta.5-chips-1
-  * Copyright (c) 2017 Google, Inc. https://material.angular.io/
-  * License: MIT
-  */
-import { ApplicationRef, Attribute, ChangeDetectionStrategy, ChangeDetectorRef, Component, ComponentFactoryResolver, ContentChild, ContentChildren, Directive, ElementRef, EventEmitter, Host, HostBinding, Inject, Injectable, Injector, Input, NgModule, NgZone, OpaqueToken, Optional, Output, Renderer, Renderer2, SecurityContext, Self, SkipSelf, TemplateRef, ViewChild, ViewContainerRef, ViewEncapsulation, forwardRef, isDevMode } from '@angular/core';
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+import { ApplicationRef, Attribute, ChangeDetectionStrategy, ChangeDetectorRef, Component, ComponentFactoryResolver, ContentChild, ContentChildren, Directive, ElementRef, EventEmitter, Host, Inject, Injectable, InjectionToken, Injector, Input, LOCALE_ID, NgModule, NgZone, Optional, Output, Renderer2, SecurityContext, Self, SkipSelf, TemplateRef, Version, ViewChild, ViewContainerRef, ViewEncapsulation, forwardRef, isDevMode } from '@angular/core';
+import { ObserveContent, ObserversModule } from '@angular/cdk/observers';
 import { DOCUMENT, DomSanitizer, HAMMER_GESTURE_CONFIG, HammerGestureConfig } from '@angular/platform-browser';
+import { BidiModule, Dir, Directionality } from '@angular/cdk/bidi';
 import { CommonModule, Location } from '@angular/common';
+import { Platform, PlatformModule, getSupportedInputTypes } from '@angular/cdk/platform';
 import { Subject } from 'rxjs/Subject';
-import { Observable } from 'rxjs/Observable';
-import 'rxjs/add/observable/fromEvent';
-import 'rxjs/add/observable/merge';
-import 'rxjs/add/operator/auditTime';
-import { FormGroupDirective, FormsModule, NG_VALUE_ACCESSOR, NgControl, NgForm } from '@angular/forms';
+import { Subscription } from 'rxjs/Subscription';
+import { fromEvent } from 'rxjs/observable/fromEvent';
+import { merge } from 'rxjs/observable/merge';
+import { RxChain, auditTime, catchOperator, debounceTime, doOperator, filter, finallyOperator, first, map, share, startWith, switchMap, takeUntil } from '@angular/cdk/rxjs';
+import { A, BACKSPACE, DELETE, DOWN_ARROW, END, ENTER, ESCAPE, HOME, LEFT_ARROW, PAGE_DOWN, PAGE_UP, RIGHT_ARROW, SPACE, TAB, UP_ARROW, Z } from '@angular/cdk/keycodes';
+import { coerceBooleanProperty, coerceNumberProperty } from '@angular/cdk/coercion';
+import { BasePortalHost, ComponentPortal, DomPortalHost, Portal, PortalHostDirective, PortalModule, TemplatePortal, TemplatePortalDirective } from '@angular/cdk/portal';
+import { A11yModule, FocusTrap, FocusTrapDeprecatedDirective, FocusTrapDirective, FocusTrapFactory, InteractivityChecker, LIVE_ANNOUNCER_ELEMENT_TOKEN, LIVE_ANNOUNCER_PROVIDER, ListKeyManager, LiveAnnouncer, isFakeMousedownFromScreenReader } from '@angular/cdk/a11y';
+import { of } from 'rxjs/observable/of';
+import { CheckboxRequiredValidator, FormGroupDirective, NG_VALIDATORS, NG_VALUE_ACCESSOR, NgControl, NgForm, Validators } from '@angular/forms';
 import { animate, state, style, transition, trigger } from '@angular/animations';
-import 'rxjs/add/operator/startWith';
-import 'rxjs/add/operator/first';
-import { Http, HttpModule } from '@angular/http';
-import 'rxjs/add/observable/forkJoin';
-import 'rxjs/add/observable/of';
-import 'rxjs/add/operator/map';
-import 'rxjs/add/operator/filter';
-import 'rxjs/add/operator/do';
-import 'rxjs/add/operator/share';
-import 'rxjs/add/operator/finally';
-import 'rxjs/add/operator/catch';
-import 'rxjs/add/observable/throw';
-import 'rxjs/add/operator/switchMap';
+import { Http } from '@angular/http';
+import { Observable } from 'rxjs/Observable';
+import { _throw } from 'rxjs/observable/throw';
+import { forkJoin } from 'rxjs/observable/forkJoin';
+import { defer } from 'rxjs/observable/defer';
+import { CDK_ROW_TEMPLATE, CDK_TABLE_TEMPLATE, CdkCell, CdkCellDef, CdkColumnDef, CdkHeaderCell, CdkHeaderCellDef, CdkHeaderRow, CdkHeaderRowDef, CdkRow, CdkRowDef, CdkTable, CdkTableModule } from '@angular/cdk/table';
 
 /**
- * Wrapper around Error that sets the error message.
- * \@docs-private
+ * Current version of Angular Material.
  */
-class MdError extends Error {
-    /**
-     * @param {?} value
-     */
-    constructor(value) {
-        super();
-        this.message = value;
-    }
-}
+const VERSION = new Version('2.0.0-beta.8-chips-2');
 
+const MATERIAL_COMPATIBILITY_MODE = new InjectionToken('md-compatibility-mode');
 /**
- * Whether we've done the global sanity checks (e.g. a theme is loaded, there is a doctype).
- */
-let hasDoneGlobalChecks = false;
-const MATERIAL_COMPATIBILITY_MODE = new OpaqueToken('md-compatibility-mode');
-/**
- * Exception thrown if the consumer has used an invalid Material prefix on a component.
+ * Returns an exception to be thrown if the consumer has used
+ * an invalid Material prefix on a component.
  * \@docs-private
+ * @param {?} prefix
+ * @param {?} nodeName
+ * @return {?}
  */
-class MdCompatibilityInvalidPrefixError extends MdError {
-    /**
-     * @param {?} prefix
-     * @param {?} nodeName
-     */
-    constructor(prefix, nodeName) {
-        super(`The "${prefix}-" prefix cannot be used in ng-material v1 compatibility mode. ` +
-            `It was used on an "${nodeName.toLowerCase()}" element.`);
-    }
+function getMdCompatibilityInvalidPrefixError(prefix, nodeName) {
+    return Error(`The "${prefix}-" prefix cannot be used in ng-material v1 compatibility mode. ` +
+        `It was used on an "${nodeName.toLowerCase()}" element.`);
 }
 /**
  * Selector that matches all elements that may have style collisions with AngularJS Material.
  */
 const MAT_ELEMENTS_SELECTOR = `
   [mat-button],
-  [mat-card-subtitle],
-  [mat-card-title],
-  [mat-dialog-actions],
-  [mat-dialog-close],
-  [mat-dialog-content],
-  [mat-dialog-title],
   [mat-fab],
   [mat-icon-button],
-  [mat-menu-trigger-for],
   [mat-mini-fab],
   [mat-raised-button],
-  [mat-tab-label],
-  [mat-tab-link],
-  [mat-tab-nav-bar],
+  [matCardSubtitle],
+  [matCardTitle],
+  [matCellDef],
+  [matColumnDef],
+  [matDialogActions],
+  [matDialogClose],
+  [matDialogContent],
+  [matDialogTitle],
+  [matHeaderCellDef],
+  [matHeaderRowDef],
+  [matLine],
+  [matRowDef],
+  [matTabLabel],
+  [matTabLink],
+  [matTabNav],
   [matTooltip],
+  [matInput],
+  [matPrefix],
+  [matSuffix],
   mat-autocomplete,
   mat-button-toggle,
-  mat-button-toggle-group,
   mat-button-toggle,
+  mat-button-toggle-group,
   mat-card,
   mat-card-actions,
   mat-card-content,
@@ -92,18 +88,23 @@ const MAT_ELEMENTS_SELECTOR = `
   mat-card-subtitle,
   mat-card-title,
   mat-card-title-group,
+  mat-cell,
   mat-checkbox,
   mat-chip,
   mat-dialog-actions,
   mat-dialog-container,
   mat-dialog-content,
   mat-divider,
+  mat-error,
   mat-grid-list,
   mat-grid-tile,
   mat-grid-tile-footer,
   mat-grid-tile-header,
+  mat-header-cell,
+  mat-header-row,
   mat-hint,
   mat-icon,
+  mat-input-container,
   mat-list,
   mat-list-item,
   mat-menu,
@@ -114,39 +115,48 @@ const MAT_ELEMENTS_SELECTOR = `
   mat-pseudo-checkbox,
   mat-radio-button,
   mat-radio-group,
+  mat-row,
   mat-select,
   mat-sidenav,
   mat-sidenav-container,
   mat-slider,
   mat-spinner,
   mat-tab,
+  mat-table,
   mat-tab-group,
-  mat-toolbar,
-  mat-error`;
+  mat-toolbar`;
 /**
  * Selector that matches all elements that may have style collisions with AngularJS Material.
  */
 const MD_ELEMENTS_SELECTOR = `
   [md-button],
-  [md-card-subtitle],
-  [md-card-title],
-  [md-dialog-actions],
-  [md-dialog-close],
-  [md-dialog-content],
-  [md-dialog-title],
   [md-fab],
   [md-icon-button],
-  [md-menu-trigger-for],
   [md-mini-fab],
   [md-raised-button],
-  [md-tab-label],
-  [md-tab-link],
-  [md-tab-nav-bar],
+  [mdCardSubtitle],
+  [mdCardTitle],
+  [mdCellDef],
+  [mdColumnDef],
+  [mdDialogActions],
+  [mdDialogClose],
+  [mdDialogContent],
+  [mdDialogTitle],
+  [mdHeaderCellDef],
+  [mdHeaderRowDef],
+  [mdLine],
+  [mdRowDef],
+  [mdTabLabel],
+  [mdTabLink],
+  [mdTabNav],
   [mdTooltip],
+  [mdInput],
+  [mdPrefix],
+  [mdSuffix],
   md-autocomplete,
   md-button-toggle,
-  md-button-toggle-group,
   md-button-toggle,
+  md-button-toggle-group,
   md-card,
   md-card-actions,
   md-card-content,
@@ -155,18 +165,23 @@ const MD_ELEMENTS_SELECTOR = `
   md-card-subtitle,
   md-card-title,
   md-card-title-group,
+  md-cell,
   md-checkbox,
   md-chip,
   md-dialog-actions,
   md-dialog-container,
   md-dialog-content,
   md-divider,
+  md-error,
   md-grid-list,
   md-grid-tile,
   md-grid-tile-footer,
   md-grid-tile-header,
+  md-header-cell,
+  md-header-row,
   md-hint,
   md-icon,
+  md-input-container,
   md-list,
   md-list-item,
   md-menu,
@@ -177,15 +192,16 @@ const MD_ELEMENTS_SELECTOR = `
   md-pseudo-checkbox,
   md-radio-button,
   md-radio-group,
+  md-row,
   md-select,
   md-sidenav,
   md-sidenav-container,
   md-slider,
   md-spinner,
   md-tab,
+  md-table,
   md-tab-group,
-  md-toolbar,
-  md-error`;
+  md-toolbar`;
 /**
  * Directive that enforces that the `mat-` prefix cannot be used.
  */
@@ -196,7 +212,7 @@ class MatPrefixRejector {
      */
     constructor(isCompatibilityMode, elementRef) {
         if (!isCompatibilityMode) {
-            throw new MdCompatibilityInvalidPrefixError('mat', elementRef.nativeElement.nodeName);
+            throw getMdCompatibilityInvalidPrefixError('mat', elementRef.nativeElement.nodeName);
         }
     }
 }
@@ -220,7 +236,7 @@ class MdPrefixRejector {
      */
     constructor(isCompatibilityMode, elementRef) {
         if (isCompatibilityMode) {
-            throw new MdCompatibilityInvalidPrefixError('md', elementRef.nativeElement.nodeName);
+            throw getMdCompatibilityInvalidPrefixError('md', elementRef.nativeElement.nodeName);
         }
     }
 }
@@ -240,51 +256,6 @@ MdPrefixRejector.ctorParameters = () => [
  * there are any uses of the `mat-` prefix.
  */
 class CompatibilityModule {
-    /**
-     * @param {?} _document
-     */
-    constructor(_document) {
-        this._document = _document;
-        if (!hasDoneGlobalChecks && isDevMode()) {
-            this._checkDoctype();
-            this._checkTheme();
-            hasDoneGlobalChecks = true;
-        }
-    }
-    /**
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: CompatibilityModule,
-            providers: [],
-        };
-    }
-    /**
-     * @return {?}
-     */
-    _checkDoctype() {
-        if (this._document && !this._document.doctype) {
-            console.warn('Current document does not have a doctype. This may cause ' +
-                'some Angular Material components not to behave as expected.');
-        }
-    }
-    /**
-     * @return {?}
-     */
-    _checkTheme() {
-        if (this._document && typeof getComputedStyle === 'function') {
-            const /** @type {?} */ testElement = this._document.createElement('div');
-            testElement.classList.add('mat-theme-loaded-marker');
-            this._document.body.appendChild(testElement);
-            if (getComputedStyle(testElement).display !== 'none') {
-                console.warn('Could not find Angular Material core theme. Most Material ' +
-                    'components may not work as expected. For more info refer ' +
-                    'to the theming guide: https://material.angular.io/guide/theming');
-            }
-            this._document.body.removeChild(testElement);
-        }
-    }
 }
 CompatibilityModule.decorators = [
     { type: NgModule, args: [{
@@ -295,9 +266,7 @@ CompatibilityModule.decorators = [
 /**
  * @nocollapse
  */
-CompatibilityModule.ctorParameters = () => [
-    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [DOCUMENT,] },] },
-];
+CompatibilityModule.ctorParameters = () => [];
 /**
  * Module that enforces "no-conflict" compatibility mode settings. When this module is loaded,
  * it will throw an error if there are any uses of the `md-` prefix.
@@ -317,6 +286,76 @@ NoConflictStyleCompatibilityMode.decorators = [
 NoConflictStyleCompatibilityMode.ctorParameters = () => [];
 
 /**
+ * Injection token that configures whether the Material sanity checks are enabled.
+ */
+const MATERIAL_SANITY_CHECKS = new InjectionToken('md-sanity-checks');
+/**
+ * Module that captures anything that should be loaded and/or run for *all* Angular Material
+ * components. This includes Bidi, compatibility mode, etc.
+ *
+ * This module should be imported to each top-level component module (e.g., MdTabsModule).
+ */
+class MdCommonModule {
+    /**
+     * @param {?} _document
+     * @param {?} _sanityChecksEnabled
+     */
+    constructor(_document, _sanityChecksEnabled) {
+        this._document = _document;
+        /**
+         * Whether we've done the global sanity checks (e.g. a theme is loaded, there is a doctype).
+         */
+        this._hasDoneGlobalChecks = false;
+        if (_sanityChecksEnabled && !this._hasDoneGlobalChecks && _document && isDevMode()) {
+            this._checkDoctype();
+            this._checkTheme();
+            this._hasDoneGlobalChecks = true;
+        }
+    }
+    /**
+     * @return {?}
+     */
+    _checkDoctype() {
+        if (!this._document.doctype) {
+            console.warn('Current document does not have a doctype. This may cause ' +
+                'some Angular Material components not to behave as expected.');
+        }
+    }
+    /**
+     * @return {?}
+     */
+    _checkTheme() {
+        if (typeof getComputedStyle === 'function') {
+            const /** @type {?} */ testElement = this._document.createElement('div');
+            testElement.classList.add('mat-theme-loaded-marker');
+            this._document.body.appendChild(testElement);
+            if (getComputedStyle(testElement).display !== 'none') {
+                console.warn('Could not find Angular Material core theme. Most Material ' +
+                    'components may not work as expected. For more info refer ' +
+                    'to the theming guide: https://material.angular.io/guide/theming');
+            }
+            this._document.body.removeChild(testElement);
+        }
+    }
+}
+MdCommonModule.decorators = [
+    { type: NgModule, args: [{
+                imports: [CompatibilityModule, BidiModule],
+                exports: [CompatibilityModule, BidiModule],
+                providers: [{
+                        provide: MATERIAL_SANITY_CHECKS, useValue: true,
+                    }],
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdCommonModule.ctorParameters = () => [
+    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [DOCUMENT,] },] },
+    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [MATERIAL_SANITY_CHECKS,] },] },
+];
+
+/**
  * Shared directive to count lines inside a text area, such as a list item.
  * Line elements can be extracted with a \@ContentChildren(MdLine) query, then
  * counted by checking the query list's length.
@@ -325,10 +364,8 @@ class MdLine {
 }
 MdLine.decorators = [
     { type: Directive, args: [{
-                selector: '[md-line], [mat-line]',
-                host: {
-                    '[class.mat-line]': 'true'
-                }
+                selector: '[md-line], [mat-line], [mdLine], [matLine]',
+                host: { 'class': 'mat-line' }
             },] },
 ];
 /**
@@ -377,19 +414,24 @@ class MdLineSetter {
     }
     /**
      * @param {?} className
-     * @param {?} bool
+     * @param {?} isAdd
      * @return {?}
      */
-    _setClass(className, bool) {
-        this._renderer.setElementClass(this._element.nativeElement, className, bool);
+    _setClass(className, isAdd) {
+        if (isAdd) {
+            this._renderer.addClass(this._element.nativeElement, className);
+        }
+        else {
+            this._renderer.removeClass(this._element.nativeElement, className);
+        }
     }
 }
 class MdLineModule {
 }
 MdLineModule.decorators = [
     { type: NgModule, args: [{
-                imports: [CompatibilityModule],
-                exports: [MdLine, CompatibilityModule],
+                imports: [MdCommonModule],
+                exports: [MdLine, MdCommonModule],
                 declarations: [MdLine],
             },] },
 ];
@@ -397,192 +439,6 @@ MdLineModule.decorators = [
  * @nocollapse
  */
 MdLineModule.ctorParameters = () => [];
-
-/**
- * Directive to listen for changes of direction of part of the DOM.
- *
- * Applications should use this directive instead of the native attribute so that Material
- * components can listen on changes of direction.
- */
-class Dir {
-    constructor() {
-        /**
-         * Layout direction of the element.
-         */
-        this._dir = 'ltr';
-        /**
-         * Event emitted when the direction changes.
-         */
-        this.dirChange = new EventEmitter();
-    }
-    /**
-     * \@docs-private
-     * @return {?}
-     */
-    get dir() {
-        return this._dir;
-    }
-    /**
-     * @param {?} v
-     * @return {?}
-     */
-    set dir(v) {
-        let /** @type {?} */ old = this._dir;
-        this._dir = v;
-        if (old != this._dir) {
-            this.dirChange.emit();
-        }
-    }
-    /**
-     * Current layout direction of the element.
-     * @return {?}
-     */
-    get value() { return this.dir; }
-    /**
-     * @param {?} v
-     * @return {?}
-     */
-    set value(v) { this.dir = v; }
-}
-Dir.decorators = [
-    { type: Directive, args: [{
-                selector: '[dir]',
-                // TODO(hansl): maybe `$implicit` isn't the best option here, but for now that's the best we got.
-                exportAs: '$implicit'
-            },] },
-];
-/**
- * @nocollapse
- */
-Dir.ctorParameters = () => [];
-Dir.propDecorators = {
-    '_dir': [{ type: Input, args: ['dir',] },],
-    'dirChange': [{ type: Output },],
-    'dir': [{ type: HostBinding, args: ['attr.dir',] },],
-};
-class RtlModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: RtlModule,
-            providers: []
-        };
-    }
-}
-RtlModule.decorators = [
-    { type: NgModule, args: [{
-                exports: [Dir],
-                declarations: [Dir]
-            },] },
-];
-/**
- * @nocollapse
- */
-RtlModule.ctorParameters = () => [];
-
-/**
- * Directive that triggers a callback whenever the content of
- * its associated element has changed.
- */
-class ObserveContent {
-    /**
-     * @param {?} _elementRef
-     */
-    constructor(_elementRef) {
-        this._elementRef = _elementRef;
-        /**
-         * Event emitted for each change in the element's content.
-         */
-        this.event = new EventEmitter();
-    }
-    /**
-     * @return {?}
-     */
-    ngAfterContentInit() {
-        this._observer = new MutationObserver(mutations => mutations.forEach(() => this.event.emit()));
-        this._observer.observe(this._elementRef.nativeElement, {
-            characterData: true,
-            childList: true,
-            subtree: true
-        });
-    }
-    /**
-     * @return {?}
-     */
-    ngOnDestroy() {
-        if (this._observer) {
-            this._observer.disconnect();
-        }
-    }
-}
-ObserveContent.decorators = [
-    { type: Directive, args: [{
-                selector: '[cdkObserveContent]'
-            },] },
-];
-/**
- * @nocollapse
- */
-ObserveContent.ctorParameters = () => [
-    { type: ElementRef, },
-];
-ObserveContent.propDecorators = {
-    'event': [{ type: Output, args: ['cdkObserveContent',] },],
-};
-class ObserveContentModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: ObserveContentModule,
-            providers: []
-        };
-    }
-}
-ObserveContentModule.decorators = [
-    { type: NgModule, args: [{
-                exports: [ObserveContent],
-                declarations: [ObserveContent]
-            },] },
-];
-/**
- * @nocollapse
- */
-ObserveContentModule.ctorParameters = () => [];
-
-// Due to a bug in the ChromeDriver, Angular keyboard events are not triggered by `sendKeys`
-// during E2E tests when using dot notation such as `(keydown.rightArrow)`. To get around this,
-// we are temporarily using a single (keydown) handler.
-// See: https://github.com/angular/angular/issues/9419
-const UP_ARROW = 38;
-const DOWN_ARROW = 40;
-const RIGHT_ARROW = 39;
-const LEFT_ARROW = 37;
-const PAGE_UP = 33;
-const PAGE_DOWN = 34;
-const HOME = 36;
-const END = 35;
-const ENTER = 13;
-const SPACE = 32;
-const TAB = 9;
-const COMMA = 188;
-const ESCAPE = 27;
-const BACKSPACE = 8;
-const DELETE = 46;
-
-/**
- * Coerces a data-bound value (typically a string) to a boolean.
- * @param {?} value
- * @return {?}
- */
-function coerceBooleanProperty(value) {
-    return value != null && `${value}` !== 'false';
-}
 
 let RippleState = {};
 RippleState.FADING_IN = 0;
@@ -637,11 +493,12 @@ const RIPPLE_FADE_OUT_DURATION = 400;
  */
 class RippleRenderer {
     /**
-     * @param {?} _elementRef
+     * @param {?} elementRef
      * @param {?} _ngZone
      * @param {?} _ruler
+     * @param {?} platform
      */
-    constructor(_elementRef, _ngZone, _ruler) {
+    constructor(elementRef, _ngZone, _ruler, platform) {
         this._ngZone = _ngZone;
         this._ruler = _ruler;
         /**
@@ -664,13 +521,16 @@ class RippleRenderer {
          * Whether mouse ripples should be created or not.
          */
         this.rippleDisabled = false;
-        this._containerElement = _elementRef.nativeElement;
-        // Specify events which need to be registered on the trigger.
-        this._triggerEvents.set('mousedown', this.onMousedown.bind(this));
-        this._triggerEvents.set('mouseup', this.onMouseup.bind(this));
-        this._triggerEvents.set('mouseleave', this.onMouseLeave.bind(this));
-        // By default use the host element as trigger element.
-        this.setTriggerElement(this._containerElement);
+        // Only do anything if we're on the browser.
+        if (platform.isBrowser) {
+            this._containerElement = elementRef.nativeElement;
+            // Specify events which need to be registered on the trigger.
+            this._triggerEvents.set('mousedown', this.onMousedown.bind(this));
+            this._triggerEvents.set('mouseup', this.onMouseup.bind(this));
+            this._triggerEvents.set('mouseleave', this.onMouseLeave.bind(this));
+            // By default use the host element as trigger element.
+            this.setTriggerElement(this._containerElement);
+        }
     }
     /**
      * Fades in a ripple at the given coordinates.
@@ -703,7 +563,7 @@ class RippleRenderer {
         ripple.style.height = `${radius * 2}px`;
         ripple.style.width = `${radius * 2}px`;
         // If the color is not set, the default CSS color will be used.
-        ripple.style.backgroundColor = config.color;
+        ripple.style.backgroundColor = config.color || null;
         ripple.style.transitionDuration = `${duration}ms`;
         this._containerElement.appendChild(ripple);
         // By default the browser does not recalculate the styles of dynamically created
@@ -741,8 +601,8 @@ class RippleRenderer {
         rippleRef.state = RippleState.FADING_OUT;
         // Once the ripple faded out, the ripple can be safely removed from the DOM.
         this.runTimeoutOutsideZone(() => {
-            rippleRef.state = RippleState.HIDDEN;
-            rippleEl.parentNode.removeChild(rippleEl);
+            rippleRef.state = RippleState.HIDDEN; /** @type {?} */
+            ((rippleEl.parentNode)).removeChild(rippleEl);
         }, RIPPLE_FADE_OUT_DURATION);
     }
     /**
@@ -760,7 +620,9 @@ class RippleRenderer {
     setTriggerElement(element) {
         // Remove all previously register event listeners from the trigger element.
         if (this._triggerElement) {
-            this._triggerEvents.forEach((fn, type) => this._triggerElement.removeEventListener(type, fn));
+            this._triggerEvents.forEach((fn, type) => {
+                ((this._triggerElement)).removeEventListener(type, fn);
+            });
         }
         if (element) {
             // If the element is not null, register all event listeners on the trigger element.
@@ -847,9 +709,11 @@ const DEFAULT_SCROLL_TIME = 20;
 class ScrollDispatcher {
     /**
      * @param {?} _ngZone
+     * @param {?} _platform
      */
-    constructor(_ngZone) {
+    constructor(_ngZone, _platform) {
         this._ngZone = _ngZone;
+        this._platform = _platform;
         /**
          * Subject for notifying that a registered scrollable reference element has been scrolled.
          */
@@ -884,8 +748,9 @@ class ScrollDispatcher {
      * @return {?}
      */
     deregister(scrollable) {
-        if (this.scrollableReferences.has(scrollable)) {
-            this.scrollableReferences.get(scrollable).unsubscribe();
+        const /** @type {?} */ scrollableReference = this.scrollableReferences.get(scrollable);
+        if (scrollableReference) {
+            scrollableReference.unsubscribe();
             this.scrollableReferences.delete(scrollable);
         }
     }
@@ -898,15 +763,19 @@ class ScrollDispatcher {
      * @return {?}
      */
     scrolled(auditTimeInMs = DEFAULT_SCROLL_TIME, callback) {
+        // Scroll events can only happen on the browser, so do nothing if we're not on the browser.
+        if (!this._platform.isBrowser) {
+            return Subscription.EMPTY;
+        }
         // In the case of a 0ms delay, use an observable without auditTime
         // since it does add a perceptible delay in processing overhead.
         let /** @type {?} */ observable = auditTimeInMs > 0 ?
-            this._scrolled.asObservable().auditTime(auditTimeInMs) :
+            auditTime.call(this._scrolled.asObservable(), auditTimeInMs) :
             this._scrolled.asObservable();
         this._scrolledCount++;
         if (!this._globalSubscription) {
             this._globalSubscription = this._ngZone.runOutsideAngular(() => {
-                return Observable.merge(Observable.fromEvent(window.document, 'scroll'), Observable.fromEvent(window, 'resize')).subscribe(() => this._notify());
+                return merge(fromEvent(window.document, 'scroll'), fromEvent(window, 'resize')).subscribe(() => this._notify());
             });
         }
         // Note that we need to do the subscribing from here, in order to be able to remove
@@ -928,7 +797,7 @@ class ScrollDispatcher {
      */
     getScrollContainers(elementRef) {
         const /** @type {?} */ scrollingContainers = [];
-        this.scrollableReferences.forEach((subscription, scrollable) => {
+        this.scrollableReferences.forEach((_subscription, scrollable) => {
             if (this.scrollableContainsElement(scrollable, elementRef)) {
                 scrollingContainers.push(scrollable);
             }
@@ -951,6 +820,7 @@ class ScrollDispatcher {
                 return true;
             }
         } while (element = element.parentElement);
+        return false;
     }
     /**
      * Sends a notification that a scroll event has been fired.
@@ -968,19 +838,25 @@ ScrollDispatcher.decorators = [
  */
 ScrollDispatcher.ctorParameters = () => [
     { type: NgZone, },
+    { type: Platform, },
 ];
 /**
+ * \@docs-private
  * @param {?} parentDispatcher
  * @param {?} ngZone
+ * @param {?} platform
  * @return {?}
  */
-function SCROLL_DISPATCHER_PROVIDER_FACTORY(parentDispatcher, ngZone) {
-    return parentDispatcher || new ScrollDispatcher(ngZone);
+function SCROLL_DISPATCHER_PROVIDER_FACTORY(parentDispatcher, ngZone, platform) {
+    return parentDispatcher || new ScrollDispatcher(ngZone, platform);
 }
+/**
+ * \@docs-private
+ */
 const SCROLL_DISPATCHER_PROVIDER = {
     // If there is already a ScrollDispatcher available, use that. Otherwise, provide a new one.
     provide: ScrollDispatcher,
-    deps: [[new Optional(), new SkipSelf(), ScrollDispatcher], NgZone],
+    deps: [[new Optional(), new SkipSelf(), ScrollDispatcher], NgZone, Platform],
     useFactory: SCROLL_DISPATCHER_PROVIDER_FACTORY
 };
 
@@ -993,10 +869,8 @@ class ViewportRuler {
      * @param {?} scrollDispatcher
      */
     constructor(scrollDispatcher) {
-        // Initially cache the document rectangle.
-        this._cacheViewportGeometry();
         // Subscribe to scroll and resize events and update the document rectangle on changes.
-        scrollDispatcher.scrolled(null, () => this._cacheViewportGeometry());
+        scrollDispatcher.scrolled(0, () => this._cacheViewportGeometry());
     }
     /**
      * Gets a ClientRect for the viewport's bounds.
@@ -1004,6 +878,11 @@ class ViewportRuler {
      * @return {?}
      */
     getViewportRect(documentRect = this._documentRect) {
+        // Cache the document bounding rect so that we don't recompute it for multiple calls.
+        if (!documentRect) {
+            this._cacheViewportGeometry();
+            documentRect = this._documentRect;
+        }
         // Use the document element's bounding rect rather than the window scroll properties
         // (e.g. pageYOffset, scrollY) due to in issue in Chrome and IE where window scroll
         // properties and client coordinates (boundingClientRect, clientX/Y, etc.) are in different
@@ -1031,14 +910,21 @@ class ViewportRuler {
      * @return {?}
      */
     getViewportScrollPosition(documentRect = this._documentRect) {
+        // Cache the document bounding rect so that we don't recompute it for multiple calls.
+        if (!documentRect) {
+            this._cacheViewportGeometry();
+            documentRect = this._documentRect;
+        }
         // The top-left-corner of the viewport is determined by the scroll position of the document
         // body, normally just (scrollLeft, scrollTop). However, Chrome and Firefox disagree about
         // whether `document.body` or `document.documentElement` is the scrolled element, so reading
         // `scrollTop` and `scrollLeft` is inconsistent. However, using the bounding rect of
         // `document.documentElement` works consistently, where the `top` and `left` values will
         // equal negative the scroll position.
-        const /** @type {?} */ top = -documentRect.top || document.body.scrollTop || window.scrollY || 0;
-        const /** @type {?} */ left = -documentRect.left || document.body.scrollLeft || window.scrollX || 0;
+        const /** @type {?} */ top = -((documentRect)).top || document.body.scrollTop || window.scrollY ||
+            document.documentElement.scrollTop || 0;
+        const /** @type {?} */ left = -((documentRect)).left || document.body.scrollLeft || window.scrollX ||
+            document.documentElement.scrollLeft || 0;
         return { top, left };
     }
     /**
@@ -1059,6 +945,7 @@ ViewportRuler.ctorParameters = () => [
     { type: ScrollDispatcher, },
 ];
 /**
+ * \@docs-private
  * @param {?} parentRuler
  * @param {?} scrollDispatcher
  * @return {?}
@@ -1066,6 +953,9 @@ ViewportRuler.ctorParameters = () => [
 function VIEWPORT_RULER_PROVIDER_FACTORY(parentRuler, scrollDispatcher) {
     return parentRuler || new ViewportRuler(scrollDispatcher);
 }
+/**
+ * \@docs-private
+ */
 const VIEWPORT_RULER_PROVIDER = {
     // If there is already a ViewportRuler available, use that. Otherwise, provide a new one.
     provide: ViewportRuler,
@@ -1074,17 +964,18 @@ const VIEWPORT_RULER_PROVIDER = {
 };
 
 /**
- * OpaqueToken that can be used to specify the global ripple options.
+ * Injection token that can be used to specify the global ripple options.
  */
-const MD_RIPPLE_GLOBAL_OPTIONS = new OpaqueToken('md-ripple-global-options');
+const MD_RIPPLE_GLOBAL_OPTIONS = new InjectionToken('md-ripple-global-options');
 class MdRipple {
     /**
      * @param {?} elementRef
      * @param {?} ngZone
      * @param {?} ruler
+     * @param {?} platform
      * @param {?} globalOptions
      */
-    constructor(elementRef, ngZone, ruler, globalOptions) {
+    constructor(elementRef, ngZone, ruler, platform, globalOptions) {
         /**
          * If set, the radius in pixels of foreground ripples when fully expanded. If unset, the radius
          * will be the distance from the center of the ripple to the furthest corner of the host element's
@@ -1097,7 +988,7 @@ class MdRipple {
          * A changed speedFactor will not modify the fade-out duration of the ripples.
          */
         this.speedFactor = 1;
-        this._rippleRenderer = new RippleRenderer(elementRef, ngZone, ruler);
+        this._rippleRenderer = new RippleRenderer(elementRef, ngZone, ruler, platform);
         this._globalOptions = globalOptions ? globalOptions : {};
         this._updateRippleRenderer();
     }
@@ -1161,7 +1052,7 @@ MdRipple.decorators = [
                 selector: '[md-ripple], [mat-ripple], [mdRipple], [matRipple]',
                 exportAs: 'mdRipple',
                 host: {
-                    '[class.mat-ripple]': 'true',
+                    'class': 'mat-ripple',
                     '[class.mat-ripple-unbounded]': 'unbounded'
                 }
             },] },
@@ -1173,6 +1064,7 @@ MdRipple.ctorParameters = () => [
     { type: ElementRef, },
     { type: NgZone, },
     { type: ViewportRuler, },
+    { type: Platform, },
     { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [MD_RIPPLE_GLOBAL_OPTIONS,] },] },
 ];
 MdRipple.propDecorators = {
@@ -1185,24 +1077,321 @@ MdRipple.propDecorators = {
     'unbounded': [{ type: Input, args: ['mdRippleUnbounded',] },],
 };
 
-class MdRippleModule {
+/**
+ * Sends an event when the directive's element is scrolled. Registers itself with the
+ * ScrollDispatcher service to include itself as part of its collection of scrolling events that it
+ * can be listened to through the service.
+ */
+class Scrollable {
     /**
-     * @deprecated
+     * @param {?} _elementRef
+     * @param {?} _scroll
+     * @param {?} _ngZone
+     * @param {?} _renderer
+     */
+    constructor(_elementRef, _scroll, _ngZone, _renderer) {
+        this._elementRef = _elementRef;
+        this._scroll = _scroll;
+        this._ngZone = _ngZone;
+        this._renderer = _renderer;
+        this._elementScrolled = new Subject();
+    }
+    /**
      * @return {?}
      */
-    static forRoot() {
-        return {
-            ngModule: MdRippleModule,
-            providers: []
-        };
+    ngOnInit() {
+        this._scrollListener = this._ngZone.runOutsideAngular(() => {
+            return this._renderer.listen(this.getElementRef().nativeElement, 'scroll', (event) => {
+                this._elementScrolled.next(event);
+            });
+        });
+        this._scroll.register(this);
     }
+    /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        this._scroll.deregister(this);
+        if (this._scrollListener) {
+            this._scrollListener();
+            this._scrollListener = null;
+        }
+    }
+    /**
+     * Returns observable that emits when a scroll event is fired on the host element.
+     * @return {?}
+     */
+    elementScrolled() {
+        return this._elementScrolled.asObservable();
+    }
+    /**
+     * @return {?}
+     */
+    getElementRef() {
+        return this._elementRef;
+    }
+}
+Scrollable.decorators = [
+    { type: Directive, args: [{
+                selector: '[cdk-scrollable], [cdkScrollable]'
+            },] },
+];
+/**
+ * @nocollapse
+ */
+Scrollable.ctorParameters = () => [
+    { type: ElementRef, },
+    { type: ScrollDispatcher, },
+    { type: NgZone, },
+    { type: Renderer2, },
+];
+
+/**
+ * Returns an error to be thrown when attempting to attach an already-attached scroll strategy.
+ * @return {?}
+ */
+function getMdScrollStrategyAlreadyAttachedError() {
+    return Error(`Scroll strategy has already been attached.`);
+}
+
+/**
+ * Strategy that will close the overlay as soon as the user starts scrolling.
+ */
+class CloseScrollStrategy {
+    /**
+     * @param {?} _scrollDispatcher
+     */
+    constructor(_scrollDispatcher) {
+        this._scrollDispatcher = _scrollDispatcher;
+        this._scrollSubscription = null;
+    }
+    /**
+     * @param {?} overlayRef
+     * @return {?}
+     */
+    attach(overlayRef) {
+        if (this._overlayRef) {
+            throw getMdScrollStrategyAlreadyAttachedError();
+        }
+        this._overlayRef = overlayRef;
+    }
+    /**
+     * @return {?}
+     */
+    enable() {
+        if (!this._scrollSubscription) {
+            this._scrollSubscription = this._scrollDispatcher.scrolled(0, () => {
+                if (this._overlayRef.hasAttached()) {
+                    this._overlayRef.detach();
+                }
+                this.disable();
+            });
+        }
+    }
+    /**
+     * @return {?}
+     */
+    disable() {
+        if (this._scrollSubscription) {
+            this._scrollSubscription.unsubscribe();
+            this._scrollSubscription = null;
+        }
+    }
+}
+
+/**
+ * Scroll strategy that doesn't do anything.
+ */
+class NoopScrollStrategy {
+    /**
+     * @return {?}
+     */
+    enable() { }
+    /**
+     * @return {?}
+     */
+    disable() { }
+    /**
+     * @return {?}
+     */
+    attach() { }
+}
+
+/**
+ * Strategy that will prevent the user from scrolling while the overlay is visible.
+ */
+class BlockScrollStrategy {
+    /**
+     * @param {?} _viewportRuler
+     */
+    constructor(_viewportRuler) {
+        this._viewportRuler = _viewportRuler;
+        this._previousHTMLStyles = { top: '', left: '' };
+        this._isEnabled = false;
+    }
+    /**
+     * @return {?}
+     */
+    attach() { }
+    /**
+     * @return {?}
+     */
+    enable() {
+        if (this._canBeEnabled()) {
+            const /** @type {?} */ root = document.documentElement;
+            this._previousScrollPosition = this._viewportRuler.getViewportScrollPosition();
+            // Cache the previous inline styles in case the user had set them.
+            this._previousHTMLStyles.left = root.style.left || '';
+            this._previousHTMLStyles.top = root.style.top || '';
+            // Note: we're using the `html` node, instead of the `body`, because the `body` may
+            // have the user agent margin, whereas the `html` is guaranteed not to have one.
+            root.style.left = `${-this._previousScrollPosition.left}px`;
+            root.style.top = `${-this._previousScrollPosition.top}px`;
+            root.classList.add('cdk-global-scrollblock');
+            this._isEnabled = true;
+        }
+    }
+    /**
+     * @return {?}
+     */
+    disable() {
+        if (this._isEnabled) {
+            this._isEnabled = false;
+            document.documentElement.style.left = this._previousHTMLStyles.left;
+            document.documentElement.style.top = this._previousHTMLStyles.top;
+            document.documentElement.classList.remove('cdk-global-scrollblock');
+            window.scroll(this._previousScrollPosition.left, this._previousScrollPosition.top);
+        }
+    }
+    /**
+     * @return {?}
+     */
+    _canBeEnabled() {
+        // Since the scroll strategies can't be singletons, we have to use a global CSS class
+        // (`cdk-global-scrollblock`) to make sure that we don't try to disable global
+        // scrolling multiple times.
+        if (document.documentElement.classList.contains('cdk-global-scrollblock') || this._isEnabled) {
+            return false;
+        }
+        const /** @type {?} */ body = document.body;
+        const /** @type {?} */ viewport = this._viewportRuler.getViewportRect();
+        return body.scrollHeight > viewport.height || body.scrollWidth > viewport.width;
+    }
+}
+
+/**
+ * Strategy that will update the element position as the user is scrolling.
+ */
+class RepositionScrollStrategy {
+    /**
+     * @param {?} _scrollDispatcher
+     * @param {?=} _config
+     */
+    constructor(_scrollDispatcher, _config) {
+        this._scrollDispatcher = _scrollDispatcher;
+        this._config = _config;
+        this._scrollSubscription = null;
+    }
+    /**
+     * @param {?} overlayRef
+     * @return {?}
+     */
+    attach(overlayRef) {
+        if (this._overlayRef) {
+            throw getMdScrollStrategyAlreadyAttachedError();
+        }
+        this._overlayRef = overlayRef;
+    }
+    /**
+     * @return {?}
+     */
+    enable() {
+        if (!this._scrollSubscription) {
+            let /** @type {?} */ throttle = this._config ? this._config.scrollThrottle : 0;
+            this._scrollSubscription = this._scrollDispatcher.scrolled(throttle, () => {
+                this._overlayRef.updatePosition();
+            });
+        }
+    }
+    /**
+     * @return {?}
+     */
+    disable() {
+        if (this._scrollSubscription) {
+            this._scrollSubscription.unsubscribe();
+            this._scrollSubscription = null;
+        }
+    }
+}
+
+/**
+ * Options for how an overlay will handle scrolling.
+ *
+ * Users can provide a custom value for `ScrollStrategyOptions` to replace the default
+ * behaviors. This class primarily acts as a factory for ScrollStrategy instances.
+ */
+class ScrollStrategyOptions {
+    /**
+     * @param {?} _scrollDispatcher
+     * @param {?} _viewportRuler
+     */
+    constructor(_scrollDispatcher, _viewportRuler) {
+        this._scrollDispatcher = _scrollDispatcher;
+        this._viewportRuler = _viewportRuler;
+        /**
+         * Do nothing on scroll.
+         */
+        this.noop = () => new NoopScrollStrategy();
+        /**
+         * Close the overlay as soon as the user scrolls.
+         */
+        this.close = () => new CloseScrollStrategy(this._scrollDispatcher);
+        /**
+         * Block scrolling.
+         */
+        this.block = () => new BlockScrollStrategy(this._viewportRuler);
+        /**
+         * Update the overlay's position on scroll.
+         * @param config Configuration to be used inside the scroll strategy.
+         * Allows debouncing the reposition calls.
+         */
+        this.reposition = (config) => new RepositionScrollStrategy(this._scrollDispatcher, config);
+    }
+}
+ScrollStrategyOptions.decorators = [
+    { type: Injectable },
+];
+/**
+ * @nocollapse
+ */
+ScrollStrategyOptions.ctorParameters = () => [
+    { type: ScrollDispatcher, },
+    { type: ViewportRuler, },
+];
+
+class ScrollDispatchModule {
+}
+ScrollDispatchModule.decorators = [
+    { type: NgModule, args: [{
+                imports: [PlatformModule],
+                exports: [Scrollable],
+                declarations: [Scrollable],
+                providers: [SCROLL_DISPATCHER_PROVIDER, ScrollStrategyOptions],
+            },] },
+];
+/**
+ * @nocollapse
+ */
+ScrollDispatchModule.ctorParameters = () => [];
+
+class MdRippleModule {
 }
 MdRippleModule.decorators = [
     { type: NgModule, args: [{
-                imports: [CompatibilityModule],
-                exports: [MdRipple, CompatibilityModule],
+                imports: [MdCommonModule, PlatformModule, ScrollDispatchModule],
+                exports: [MdRipple, MdCommonModule],
                 declarations: [MdRipple],
-                providers: [VIEWPORT_RULER_PROVIDER, SCROLL_DISPATCHER_PROVIDER],
+                providers: [VIEWPORT_RULER_PROVIDER],
             },] },
 ];
 /**
@@ -1214,6 +1403,8 @@ MdRippleModule.ctorParameters = () => [];
  * Component that shows a simplified checkbox without including any kind of "real" checkbox.
  * Meant to be used when the checkbox is purely decorative and a large number of them will be
  * included, such as for the options in a multi-select. Uses no SVGs or complex animations.
+ * Note that theming is meant to be handled by the parent element, e.g.
+ * `mat-primary .mat-pseudo-checkbox`.
  *
  * Note that this component will be completely invisible to screen-reader users. This is *not*
  * interchangeable with <md-checkbox> and should *not* be used if the user would directly interact
@@ -1222,13 +1413,7 @@ MdRippleModule.ctorParameters = () => [];
  * \@docs-private
  */
 class MdPseudoCheckbox {
-    /**
-     * @param {?} _elementRef
-     * @param {?} _renderer
-     */
-    constructor(_elementRef, _renderer) {
-        this._elementRef = _elementRef;
-        this._renderer = _renderer;
+    constructor() {
         /**
          * Display state of the checkbox.
          */
@@ -1237,33 +1422,16 @@ class MdPseudoCheckbox {
          * Whether the checkbox is disabled.
          */
         this.disabled = false;
-        this.color = 'accent';
-    }
-    /**
-     * Color of the checkbox.
-     * @return {?}
-     */
-    get color() { return this._color; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set color(value) {
-        if (value) {
-            let /** @type {?} */ nativeElement = this._elementRef.nativeElement;
-            this._renderer.setElementClass(nativeElement, `mat-${this.color}`, false);
-            this._renderer.setElementClass(nativeElement, `mat-${value}`, true);
-            this._color = value;
-        }
     }
 }
 MdPseudoCheckbox.decorators = [
     { type: Component, args: [{encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
                 selector: 'md-pseudo-checkbox, mat-pseudo-checkbox',
-                styles: [".mat-pseudo-checkbox{width:20px;height:20px;border:2px solid;border-radius:2px;cursor:pointer;display:inline-block;vertical-align:middle;box-sizing:border-box;position:relative;transition:border-color 90ms cubic-bezier(0,0,.2,.1),background-color 90ms cubic-bezier(0,0,.2,.1)}.mat-pseudo-checkbox::after{position:absolute;opacity:0;content:'';border-bottom:2px solid currentColor;transition:opacity 90ms cubic-bezier(0,0,.2,.1)}.mat-pseudo-checkbox.mat-pseudo-checkbox-checked,.mat-pseudo-checkbox.mat-pseudo-checkbox-indeterminate{border:none}.mat-pseudo-checkbox-disabled{cursor:default}.mat-pseudo-checkbox-indeterminate::after{top:9px;left:2px;width:16px;opacity:1}.mat-pseudo-checkbox-checked::after{top:5px;left:3px;width:12px;height:5px;border-left:2px solid currentColor;transform:rotate(-45deg);opacity:1} /*# sourceMappingURL=pseudo-checkbox.css.map */ "],
+                styles: [".mat-pseudo-checkbox{width:20px;height:20px;border:2px solid;border-radius:2px;cursor:pointer;display:inline-block;vertical-align:middle;box-sizing:border-box;position:relative;transition:border-color 90ms cubic-bezier(0,0,.2,.1),background-color 90ms cubic-bezier(0,0,.2,.1)}.mat-pseudo-checkbox::after{position:absolute;opacity:0;content:'';border-bottom:2px solid currentColor;transition:opacity 90ms cubic-bezier(0,0,.2,.1)}.mat-pseudo-checkbox.mat-pseudo-checkbox-checked,.mat-pseudo-checkbox.mat-pseudo-checkbox-indeterminate{border:none}.mat-pseudo-checkbox-disabled{cursor:default}.mat-pseudo-checkbox-indeterminate::after{top:9px;left:2px;width:16px;opacity:1}.mat-pseudo-checkbox-checked::after{top:5px;left:3px;width:12px;height:5px;border-left:2px solid currentColor;transform:rotate(-45deg);opacity:1}"],
                 template: '',
                 host: {
-                    '[class.mat-pseudo-checkbox]': 'true',
+                    'class': 'mat-pseudo-checkbox',
                     '[class.mat-pseudo-checkbox-indeterminate]': 'state === "indeterminate"',
                     '[class.mat-pseudo-checkbox-checked]': 'state === "checked"',
                     '[class.mat-pseudo-checkbox-disabled]': 'disabled',
@@ -1273,14 +1441,10 @@ MdPseudoCheckbox.decorators = [
 /**
  * @nocollapse
  */
-MdPseudoCheckbox.ctorParameters = () => [
-    { type: ElementRef, },
-    { type: Renderer, },
-];
+MdPseudoCheckbox.ctorParameters = () => [];
 MdPseudoCheckbox.propDecorators = {
     'state': [{ type: Input },],
     'disabled': [{ type: Input },],
-    'color': [{ type: Input },],
 };
 
 class MdSelectionModule {
@@ -1295,6 +1459,76 @@ MdSelectionModule.decorators = [
  * @nocollapse
  */
 MdSelectionModule.ctorParameters = () => [];
+
+/**
+ * Mixin to augment a directive with a `disabled` property.
+ * @template T
+ * @param {?} base
+ * @return {?}
+ */
+function mixinDisabled(base) {
+    return class extends base {
+        /**
+         * @param {...?} args
+         */
+        constructor(...args) {
+            super(...args);
+            this._disabled = false;
+        }
+        /**
+         * @return {?}
+         */
+        get disabled() { return this._disabled; }
+        /**
+         * @param {?} value
+         * @return {?}
+         */
+        set disabled(value) { this._disabled = coerceBooleanProperty(value); }
+    };
+}
+
+/**
+ * \@docs-private
+ */
+class MdOptgroupBase {
+}
+const _MdOptgroupMixinBase = mixinDisabled(MdOptgroupBase);
+// Counter for unique group ids.
+let _uniqueOptgroupIdCounter = 0;
+/**
+ * Component that is used to group instances of `md-option`.
+ */
+class MdOptgroup extends _MdOptgroupMixinBase {
+    constructor() {
+        super(...arguments);
+        /**
+         * Unique id for the underlying label.
+         */
+        this._labelId = `mat-optgroup-label-${_uniqueOptgroupIdCounter++}`;
+    }
+}
+MdOptgroup.decorators = [
+    { type: Component, args: [{selector: 'md-optgroup, mat-optgroup',
+                template: "<label class=\"mat-optgroup-label\" [id]=\"_labelId\">{{ label }}</label><ng-content select=\"md-option, mat-option\"></ng-content>",
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
+                inputs: ['disabled'],
+                host: {
+                    'class': 'mat-optgroup',
+                    'role': 'group',
+                    '[class.mat-optgroup-disabled]': 'disabled',
+                    '[attr.aria-disabled]': 'disabled.toString()',
+                    '[attr.aria-labelledby]': '_labelId',
+                }
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdOptgroup.ctorParameters = () => [];
+MdOptgroup.propDecorators = {
+    'label': [{ type: Input },],
+};
 
 /**
  * Option IDs need to be unique across components, so this counter exists outside of
@@ -1320,26 +1554,43 @@ class MdOptionSelectionChange {
 class MdOption {
     /**
      * @param {?} _element
+     * @param {?} _changeDetectorRef
+     * @param {?} group
      * @param {?} _isCompatibilityMode
      */
-    constructor(_element, _isCompatibilityMode) {
+    constructor(_element, _changeDetectorRef, group, _isCompatibilityMode) {
         this._element = _element;
+        this._changeDetectorRef = _changeDetectorRef;
+        this.group = group;
         this._isCompatibilityMode = _isCompatibilityMode;
         this._selected = false;
         this._active = false;
+        this._multiple = false;
+        this._disableRipple = false;
         /**
          * Whether the option is disabled.
          */
         this._disabled = false;
         this._id = `md-option-${_uniqueIdCounter++}`;
         /**
-         * Whether the wrapping component is in multiple selection mode.
-         */
-        this.multiple = false;
-        /**
          * Event emitted when the option is selected or deselected.
          */
         this.onSelectionChange = new EventEmitter();
+    }
+    /**
+     * Whether the wrapping component is in multiple selection mode.
+     * @return {?}
+     */
+    get multiple() { return this._multiple; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set multiple(value) {
+        if (value !== this._multiple) {
+            this._multiple = value;
+            this._changeDetectorRef.markForCheck();
+        }
     }
     /**
      * The unique ID of the option.
@@ -1355,12 +1606,25 @@ class MdOption {
      * Whether the option is disabled.
      * @return {?}
      */
-    get disabled() { return this._disabled; }
+    get disabled() { return (this.group && this.group.disabled) || this._disabled; }
     /**
      * @param {?} value
      * @return {?}
      */
     set disabled(value) { this._disabled = coerceBooleanProperty(value); }
+    /**
+     * Whether ripples for the option are disabled.
+     * @return {?}
+     */
+    get disableRipple() { return this._disableRipple; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set disableRipple(value) {
+        this._disableRipple = value;
+        this._changeDetectorRef.markForCheck();
+    }
     /**
      * Whether or not the option is currently active and ready to be selected.
      * An active option displays styles as if it is focused, but the
@@ -1378,7 +1642,7 @@ class MdOption {
      */
     get viewValue() {
         // TODO(kara): Add input property alternative for node envs.
-        return this._getHostElement().textContent.trim();
+        return (this._getHostElement().textContent || '').trim();
     }
     /**
      * Selects the option.
@@ -1386,6 +1650,7 @@ class MdOption {
      */
     select() {
         this._selected = true;
+        this._changeDetectorRef.markForCheck();
         this._emitSelectionChangeEvent();
     }
     /**
@@ -1394,6 +1659,7 @@ class MdOption {
      */
     deselect() {
         this._selected = false;
+        this._changeDetectorRef.markForCheck();
         this._emitSelectionChangeEvent();
     }
     /**
@@ -1401,7 +1667,10 @@ class MdOption {
      * @return {?}
      */
     focus() {
-        this._getHostElement().focus();
+        const /** @type {?} */ element = this._getHostElement();
+        if ('focus' in element) {
+            element.focus();
+        }
     }
     /**
      * This method sets display styles on the option to make it appear
@@ -1410,7 +1679,10 @@ class MdOption {
      * @return {?}
      */
     setActiveStyles() {
-        this._active = true;
+        if (!this._active) {
+            this._active = true;
+            this._changeDetectorRef.markForCheck();
+        }
     }
     /**
      * This method removes display styles on the option that made it appear
@@ -1419,7 +1691,17 @@ class MdOption {
      * @return {?}
      */
     setInactiveStyles() {
-        this._active = false;
+        if (this._active) {
+            this._active = false;
+            this._changeDetectorRef.markForCheck();
+        }
+    }
+    /**
+     * Gets the label to be used when determining whether the option should be focused.
+     * @return {?}
+     */
+    getLabel() {
+        return this.viewValue;
     }
     /**
      * Ensures the option is selected when activated from the keyboard.
@@ -1429,6 +1711,8 @@ class MdOption {
     _handleKeydown(event) {
         if (event.keyCode === ENTER || event.keyCode === SPACE) {
             this._selectViaInteraction();
+            // Prevent the page from scrolling down and form submits.
+            event.preventDefault();
         }
     }
     /**
@@ -1439,6 +1723,7 @@ class MdOption {
     _selectViaInteraction() {
         if (!this.disabled) {
             this._selected = this.multiple ? !this._selected : true;
+            this._changeDetectorRef.markForCheck();
             this._emitSelectionChangeEvent(true);
         }
     }
@@ -1450,7 +1735,7 @@ class MdOption {
         return this.disabled ? '-1' : '0';
     }
     /**
-     * Fetches the host DOM element.
+     * Gets the host DOM element.
      * @return {?}
      */
     _getHostElement() {
@@ -1479,10 +1764,11 @@ MdOption.decorators = [
                     '[class.mat-option-disabled]': 'disabled',
                     '(click)': '_selectViaInteraction()',
                     '(keydown)': '_handleKeydown($event)',
-                    '[class.mat-option]': 'true',
+                    'class': 'mat-option',
                 },
-                template: "<span [ngSwitch]=\"_isCompatibilityMode\" *ngIf=\"multiple\"> <mat-pseudo-checkbox class=\"mat-option-pseudo-checkbox\" *ngSwitchCase=\"true\" [state]=\"selected ? 'checked' : ''\" color=\"primary\"></mat-pseudo-checkbox> <md-pseudo-checkbox class=\"mat-option-pseudo-checkbox\" *ngSwitchDefault [state]=\"selected ? 'checked' : ''\" color=\"primary\"></md-pseudo-checkbox> </span> <ng-content></ng-content> <div class=\"mat-option-ripple\" *ngIf=\"!disabled\" md-ripple [mdRippleTrigger]=\"_getHostElement()\"> </div> ",
-                encapsulation: ViewEncapsulation.None
+                template: "<span [ngSwitch]=\"_isCompatibilityMode\" *ngIf=\"multiple\"><mat-pseudo-checkbox class=\"mat-option-pseudo-checkbox\" *ngSwitchCase=\"true\" [state]=\"selected ? 'checked' : ''\"></mat-pseudo-checkbox><md-pseudo-checkbox class=\"mat-option-pseudo-checkbox\" *ngSwitchDefault [state]=\"selected ? 'checked' : ''\"></md-pseudo-checkbox></span><ng-content></ng-content><div class=\"mat-option-ripple\" md-ripple [mdRippleTrigger]=\"_getHostElement()\" [mdRippleDisabled]=\"disabled || disableRipple\"></div>",
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
             },] },
 ];
 /**
@@ -1490,6 +1776,8 @@ MdOption.decorators = [
  */
 MdOption.ctorParameters = () => [
     { type: ElementRef, },
+    { type: ChangeDetectorRef, },
+    { type: MdOptgroup, decorators: [{ type: Optional },] },
     { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [MATERIAL_COMPATIBILITY_MODE,] },] },
 ];
 MdOption.propDecorators = {
@@ -1497,22 +1785,14 @@ MdOption.propDecorators = {
     'disabled': [{ type: Input },],
     'onSelectionChange': [{ type: Output },],
 };
+
 class MdOptionModule {
-    /**
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdOptionModule,
-            providers: []
-        };
-    }
 }
 MdOptionModule.decorators = [
     { type: NgModule, args: [{
                 imports: [MdRippleModule, CommonModule, MdSelectionModule],
-                exports: [MdOption],
-                declarations: [MdOption]
+                exports: [MdOption, MdOptgroup],
+                declarations: [MdOption, MdOptgroup]
             },] },
 ];
 /**
@@ -1521,428 +1801,19 @@ MdOptionModule.decorators = [
 MdOptionModule.ctorParameters = () => [];
 
 /**
- * Exception thrown when attempting to attach a null portal to a host.
- * \@docs-private
- */
-class NullPortalError extends MdError {
-    constructor() {
-        super('Must provide a portal to attach');
-    }
-}
-/**
- * Exception thrown when attempting to attach a portal to a host that is already attached.
- * \@docs-private
- */
-class PortalAlreadyAttachedError extends MdError {
-    constructor() {
-        super('Host already has a portal attached');
-    }
-}
-/**
- * Exception thrown when attempting to attach a portal to an already-disposed host.
- * \@docs-private
- */
-class PortalHostAlreadyDisposedError extends MdError {
-    constructor() {
-        super('This PortalHost has already been disposed');
-    }
-}
-/**
- * Exception thrown when attempting to attach an unknown portal type.
- * \@docs-private
- */
-class UnknownPortalTypeError extends MdError {
-    constructor() {
-        super('Attempting to attach an unknown Portal type. ' +
-            'BasePortalHost accepts either a ComponentPortal or a TemplatePortal.');
-    }
-}
-/**
- * Exception thrown when attempting to attach a portal to a null host.
- * \@docs-private
- */
-class NullPortalHostError extends MdError {
-    constructor() {
-        super('Attempting to attach a portal to a null PortalHost');
-    }
-}
-/**
- * Exception thrown when attempting to detach a portal that is not attached.
- * \@docs-private
- */
-class NoPortalAttachedError extends MdError {
-    constructor() {
-        super('Attempting to detach a portal that is not attached to a host');
-    }
-}
-
-/**
- * A `Portal` is something that you want to render somewhere else.
- * It can be attach to / detached from a `PortalHost`.
- * @abstract
- */
-class Portal {
-    /**
-     * Attach this portal to a host.
-     * @param {?} host
-     * @return {?}
-     */
-    attach(host) {
-        if (host == null) {
-            throw new NullPortalHostError();
-        }
-        if (host.hasAttached()) {
-            throw new PortalAlreadyAttachedError();
-        }
-        this._attachedHost = host;
-        return (host.attach(this));
-    }
-    /**
-     * Detach this portal from its host
-     * @return {?}
-     */
-    detach() {
-        let /** @type {?} */ host = this._attachedHost;
-        if (host == null) {
-            throw new NoPortalAttachedError();
-        }
-        this._attachedHost = null;
-        return host.detach();
-    }
-    /**
-     * Whether this portal is attached to a host.
-     * @return {?}
-     */
-    get isAttached() {
-        return this._attachedHost != null;
-    }
-    /**
-     * Sets the PortalHost reference without performing `attach()`. This is used directly by
-     * the PortalHost when it is performing an `attach()` or `detach()`.
-     * @param {?} host
-     * @return {?}
-     */
-    setAttachedHost(host) {
-        this._attachedHost = host;
-    }
-}
-/**
- * A `ComponentPortal` is a portal that instantiates some Component upon attachment.
- */
-class ComponentPortal extends Portal {
-    /**
-     * @param {?} component
-     * @param {?=} viewContainerRef
-     * @param {?=} injector
-     */
-    constructor(component, viewContainerRef = null, injector = null) {
-        super();
-        this.component = component;
-        this.viewContainerRef = viewContainerRef;
-        this.injector = injector;
-    }
-}
-/**
- * A `TemplatePortal` is a portal that represents some embedded template (TemplateRef).
- */
-class TemplatePortal extends Portal {
-    /**
-     * @param {?} template
-     * @param {?} viewContainerRef
-     */
-    constructor(template, viewContainerRef) {
-        super();
-        /**
-         * Additional locals for the instantiated embedded view.
-         * These locals can be seen as "exports" for the template, such as how ngFor has
-         * index / event / odd.
-         * See https://angular.io/docs/ts/latest/api/core/EmbeddedViewRef-class.html
-         */
-        this.locals = new Map();
-        this.templateRef = template;
-        this.viewContainerRef = viewContainerRef;
-    }
-    /**
-     * @return {?}
-     */
-    get origin() {
-        return this.templateRef.elementRef;
-    }
-    /**
-     * @param {?} host
-     * @param {?=} locals
-     * @return {?}
-     */
-    attach(host, locals) {
-        this.locals = locals == null ? new Map() : locals;
-        return super.attach(host);
-    }
-    /**
-     * @return {?}
-     */
-    detach() {
-        this.locals = new Map();
-        return super.detach();
-    }
-}
-/**
- * Partial implementation of PortalHost that only deals with attaching either a
- * ComponentPortal or a TemplatePortal.
- * @abstract
- */
-class BasePortalHost {
-    constructor() {
-        /**
-         * Whether this host has already been permanently disposed.
-         */
-        this._isDisposed = false;
-    }
-    /**
-     * Whether this host has an attached portal.
-     * @return {?}
-     */
-    hasAttached() {
-        return !!this._attachedPortal;
-    }
-    /**
-     * @param {?} portal
-     * @return {?}
-     */
-    attach(portal) {
-        if (!portal) {
-            throw new NullPortalError();
-        }
-        if (this.hasAttached()) {
-            throw new PortalAlreadyAttachedError();
-        }
-        if (this._isDisposed) {
-            throw new PortalHostAlreadyDisposedError();
-        }
-        if (portal instanceof ComponentPortal) {
-            this._attachedPortal = portal;
-            return this.attachComponentPortal(portal);
-        }
-        else if (portal instanceof TemplatePortal) {
-            this._attachedPortal = portal;
-            return this.attachTemplatePortal(portal);
-        }
-        throw new UnknownPortalTypeError();
-    }
-    /**
-     * @abstract
-     * @template T
-     * @param {?} portal
-     * @return {?}
-     */
-    attachComponentPortal(portal) { }
-    /**
-     * @abstract
-     * @param {?} portal
-     * @return {?}
-     */
-    attachTemplatePortal(portal) { }
-    /**
-     * @return {?}
-     */
-    detach() {
-        if (this._attachedPortal) {
-            this._attachedPortal.setAttachedHost(null);
-            this._attachedPortal = null;
-        }
-        this._invokeDisposeFn();
-    }
-    /**
-     * @return {?}
-     */
-    dispose() {
-        if (this.hasAttached()) {
-            this.detach();
-        }
-        this._invokeDisposeFn();
-        this._isDisposed = true;
-    }
-    /**
-     * @param {?} fn
-     * @return {?}
-     */
-    setDisposeFn(fn) {
-        this._disposeFn = fn;
-    }
-    /**
-     * @return {?}
-     */
-    _invokeDisposeFn() {
-        if (this._disposeFn) {
-            this._disposeFn();
-            this._disposeFn = null;
-        }
-    }
-}
-
-/**
- * Directive version of a `TemplatePortal`. Because the directive *is* a TemplatePortal,
- * the directive instance itself can be attached to a host, enabling declarative use of portals.
- *
- * Usage:
- * <ng-template portal #greeting>
- *   <p> Hello {{name}} </p>
- * </ng-template>
- */
-class TemplatePortalDirective extends TemplatePortal {
-    /**
-     * @param {?} templateRef
-     * @param {?} viewContainerRef
-     */
-    constructor(templateRef, viewContainerRef) {
-        super(templateRef, viewContainerRef);
-    }
-}
-TemplatePortalDirective.decorators = [
-    { type: Directive, args: [{
-                selector: '[cdk-portal], [portal]',
-                exportAs: 'cdkPortal',
-            },] },
-];
-/**
- * @nocollapse
- */
-TemplatePortalDirective.ctorParameters = () => [
-    { type: TemplateRef, },
-    { type: ViewContainerRef, },
-];
-/**
- * Directive version of a PortalHost. Because the directive *is* a PortalHost, portals can be
- * directly attached to it, enabling declarative use.
- *
- * Usage:
- * <ng-template [cdkPortalHost]="greeting"></ng-template>
- */
-class PortalHostDirective extends BasePortalHost {
-    /**
-     * @param {?} _componentFactoryResolver
-     * @param {?} _viewContainerRef
-     */
-    constructor(_componentFactoryResolver, _viewContainerRef) {
-        super();
-        this._componentFactoryResolver = _componentFactoryResolver;
-        this._viewContainerRef = _viewContainerRef;
-    }
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    get _deprecatedPortal() { return this.portal; }
-    /**
-     * @param {?} v
-     * @return {?}
-     */
-    set _deprecatedPortal(v) { this.portal = v; }
-    /**
-     * Portal associated with the Portal host.
-     * @return {?}
-     */
-    get portal() {
-        return this._portal;
-    }
-    /**
-     * @param {?} portal
-     * @return {?}
-     */
-    set portal(portal) {
-        if (this.hasAttached()) {
-            super.detach();
-        }
-        if (portal) {
-            super.attach(portal);
-        }
-        this._portal = portal;
-    }
-    /**
-     * @return {?}
-     */
-    ngOnDestroy() {
-        super.dispose();
-        this._portal = null;
-    }
-    /**
-     * Attach the given ComponentPortal to this PortalHost using the ComponentFactoryResolver.
-     *
-     * @template T
-     * @param {?} portal Portal to be attached to the portal host.
-     * @return {?}
-     */
-    attachComponentPortal(portal) {
-        portal.setAttachedHost(this);
-        // If the portal specifies an origin, use that as the logical location of the component
-        // in the application tree. Otherwise use the location of this PortalHost.
-        let /** @type {?} */ viewContainerRef = portal.viewContainerRef != null ?
-            portal.viewContainerRef :
-            this._viewContainerRef;
-        let /** @type {?} */ componentFactory = this._componentFactoryResolver.resolveComponentFactory(portal.component);
-        let /** @type {?} */ ref = viewContainerRef.createComponent(componentFactory, viewContainerRef.length, portal.injector || viewContainerRef.parentInjector);
-        super.setDisposeFn(() => ref.destroy());
-        this._portal = portal;
-        return ref;
-    }
-    /**
-     * Attach the given TemplatePortal to this PortlHost as an embedded View.
-     * @param {?} portal Portal to be attached.
-     * @return {?}
-     */
-    attachTemplatePortal(portal) {
-        portal.setAttachedHost(this);
-        this._viewContainerRef.createEmbeddedView(portal.templateRef);
-        super.setDisposeFn(() => this._viewContainerRef.clear());
-        this._portal = portal;
-        // TODO(jelbourn): return locals from view
-        return new Map();
-    }
-}
-PortalHostDirective.decorators = [
-    { type: Directive, args: [{
-                selector: '[cdkPortalHost], [portalHost]',
-                inputs: ['portal: cdkPortalHost']
-            },] },
-];
-/**
- * @nocollapse
- */
-PortalHostDirective.ctorParameters = () => [
-    { type: ComponentFactoryResolver, },
-    { type: ViewContainerRef, },
-];
-PortalHostDirective.propDecorators = {
-    '_deprecatedPortal': [{ type: Input, args: ['portalHost',] },],
-};
-class PortalModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: PortalModule,
-            providers: []
-        };
-    }
-}
-PortalModule.decorators = [
-    { type: NgModule, args: [{
-                exports: [TemplatePortalDirective, PortalHostDirective],
-                declarations: [TemplatePortalDirective, PortalHostDirective],
-            },] },
-];
-/**
- * @nocollapse
- */
-PortalModule.ctorParameters = () => [];
-
-/**
  * OverlayState is a bag of values for either the initial configuration or current state of an
  * overlay.
  */
 class OverlayState {
     constructor() {
+        /**
+         * Strategy to be used when handling scroll events while the overlay is open.
+         */
+        this.scrollStrategy = new NoopScrollStrategy();
+        /**
+         * Custom class to add to the overlay pane.
+         */
+        this.panelClass = '';
         /**
          * Whether the overlay has a backdrop.
          */
@@ -1959,98 +1830,6 @@ class OverlayState {
         // - focus trap
         // - disable pointer events
         // - z-index
-    }
-}
-
-/**
- * A PortalHost for attaching portals to an arbitrary DOM element outside of the Angular
- * application context.
- *
- * This is the only part of the portal core that directly touches the DOM.
- */
-class DomPortalHost extends BasePortalHost {
-    /**
-     * @param {?} _hostDomElement
-     * @param {?} _componentFactoryResolver
-     * @param {?} _appRef
-     * @param {?} _defaultInjector
-     */
-    constructor(_hostDomElement, _componentFactoryResolver, _appRef, _defaultInjector) {
-        super();
-        this._hostDomElement = _hostDomElement;
-        this._componentFactoryResolver = _componentFactoryResolver;
-        this._appRef = _appRef;
-        this._defaultInjector = _defaultInjector;
-    }
-    /**
-     * Attach the given ComponentPortal to DOM element using the ComponentFactoryResolver.
-     * @template T
-     * @param {?} portal Portal to be attached
-     * @return {?}
-     */
-    attachComponentPortal(portal) {
-        let /** @type {?} */ componentFactory = this._componentFactoryResolver.resolveComponentFactory(portal.component);
-        let /** @type {?} */ componentRef;
-        // If the portal specifies a ViewContainerRef, we will use that as the attachment point
-        // for the component (in terms of Angular's component tree, not rendering).
-        // When the ViewContainerRef is missing, we use the factory to create the component directly
-        // and then manually attach the view to the application.
-        if (portal.viewContainerRef) {
-            componentRef = portal.viewContainerRef.createComponent(componentFactory, portal.viewContainerRef.length, portal.injector || portal.viewContainerRef.parentInjector);
-            this.setDisposeFn(() => componentRef.destroy());
-        }
-        else {
-            componentRef = componentFactory.create(portal.injector || this._defaultInjector);
-            this._appRef.attachView(componentRef.hostView);
-            this.setDisposeFn(() => {
-                this._appRef.detachView(componentRef.hostView);
-                componentRef.destroy();
-            });
-        }
-        // At this point the component has been instantiated, so we move it to the location in the DOM
-        // where we want it to be rendered.
-        this._hostDomElement.appendChild(this._getComponentRootNode(componentRef));
-        return componentRef;
-    }
-    /**
-     * Attaches a template portal to the DOM as an embedded view.
-     * @param {?} portal Portal to be attached.
-     * @return {?}
-     */
-    attachTemplatePortal(portal) {
-        let /** @type {?} */ viewContainer = portal.viewContainerRef;
-        let /** @type {?} */ viewRef = viewContainer.createEmbeddedView(portal.templateRef);
-        viewRef.detectChanges();
-        // The method `createEmbeddedView` will add the view as a child of the viewContainer.
-        // But for the DomPortalHost the view can be added everywhere in the DOM (e.g Overlay Container)
-        // To move the view to the specified host element. We just re-append the existing root nodes.
-        viewRef.rootNodes.forEach(rootNode => this._hostDomElement.appendChild(rootNode));
-        this.setDisposeFn((() => {
-            let /** @type {?} */ index = viewContainer.indexOf(viewRef);
-            if (index !== -1) {
-                viewContainer.remove(index);
-            }
-        }));
-        // TODO(jelbourn): Return locals from view.
-        return new Map();
-    }
-    /**
-     * Clears out a portal from the DOM.
-     * @return {?}
-     */
-    dispose() {
-        super.dispose();
-        if (this._hostDomElement.parentNode != null) {
-            this._hostDomElement.parentNode.removeChild(this._hostDomElement);
-        }
-    }
-    /**
-     * Gets the root HTMLElement for an instantiated component.
-     * @param {?} componentRef
-     * @return {?}
-     */
-    _getComponentRootNode(componentRef) {
-        return (((componentRef.hostView)).rootNodes[0]);
     }
 }
 
@@ -2072,6 +1851,9 @@ class OverlayRef {
         this._ngZone = _ngZone;
         this._backdropElement = null;
         this._backdropClick = new Subject();
+        this._attachments = new Subject();
+        this._detachments = new Subject();
+        _state.scrollStrategy.attach(this);
     }
     /**
      * The overlay's HTML element
@@ -2092,11 +1874,23 @@ class OverlayRef {
         this.updateSize();
         this.updateDirection();
         this.updatePosition();
+        this._state.scrollStrategy.enable();
         // Enable pointer events for the overlay pane element.
         this._togglePointerEvents(true);
         if (this._state.hasBackdrop) {
             this._attachBackdrop();
         }
+        if (this._state.panelClass) {
+            // We can't do a spread here, because IE doesn't support setting multiple classes.
+            if (Array.isArray(this._state.panelClass)) {
+                this._state.panelClass.forEach(cls => this._pane.classList.add(cls));
+            }
+            else {
+                this._pane.classList.add(this._state.panelClass);
+            }
+        }
+        // Only emit the `attachments` event once all other setup is done.
+        this._attachments.next();
         return attachResult;
     }
     /**
@@ -2109,7 +1903,11 @@ class OverlayRef {
         // This is necessary because otherwise the pane element will cover the page and disable
         // pointer events therefore. Depends on the position strategy and the applied pane boundaries.
         this._togglePointerEvents(false);
-        return this._portalHost.detach();
+        this._state.scrollStrategy.disable();
+        let /** @type {?} */ detachmentResult = this._portalHost.detach();
+        // Only emit after everything is detached.
+        this._detachments.next();
+        return detachmentResult;
     }
     /**
      * Cleans up the overlay from the DOM.
@@ -2119,8 +1917,13 @@ class OverlayRef {
         if (this._state.positionStrategy) {
             this._state.positionStrategy.dispose();
         }
+        this._state.scrollStrategy.disable();
         this.detachBackdrop();
         this._portalHost.dispose();
+        this._attachments.complete();
+        this._backdropClick.complete();
+        this._detachments.next();
+        this._detachments.complete();
     }
     /**
      * Checks whether the overlay has been attached.
@@ -2135,6 +1938,20 @@ class OverlayRef {
      */
     backdropClick() {
         return this._backdropClick.asObservable();
+    }
+    /**
+     * Returns an observable that emits when the overlay has been attached.
+     * @return {?}
+     */
+    attachments() {
+        return this._attachments.asObservable();
+    }
+    /**
+     * Returns an observable that emits when the overlay has been detached.
+     * @return {?}
+     */
+    detachments() {
+        return this._detachments.asObservable();
     }
     /**
      * Gets the current state config of the overlay.
@@ -2157,7 +1974,7 @@ class OverlayRef {
      * @return {?}
      */
     updateDirection() {
-        this._pane.setAttribute('dir', this._state.direction);
+        this._pane.setAttribute('dir', /** @type {?} */ ((this._state.direction)));
     }
     /**
      * Updates the size of the overlay based on the overlay config.
@@ -2192,10 +2009,13 @@ class OverlayRef {
     _attachBackdrop() {
         this._backdropElement = document.createElement('div');
         this._backdropElement.classList.add('cdk-overlay-backdrop');
-        this._backdropElement.classList.add(this._state.backdropClass);
+        if (this._state.backdropClass) {
+            this._backdropElement.classList.add(this._state.backdropClass);
+        } /** @type {?} */
+        ((
         // Insert the backdrop before the pane in the DOM order,
         // in order to handle stacked overlays properly.
-        this._pane.parentElement.insertBefore(this._backdropElement, this._pane);
+        this._pane.parentElement)).insertBefore(this._backdropElement, this._pane);
         // Forward backdrop clicks such that the consumer of the overlay can perform whatever
         // action desired when such a click occurs (usually closing the overlay).
         this._backdropElement.addEventListener('click', () => this._backdropClick.next(null));
@@ -2216,7 +2036,7 @@ class OverlayRef {
      */
     _updateStackingOrder() {
         if (this._pane.nextSibling) {
-            this._pane.parentNode.appendChild(this._pane);
+            ((this._pane.parentNode)).appendChild(this._pane);
         }
     }
     /**
@@ -2239,7 +2059,9 @@ class OverlayRef {
                 }
             };
             backdropToDetach.classList.remove('cdk-overlay-backdrop-showing');
-            backdropToDetach.classList.remove(this._state.backdropClass);
+            if (this._state.backdropClass) {
+                backdropToDetach.classList.remove(this._state.backdropClass);
+            }
             backdropToDetach.addEventListener('transitionend', finishDetach);
             // If the backdrop doesn't have a transition, the `transitionend` event won't fire.
             // In this case we make it unclickable and we try to remove it after a delay.
@@ -2407,7 +2229,8 @@ class ConnectedPositionStrategy {
         // We use the viewport rect to determine whether a position would go off-screen.
         const /** @type {?} */ viewportRect = this._viewportRuler.getViewportRect();
         // Fallback point if none of the fallbacks fit into the viewport.
-        let /** @type {?} */ fallbackPoint = null;
+        let /** @type {?} */ fallbackPoint;
+        let /** @type {?} */ fallbackPosition;
         // We want to place the overlay in the first of the preferred positions such that the
         // overlay fits on-screen.
         for (let /** @type {?} */ pos of this._preferredPositions) {
@@ -2417,23 +2240,19 @@ class ConnectedPositionStrategy {
             let /** @type {?} */ overlayPoint = this._getOverlayPoint(originPoint, overlayRect, viewportRect, pos);
             // If the overlay in the calculated position fits on-screen, put it there and we're done.
             if (overlayPoint.fitsInViewport) {
-                this._setElementPosition(element, overlayPoint);
+                this._setElementPosition(element, overlayRect, overlayPoint, pos);
                 // Save the last connected position in case the position needs to be re-calculated.
                 this._lastConnectedPosition = pos;
-                // Notify that the position has been changed along with its change properties.
-                const /** @type {?} */ scrollableViewProperties = this.getScrollableViewProperties(element);
-                const /** @type {?} */ positionChange = new ConnectedOverlayPositionChange(pos, scrollableViewProperties);
-                this._onPositionChange.next(positionChange);
-                return Promise.resolve(null);
+                return;
             }
             else if (!fallbackPoint || fallbackPoint.visibleArea < overlayPoint.visibleArea) {
                 fallbackPoint = overlayPoint;
+                fallbackPosition = pos;
             }
         }
         // If none of the preferred positions were in the viewport, take the one
         // with the largest visible area.
-        this._setElementPosition(element, fallbackPoint);
-        return Promise.resolve(null);
+        this._setElementPosition(element, overlayRect, /** @type {?} */ ((fallbackPoint)), /** @type {?} */ ((fallbackPosition)));
     }
     /**
      * This re-aligns the overlay element with the trigger in its last calculated position,
@@ -2448,7 +2267,7 @@ class ConnectedPositionStrategy {
         const /** @type {?} */ lastPosition = this._lastConnectedPosition || this._preferredPositions[0];
         let /** @type {?} */ originPoint = this._getOriginConnectionPoint(originRect, lastPosition);
         let /** @type {?} */ overlayPoint = this._getOverlayPoint(originPoint, overlayRect, viewportRect, lastPosition);
-        this._setElementPosition(this._pane, overlayPoint);
+        this._setElementPosition(this._pane, overlayRect, overlayPoint, lastPosition);
     }
     /**
      * Sets the list of Scrollable containers that host the origin element so that
@@ -2636,12 +2455,45 @@ class ConnectedPositionStrategy {
     /**
      * Physically positions the overlay element to the given coordinate.
      * @param {?} element
+     * @param {?} overlayRect
      * @param {?} overlayPoint
+     * @param {?} pos
      * @return {?}
      */
-    _setElementPosition(element, overlayPoint) {
-        element.style.left = overlayPoint.x + 'px';
-        element.style.top = overlayPoint.y + 'px';
+    _setElementPosition(element, overlayRect, overlayPoint, pos) {
+        // We want to set either `top` or `bottom` based on whether the overlay wants to appear above
+        // or below the origin and the direction in which the element will expand.
+        let /** @type {?} */ verticalStyleProperty = pos.overlayY === 'bottom' ? 'bottom' : 'top';
+        // When using `bottom`, we adjust the y position such that it is the distance
+        // from the bottom of the viewport rather than the top.
+        let /** @type {?} */ y = verticalStyleProperty === 'top' ?
+            overlayPoint.y :
+            document.documentElement.clientHeight - (overlayPoint.y + overlayRect.height);
+        // We want to set either `left` or `right` based on whether the overlay wants to appear "before"
+        // or "after" the origin, which determines the direction in which the element will expand.
+        // For the horizontal axis, the meaning of "before" and "after" change based on whether the
+        // page is in RTL or LTR.
+        let /** @type {?} */ horizontalStyleProperty;
+        if (this._dir === 'rtl') {
+            horizontalStyleProperty = pos.overlayX === 'end' ? 'left' : 'right';
+        }
+        else {
+            horizontalStyleProperty = pos.overlayX === 'end' ? 'right' : 'left';
+        }
+        // When we're setting `right`, we adjust the x position such that it is the distance
+        // from the right edge of the viewport rather than the left edge.
+        let /** @type {?} */ x = horizontalStyleProperty === 'left' ?
+            overlayPoint.x :
+            document.documentElement.clientWidth - (overlayPoint.x + overlayRect.width);
+        // Reset any existing styles. This is necessary in case the preferred position has
+        // changed since the last `apply`.
+        ['top', 'bottom', 'left', 'right'].forEach(p => element.style[p] = null);
+        element.style[verticalStyleProperty] = `${y}px`;
+        element.style[horizontalStyleProperty] = `${x}px`;
+        // Notify that the position has been changed along with its change properties.
+        const /** @type {?} */ scrollableViewProperties = this.getScrollableViewProperties(element);
+        const /** @type {?} */ positionChange = new ConnectedOverlayPositionChange(pos, scrollableViewProperties);
+        this._onPositionChange.next(positionChange);
     }
     /**
      * Returns the bounding positions of the provided element with respect to the viewport.
@@ -2687,13 +2539,14 @@ class GlobalPositionStrategy {
         this._justifyContent = '';
         this._width = '';
         this._height = '';
+        this._wrapper = null;
     }
     /**
      * Sets the top position of the overlay. Clears any previously set vertical position.
-     * @param {?} value New top offset.
+     * @param {?=} value New top offset.
      * @return {?}
      */
-    top(value) {
+    top(value = '') {
         this._bottomOffset = '';
         this._topOffset = value;
         this._alignItems = 'flex-start';
@@ -2701,10 +2554,10 @@ class GlobalPositionStrategy {
     }
     /**
      * Sets the left position of the overlay. Clears any previously set horizontal position.
-     * @param {?} value New left offset.
+     * @param {?=} value New left offset.
      * @return {?}
      */
-    left(value) {
+    left(value = '') {
         this._rightOffset = '';
         this._leftOffset = value;
         this._justifyContent = 'flex-start';
@@ -2712,10 +2565,10 @@ class GlobalPositionStrategy {
     }
     /**
      * Sets the bottom position of the overlay. Clears any previously set vertical position.
-     * @param {?} value New bottom offset.
+     * @param {?=} value New bottom offset.
      * @return {?}
      */
-    bottom(value) {
+    bottom(value = '') {
         this._topOffset = '';
         this._bottomOffset = value;
         this._alignItems = 'flex-end';
@@ -2723,10 +2576,10 @@ class GlobalPositionStrategy {
     }
     /**
      * Sets the right position of the overlay. Clears any previously set horizontal position.
-     * @param {?} value New right offset.
+     * @param {?=} value New right offset.
      * @return {?}
      */
-    right(value) {
+    right(value = '') {
         this._leftOffset = '';
         this._rightOffset = value;
         this._justifyContent = 'flex-end';
@@ -2734,10 +2587,10 @@ class GlobalPositionStrategy {
     }
     /**
      * Sets the overlay width and clears any previously set width.
-     * @param {?} value New width for the overlay
+     * @param {?=} value New width for the overlay
      * @return {?}
      */
-    width(value) {
+    width(value = '') {
         this._width = value;
         // When the width is 100%, we should reset the `left` and the offset,
         // in order to ensure that the element is flush against the viewport edge.
@@ -2748,10 +2601,10 @@ class GlobalPositionStrategy {
     }
     /**
      * Sets the overlay height and clears any previously set height.
-     * @param {?} value New height for the overlay
+     * @param {?=} value New height for the overlay
      * @return {?}
      */
-    height(value) {
+    height(value = '') {
         this._height = value;
         // When the height is 100%, we should reset the `top` and the offset,
         // in order to ensure that the element is flush against the viewport edge.
@@ -2792,7 +2645,7 @@ class GlobalPositionStrategy {
      * @return {?} Resolved when the styles have been applied.
      */
     apply(element) {
-        if (!this._wrapper) {
+        if (!this._wrapper && element.parentNode) {
             this._wrapper = document.createElement('div');
             this._wrapper.classList.add('cdk-global-overlay-wrapper');
             element.parentNode.insertBefore(this._wrapper, element);
@@ -2809,7 +2662,6 @@ class GlobalPositionStrategy {
         styles.height = this._height;
         parentStyles.justifyContent = this._justifyContent;
         parentStyles.alignItems = this._alignItems;
-        return Promise.resolve(null);
     }
     /**
      * Removes the wrapper element from the DOM.
@@ -2877,7 +2729,9 @@ class OverlayContainer {
      */
     set themeClass(value) {
         if (this._containerElement) {
-            this._containerElement.classList.remove(this._themeClass);
+            if (this._themeClass) {
+                this._containerElement.classList.remove(this._themeClass);
+            }
             if (value) {
                 this._containerElement.classList.add(value);
             }
@@ -2919,12 +2773,16 @@ OverlayContainer.decorators = [
  */
 OverlayContainer.ctorParameters = () => [];
 /**
+ * \@docs-private
  * @param {?} parentContainer
  * @return {?}
  */
 function OVERLAY_CONTAINER_PROVIDER_FACTORY(parentContainer) {
     return parentContainer || new OverlayContainer();
 }
+/**
+ * \@docs-private
+ */
 const OVERLAY_CONTAINER_PROVIDER = {
     // If there is already an OverlayContainer available, use that. Otherwise, provide a new one.
     provide: OverlayContainer,
@@ -2950,6 +2808,7 @@ let defaultState = new OverlayState();
  */
 class Overlay {
     /**
+     * @param {?} scrollStrategies
      * @param {?} _overlayContainer
      * @param {?} _componentFactoryResolver
      * @param {?} _positionBuilder
@@ -2957,7 +2816,8 @@ class Overlay {
      * @param {?} _injector
      * @param {?} _ngZone
      */
-    constructor(_overlayContainer, _componentFactoryResolver, _positionBuilder, _appRef, _injector, _ngZone) {
+    constructor(scrollStrategies, _overlayContainer, _componentFactoryResolver, _positionBuilder, _appRef, _injector, _ngZone) {
+        this.scrollStrategies = scrollStrategies;
         this._overlayContainer = _overlayContainer;
         this._componentFactoryResolver = _componentFactoryResolver;
         this._positionBuilder = _positionBuilder;
@@ -2971,7 +2831,9 @@ class Overlay {
      * @return {?} Reference to the created overlay.
      */
     create(state$$1 = defaultState) {
-        return this._createOverlayRef(this._createPaneElement(), state$$1);
+        const /** @type {?} */ pane = this._createPaneElement();
+        const /** @type {?} */ portalHost = this._createPortalHost(pane);
+        return new OverlayRef(portalHost, pane, state$$1, this._ngZone);
     }
     /**
      * Returns a position builder that can be used, via fluent API,
@@ -3000,15 +2862,6 @@ class Overlay {
     _createPortalHost(pane) {
         return new DomPortalHost(pane, this._componentFactoryResolver, this._appRef, this._injector);
     }
-    /**
-     * Creates an OverlayRef for an overlay in the given DOM element.
-     * @param {?} pane DOM element for the overlay
-     * @param {?} state
-     * @return {?}
-     */
-    _createOverlayRef(pane, state$$1) {
-        return new OverlayRef(this._createPortalHost(pane), pane, state$$1, this._ngZone);
-    }
 }
 Overlay.decorators = [
     { type: Injectable },
@@ -3017,6 +2870,7 @@ Overlay.decorators = [
  * @nocollapse
  */
 Overlay.ctorParameters = () => [
+    { type: ScrollStrategyOptions, },
     { type: OverlayContainer, },
     { type: ComponentFactoryResolver, },
     { type: OverlayPositionBuilder, },
@@ -3024,93 +2878,34 @@ Overlay.ctorParameters = () => [
     { type: Injector, },
     { type: NgZone, },
 ];
-/**
- * Providers for Overlay and its related injectables.
- */
-const OVERLAY_PROVIDERS = [
-    Overlay,
-    OverlayPositionBuilder,
-    VIEWPORT_RULER_PROVIDER,
-    SCROLL_DISPATCHER_PROVIDER,
-    OVERLAY_CONTAINER_PROVIDER,
-];
-
-/**
- * Sends an event when the directive's element is scrolled. Registers itself with the
- * ScrollDispatcher service to include itself as part of its collection of scrolling events that it
- * can be listened to through the service.
- */
-class Scrollable {
-    /**
-     * @param {?} _elementRef
-     * @param {?} _scroll
-     * @param {?} _ngZone
-     * @param {?} _renderer
-     */
-    constructor(_elementRef, _scroll, _ngZone, _renderer) {
-        this._elementRef = _elementRef;
-        this._scroll = _scroll;
-        this._ngZone = _ngZone;
-        this._renderer = _renderer;
-        this._elementScrolled = new Subject();
-    }
-    /**
-     * @return {?}
-     */
-    ngOnInit() {
-        this._scrollListener = this._ngZone.runOutsideAngular(() => {
-            return this._renderer.listen(this.getElementRef().nativeElement, 'scroll', (event) => {
-                this._elementScrolled.next(event);
-            });
-        });
-        this._scroll.register(this);
-    }
-    /**
-     * @return {?}
-     */
-    ngOnDestroy() {
-        this._scroll.deregister(this);
-        if (this._scrollListener) {
-            this._scrollListener();
-            this._scrollListener = null;
-        }
-    }
-    /**
-     * Returns observable that emits when a scroll event is fired on the host element.
-     * @return {?}
-     */
-    elementScrolled() {
-        return this._elementScrolled.asObservable();
-    }
-    /**
-     * @return {?}
-     */
-    getElementRef() {
-        return this._elementRef;
-    }
-}
-Scrollable.decorators = [
-    { type: Directive, args: [{
-                selector: '[cdk-scrollable]'
-            },] },
-];
-/**
- * @nocollapse
- */
-Scrollable.ctorParameters = () => [
-    { type: ElementRef, },
-    { type: ScrollDispatcher, },
-    { type: NgZone, },
-    { type: Renderer, },
-];
 
 /**
  * Default set of positions for the overlay. Follows the behavior of a dropdown.
  */
-let defaultPositionList = [
+const defaultPositionList = [
     new ConnectionPositionPair({ originX: 'start', originY: 'bottom' }, { overlayX: 'start', overlayY: 'top' }),
     new ConnectionPositionPair({ originX: 'start', originY: 'top' }, { overlayX: 'start', overlayY: 'bottom' }),
 ];
+/**
+ * Injection token that determines the scroll handling while the connected overlay is open.
+ */
+const MD_CONNECTED_OVERLAY_SCROLL_STRATEGY = new InjectionToken('md-connected-overlay-scroll-strategy');
+/**
+ * \@docs-private
+ * @param {?} overlay
+ * @return {?}
+ */
+function MD_CONNECTED_OVERLAY_SCROLL_STRATEGY_PROVIDER_FACTORY(overlay) {
+    return () => overlay.scrollStrategies.reposition();
+}
+/**
+ * \@docs-private
+ */
+const MD_CONNECTED_OVERLAY_SCROLL_STRATEGY_PROVIDER = {
+    provide: MD_CONNECTED_OVERLAY_SCROLL_STRATEGY,
+    deps: [Overlay],
+    useFactory: MD_CONNECTED_OVERLAY_SCROLL_STRATEGY_PROVIDER_FACTORY,
+};
 /**
  * Directive applied to an element to make it usable as an origin for an Overlay using a
  * ConnectedPositionStrategy.
@@ -3125,7 +2920,7 @@ class OverlayOrigin {
 }
 OverlayOrigin.decorators = [
     { type: Directive, args: [{
-                selector: '[cdk-overlay-origin], [overlay-origin]',
+                selector: '[cdk-overlay-origin], [overlay-origin], [cdkOverlayOrigin]',
                 exportAs: 'cdkOverlayOrigin',
             },] },
 ];
@@ -3144,16 +2939,25 @@ class ConnectedOverlayDirective {
      * @param {?} _renderer
      * @param {?} templateRef
      * @param {?} viewContainerRef
+     * @param {?} _scrollStrategy
      * @param {?} _dir
      */
-    constructor(_overlay, _renderer, templateRef, viewContainerRef, _dir) {
+    constructor(_overlay, _renderer, templateRef, viewContainerRef, _scrollStrategy, _dir) {
         this._overlay = _overlay;
         this._renderer = _renderer;
+        this._scrollStrategy = _scrollStrategy;
         this._dir = _dir;
-        this._open = false;
         this._hasBackdrop = false;
         this._offsetX = 0;
         this._offsetY = 0;
+        /**
+         * Strategy to be used when handling scroll events while the overlay is open.
+         */
+        this.scrollStrategy = this._scrollStrategy();
+        /**
+         * Whether the overlay is open.
+         */
+        this.open = false;
         /**
          * Event emitted when the backdrop is clicked.
          */
@@ -3176,9 +2980,7 @@ class ConnectedOverlayDirective {
      * The offset in pixels for the overlay connection point on the x-axis
      * @return {?}
      */
-    get offsetX() {
-        return this._offsetX;
-    }
+    get offsetX() { return this._offsetX; }
     /**
      * @param {?} offsetX
      * @return {?}
@@ -3193,9 +2995,7 @@ class ConnectedOverlayDirective {
      * The offset in pixels for the overlay connection point on the y-axis
      * @return {?}
      */
-    get offsetY() {
-        return this._offsetY;
-    }
+    get offsetY() { return this._offsetY; }
     /**
      * @param {?} offsetY
      * @return {?}
@@ -3210,30 +3010,134 @@ class ConnectedOverlayDirective {
      * Whether or not the overlay should attach a backdrop.
      * @return {?}
      */
-    get hasBackdrop() {
-        return this._hasBackdrop;
-    }
+    get hasBackdrop() { return this._hasBackdrop; }
     /**
      * @param {?} value
      * @return {?}
      */
-    set hasBackdrop(value) {
-        this._hasBackdrop = coerceBooleanProperty(value);
-    }
+    set hasBackdrop(value) { this._hasBackdrop = coerceBooleanProperty(value); }
     /**
+     * @deprecated
      * @return {?}
      */
-    get open() {
-        return this._open;
-    }
+    get _deprecatedOrigin() { return this.origin; }
     /**
-     * @param {?} value
+     * @param {?} _origin
      * @return {?}
      */
-    set open(value) {
-        value ? this._attachOverlay() : this._detachOverlay();
-        this._open = value;
+    set _deprecatedOrigin(_origin) { this.origin = _origin; }
+    /**
+     * @deprecated
+     * @return {?}
+     */
+    get _deprecatedPositions() { return this.positions; }
+    /**
+     * @param {?} _positions
+     * @return {?}
+     */
+    set _deprecatedPositions(_positions) { this.positions = _positions; }
+    /**
+     * @deprecated
+     * @return {?}
+     */
+    get _deprecatedOffsetX() { return this.offsetX; }
+    /**
+     * @param {?} _offsetX
+     * @return {?}
+     */
+    set _deprecatedOffsetX(_offsetX) { this.offsetX = _offsetX; }
+    /**
+     * @deprecated
+     * @return {?}
+     */
+    get _deprecatedOffsetY() { return this.offsetY; }
+    /**
+     * @param {?} _offsetY
+     * @return {?}
+     */
+    set _deprecatedOffsetY(_offsetY) { this.offsetY = _offsetY; }
+    /**
+     * @deprecated
+     * @return {?}
+     */
+    get _deprecatedWidth() { return this.width; }
+    /**
+     * @param {?} _width
+     * @return {?}
+     */
+    set _deprecatedWidth(_width) { this.width = _width; }
+    /**
+     * @deprecated
+     * @return {?}
+     */
+    get _deprecatedHeight() { return this.height; }
+    /**
+     * @param {?} _height
+     * @return {?}
+     */
+    set _deprecatedHeight(_height) { this.height = _height; }
+    /**
+     * @deprecated
+     * @return {?}
+     */
+    get _deprecatedMinWidth() { return this.minWidth; }
+    /**
+     * @param {?} _minWidth
+     * @return {?}
+     */
+    set _deprecatedMinWidth(_minWidth) { this.minWidth = _minWidth; }
+    /**
+     * @deprecated
+     * @return {?}
+     */
+    get _deprecatedMinHeight() { return this.minHeight; }
+    /**
+     * @param {?} _minHeight
+     * @return {?}
+     */
+    set _deprecatedMinHeight(_minHeight) { this.minHeight = _minHeight; }
+    /**
+     * @deprecated
+     * @return {?}
+     */
+    get _deprecatedBackdropClass() { return this.backdropClass; }
+    /**
+     * @param {?} _backdropClass
+     * @return {?}
+     */
+    set _deprecatedBackdropClass(_backdropClass) { this.backdropClass = _backdropClass; }
+    /**
+     * @deprecated
+     * @return {?}
+     */
+    get _deprecatedScrollStrategy() { return this.scrollStrategy; }
+    /**
+     * @param {?} _scrollStrategy
+     * @return {?}
+     */
+    set _deprecatedScrollStrategy(_scrollStrategy) {
+        this.scrollStrategy = _scrollStrategy;
     }
+    /**
+     * @deprecated
+     * @return {?}
+     */
+    get _deprecatedOpen() { return this.open; }
+    /**
+     * @param {?} _open
+     * @return {?}
+     */
+    set _deprecatedOpen(_open) { this.open = _open; }
+    /**
+     * @deprecated
+     * @return {?}
+     */
+    get _deprecatedHasBackdrop() { return this.hasBackdrop; }
+    /**
+     * @param {?} _hasBackdrop
+     * @return {?}
+     */
+    set _deprecatedHasBackdrop(_hasBackdrop) { this.hasBackdrop = _hasBackdrop; }
     /**
      * The associated overlay reference.
      * @return {?}
@@ -3253,6 +3157,15 @@ class ConnectedOverlayDirective {
      */
     ngOnDestroy() {
         this._destroyOverlay();
+    }
+    /**
+     * @param {?} changes
+     * @return {?}
+     */
+    ngOnChanges(changes) {
+        if (changes['open'] || changes['_deprecatedOpen']) {
+            this.open ? this._attachOverlay() : this._detachOverlay();
+        }
     }
     /**
      * Creates an overlay
@@ -3288,6 +3201,7 @@ class ConnectedOverlayDirective {
         }
         this._position = (this._createPositionStrategy());
         overlayConfig.positionStrategy = this._position;
+        overlayConfig.scrollStrategy = this.scrollStrategy;
         return overlayConfig;
     }
     /**
@@ -3386,7 +3300,7 @@ class ConnectedOverlayDirective {
 }
 ConnectedOverlayDirective.decorators = [
     { type: Directive, args: [{
-                selector: '[cdk-connected-overlay], [connected-overlay]',
+                selector: '[cdk-connected-overlay], [connected-overlay], [cdkConnectedOverlay]',
                 exportAs: 'cdkConnectedOverlay'
             },] },
 ];
@@ -3398,806 +3312,39 @@ ConnectedOverlayDirective.ctorParameters = () => [
     { type: Renderer2, },
     { type: TemplateRef, },
     { type: ViewContainerRef, },
-    { type: Dir, decorators: [{ type: Optional },] },
+    { type: undefined, decorators: [{ type: Inject, args: [MD_CONNECTED_OVERLAY_SCROLL_STRATEGY,] },] },
+    { type: Directionality, decorators: [{ type: Optional },] },
 ];
 ConnectedOverlayDirective.propDecorators = {
-    'origin': [{ type: Input },],
-    'positions': [{ type: Input },],
-    'offsetX': [{ type: Input },],
-    'offsetY': [{ type: Input },],
-    'width': [{ type: Input },],
-    'height': [{ type: Input },],
-    'minWidth': [{ type: Input },],
-    'minHeight': [{ type: Input },],
-    'backdropClass': [{ type: Input },],
-    'hasBackdrop': [{ type: Input },],
-    'open': [{ type: Input },],
+    'origin': [{ type: Input, args: ['cdkConnectedOverlayOrigin',] },],
+    'positions': [{ type: Input, args: ['cdkConnectedOverlayPositions',] },],
+    'offsetX': [{ type: Input, args: ['cdkConnectedOverlayOffsetX',] },],
+    'offsetY': [{ type: Input, args: ['cdkConnectedOverlayOffsetY',] },],
+    'width': [{ type: Input, args: ['cdkConnectedOverlayWidth',] },],
+    'height': [{ type: Input, args: ['cdkConnectedOverlayHeight',] },],
+    'minWidth': [{ type: Input, args: ['cdkConnectedOverlayMinWidth',] },],
+    'minHeight': [{ type: Input, args: ['cdkConnectedOverlayMinHeight',] },],
+    'backdropClass': [{ type: Input, args: ['cdkConnectedOverlayBackdropClass',] },],
+    'scrollStrategy': [{ type: Input, args: ['cdkConnectedOverlayScrollStrategy',] },],
+    'open': [{ type: Input, args: ['cdkConnectedOverlayOpen',] },],
+    'hasBackdrop': [{ type: Input, args: ['cdkConnectedOverlayHasBackdrop',] },],
+    '_deprecatedOrigin': [{ type: Input, args: ['origin',] },],
+    '_deprecatedPositions': [{ type: Input, args: ['positions',] },],
+    '_deprecatedOffsetX': [{ type: Input, args: ['offsetX',] },],
+    '_deprecatedOffsetY': [{ type: Input, args: ['offsetY',] },],
+    '_deprecatedWidth': [{ type: Input, args: ['width',] },],
+    '_deprecatedHeight': [{ type: Input, args: ['height',] },],
+    '_deprecatedMinWidth': [{ type: Input, args: ['minWidth',] },],
+    '_deprecatedMinHeight': [{ type: Input, args: ['minHeight',] },],
+    '_deprecatedBackdropClass': [{ type: Input, args: ['backdropClass',] },],
+    '_deprecatedScrollStrategy': [{ type: Input, args: ['scrollStrategy',] },],
+    '_deprecatedOpen': [{ type: Input, args: ['open',] },],
+    '_deprecatedHasBackdrop': [{ type: Input, args: ['hasBackdrop',] },],
     'backdropClick': [{ type: Output },],
     'positionChange': [{ type: Output },],
     'attach': [{ type: Output },],
     'detach': [{ type: Output },],
 };
-class OverlayModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: OverlayModule,
-            providers: [],
-        };
-    }
-}
-OverlayModule.decorators = [
-    { type: NgModule, args: [{
-                imports: [PortalModule],
-                exports: [ConnectedOverlayDirective, OverlayOrigin, Scrollable],
-                declarations: [ConnectedOverlayDirective, OverlayOrigin, Scrollable],
-                providers: [OVERLAY_PROVIDERS],
-            },] },
-];
-/**
- * @nocollapse
- */
-OverlayModule.ctorParameters = () => [];
-
-// Whether the current platform supports the V8 Break Iterator. The V8 check
-// is necessary to detect all Blink based browsers.
-const hasV8BreakIterator = typeof (window) !== 'undefined' ?
-    (window.Intl && ((window.Intl)).v8BreakIterator) :
-    (typeof (Intl) !== 'undefined' && ((Intl)).v8BreakIterator);
-/**
- * Service to detect the current platform by comparing the userAgent strings and
- * checking browser-specific global properties.
- * \@docs-private
- */
-class Platform {
-    constructor() {
-        /**
-         * Layout Engines
-         */
-        this.EDGE = /(edge)/i.test(navigator.userAgent);
-        this.TRIDENT = /(msie|trident)/i.test(navigator.userAgent);
-        // EdgeHTML and Trident mock Blink specific things and need to excluded from this check.
-        this.BLINK = !!(window.chrome || hasV8BreakIterator) && !!CSS && !this.EDGE && !this.TRIDENT;
-        // Webkit is part of the userAgent in EdgeHTML Blink and Trident, so we need to
-        // ensure that Webkit runs standalone and is not use as another engines base.
-        this.WEBKIT = /AppleWebKit/i.test(navigator.userAgent) && !this.BLINK && !this.EDGE && !this.TRIDENT;
-        /**
-         * Browsers and Platform Types
-         */
-        this.IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        // It's difficult to detect the plain Gecko engine, because most of the browsers identify
-        // them self as Gecko-like browsers and modify the userAgent's according to that.
-        // Since we only cover one explicit Firefox case, we can simply check for Firefox
-        // instead of having an unstable check for Gecko.
-        this.FIREFOX = /(firefox|minefield)/i.test(navigator.userAgent);
-        // Trident on mobile adds the android platform to the userAgent to trick detections.
-        this.ANDROID = /android/i.test(navigator.userAgent) && !this.TRIDENT;
-    }
-}
-Platform.decorators = [
-    { type: Injectable },
-];
-/**
- * @nocollapse
- */
-Platform.ctorParameters = () => [];
-
-/**
- * Utility for checking the interactivity of an element, such as whether is is focusable or
- * tabbable.
- */
-class InteractivityChecker {
-    /**
-     * @param {?} _platform
-     */
-    constructor(_platform) {
-        this._platform = _platform;
-    }
-    /**
-     * Gets whether an element is disabled.
-     *
-     * @param {?} element Element to be checked.
-     * @return {?} Whether the element is disabled.
-     */
-    isDisabled(element) {
-        // This does not capture some cases, such as a non-form control with a disabled attribute or
-        // a form control inside of a disabled form, but should capture the most common cases.
-        return element.hasAttribute('disabled');
-    }
-    /**
-     * Gets whether an element is visible for the purposes of interactivity.
-     *
-     * This will capture states like `display: none` and `visibility: hidden`, but not things like
-     * being clipped by an `overflow: hidden` parent or being outside the viewport.
-     *
-     * @param {?} element
-     * @return {?} Whether the element is visible.
-     */
-    isVisible(element) {
-        return hasGeometry(element) && getComputedStyle(element).visibility === 'visible';
-    }
-    /**
-     * Gets whether an element can be reached via Tab key.
-     * Assumes that the element has already been checked with isFocusable.
-     *
-     * @param {?} element Element to be checked.
-     * @return {?} Whether the element is tabbable.
-     */
-    isTabbable(element) {
-        let /** @type {?} */ frameElement = (getWindow(element).frameElement);
-        if (frameElement) {
-            let /** @type {?} */ frameType = frameElement && frameElement.nodeName.toLowerCase();
-            // Frame elements inherit their tabindex onto all child elements.
-            if (getTabIndexValue(frameElement) === -1) {
-                return false;
-            }
-            // Webkit and Blink consider anything inside of an <object> element as non-tabbable.
-            if ((this._platform.BLINK || this._platform.WEBKIT) && frameType === 'object') {
-                return false;
-            }
-            // Webkit and Blink disable tabbing to an element inside of an invisible frame.
-            if ((this._platform.BLINK || this._platform.WEBKIT) && !this.isVisible(frameElement)) {
-                return false;
-            }
-        }
-        let /** @type {?} */ nodeName = element.nodeName.toLowerCase();
-        let /** @type {?} */ tabIndexValue = getTabIndexValue(element);
-        if (element.hasAttribute('contenteditable')) {
-            return tabIndexValue !== -1;
-        }
-        if (nodeName === 'iframe') {
-            // The frames may be tabbable depending on content, but it's not possibly to reliably
-            // investigate the content of the frames.
-            return false;
-        }
-        if (nodeName === 'audio') {
-            if (!element.hasAttribute('controls')) {
-                // By default an <audio> element without the controls enabled is not tabbable.
-                return false;
-            }
-            else if (this._platform.BLINK) {
-                // In Blink <audio controls> elements are always tabbable.
-                return true;
-            }
-        }
-        if (nodeName === 'video') {
-            if (!element.hasAttribute('controls') && this._platform.TRIDENT) {
-                // In Trident a <video> element without the controls enabled is not tabbable.
-                return false;
-            }
-            else if (this._platform.BLINK || this._platform.FIREFOX) {
-                // In Chrome and Firefox <video controls> elements are always tabbable.
-                return true;
-            }
-        }
-        if (nodeName === 'object' && (this._platform.BLINK || this._platform.WEBKIT)) {
-            // In all Blink and WebKit based browsers <object> elements are never tabbable.
-            return false;
-        }
-        // In iOS the browser only considers some specific elements as tabbable.
-        if (this._platform.WEBKIT && this._platform.IOS && !isPotentiallyTabbableIOS(element)) {
-            return false;
-        }
-        return element.tabIndex >= 0;
-    }
-    /**
-     * Gets whether an element can be focused by the user.
-     *
-     * @param {?} element Element to be checked.
-     * @return {?} Whether the element is focusable.
-     */
-    isFocusable(element) {
-        // Perform checks in order of left to most expensive.
-        // Again, naive approach that does not capture many edge cases and browser quirks.
-        return isPotentiallyFocusable(element) && !this.isDisabled(element) && this.isVisible(element);
-    }
-}
-InteractivityChecker.decorators = [
-    { type: Injectable },
-];
-/**
- * @nocollapse
- */
-InteractivityChecker.ctorParameters = () => [
-    { type: Platform, },
-];
-/**
- * Checks whether the specified element has any geometry / rectangles.
- * @param {?} element
- * @return {?}
- */
-function hasGeometry(element) {
-    // Use logic from jQuery to check for an invisible element.
-    // See https://github.com/jquery/jquery/blob/master/src/css/hiddenVisibleSelectors.js#L12
-    return !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
-}
-/**
- * Gets whether an element's
- * @param {?} element
- * @return {?}
- */
-function isNativeFormElement(element) {
-    let /** @type {?} */ nodeName = element.nodeName.toLowerCase();
-    return nodeName === 'input' ||
-        nodeName === 'select' ||
-        nodeName === 'button' ||
-        nodeName === 'textarea';
-}
-/**
- * Gets whether an element is an <input type="hidden">.
- * @param {?} element
- * @return {?}
- */
-function isHiddenInput(element) {
-    return isInputElement(element) && element.type == 'hidden';
-}
-/**
- * Gets whether an element is an anchor that has an href attribute.
- * @param {?} element
- * @return {?}
- */
-function isAnchorWithHref(element) {
-    return isAnchorElement(element) && element.hasAttribute('href');
-}
-/**
- * Gets whether an element is an input element.
- * @param {?} element
- * @return {?}
- */
-function isInputElement(element) {
-    return element.nodeName.toLowerCase() == 'input';
-}
-/**
- * Gets whether an element is an anchor element.
- * @param {?} element
- * @return {?}
- */
-function isAnchorElement(element) {
-    return element.nodeName.toLowerCase() == 'a';
-}
-/**
- * Gets whether an element has a valid tabindex.
- * @param {?} element
- * @return {?}
- */
-function hasValidTabIndex(element) {
-    if (!element.hasAttribute('tabindex') || element.tabIndex === undefined) {
-        return false;
-    }
-    let /** @type {?} */ tabIndex = element.getAttribute('tabindex');
-    // IE11 parses tabindex="" as the value "-32768"
-    if (tabIndex == '-32768') {
-        return false;
-    }
-    return !!(tabIndex && !isNaN(parseInt(tabIndex, 10)));
-}
-/**
- * Returns the parsed tabindex from the element attributes instead of returning the
- * evaluated tabindex from the browsers defaults.
- * @param {?} element
- * @return {?}
- */
-function getTabIndexValue(element) {
-    if (!hasValidTabIndex(element)) {
-        return null;
-    }
-    // See browser issue in Gecko https://bugzilla.mozilla.org/show_bug.cgi?id=1128054
-    const /** @type {?} */ tabIndex = parseInt(element.getAttribute('tabindex'), 10);
-    return isNaN(tabIndex) ? -1 : tabIndex;
-}
-/**
- * Checks whether the specified element is potentially tabbable on iOS
- * @param {?} element
- * @return {?}
- */
-function isPotentiallyTabbableIOS(element) {
-    let /** @type {?} */ nodeName = element.nodeName.toLowerCase();
-    let /** @type {?} */ inputType = nodeName === 'input' && ((element)).type;
-    return inputType === 'text'
-        || inputType === 'password'
-        || nodeName === 'select'
-        || nodeName === 'textarea';
-}
-/**
- * Gets whether an element is potentially focusable without taking current visible/disabled state
- * into account.
- * @param {?} element
- * @return {?}
- */
-function isPotentiallyFocusable(element) {
-    // Inputs are potentially focusable *unless* they're type="hidden".
-    if (isHiddenInput(element)) {
-        return false;
-    }
-    return isNativeFormElement(element) ||
-        isAnchorWithHref(element) ||
-        element.hasAttribute('contenteditable') ||
-        hasValidTabIndex(element);
-}
-/**
- * Gets the parent window of a DOM node with regards of being inside of an iframe.
- * @param {?} node
- * @return {?}
- */
-function getWindow(node) {
-    return node.ownerDocument.defaultView || window;
-}
-
-/**
- * Class that allows for trapping focus within a DOM element.
- *
- * NOTE: This class currently uses a very simple (naive) approach to focus trapping.
- * It assumes that the tab order is the same as DOM order, which is not necessarily true.
- * Things like tabIndex > 0, flex `order`, and shadow roots can cause to two to misalign.
- * This will be replaced with a more intelligent solution before the library is considered stable.
- */
-class FocusTrap {
-    /**
-     * @param {?} _element
-     * @param {?} _checker
-     * @param {?} _ngZone
-     * @param {?=} deferAnchors
-     */
-    constructor(_element, _checker, _ngZone, deferAnchors = false) {
-        this._element = _element;
-        this._checker = _checker;
-        this._ngZone = _ngZone;
-        this._enabled = true;
-        if (!deferAnchors) {
-            this.attachAnchors();
-        }
-    }
-    /**
-     * Whether the focus trap is active.
-     * @return {?}
-     */
-    get enabled() { return this._enabled; }
-    /**
-     * @param {?} val
-     * @return {?}
-     */
-    set enabled(val) {
-        this._enabled = val;
-        if (this._startAnchor && this._endAnchor) {
-            this._startAnchor.tabIndex = this._endAnchor.tabIndex = this._enabled ? 0 : -1;
-        }
-    }
-    /**
-     * Destroys the focus trap by cleaning up the anchors.
-     * @return {?}
-     */
-    destroy() {
-        if (this._startAnchor && this._startAnchor.parentNode) {
-            this._startAnchor.parentNode.removeChild(this._startAnchor);
-        }
-        if (this._endAnchor && this._endAnchor.parentNode) {
-            this._endAnchor.parentNode.removeChild(this._endAnchor);
-        }
-        this._startAnchor = this._endAnchor = null;
-    }
-    /**
-     * Inserts the anchors into the DOM. This is usually done automatically
-     * in the constructor, but can be deferred for cases like directives with `*ngIf`.
-     * @return {?}
-     */
-    attachAnchors() {
-        if (!this._startAnchor) {
-            this._startAnchor = this._createAnchor();
-        }
-        if (!this._endAnchor) {
-            this._endAnchor = this._createAnchor();
-        }
-        this._ngZone.runOutsideAngular(() => {
-            this._startAnchor.addEventListener('focus', () => this.focusLastTabbableElement());
-            this._endAnchor.addEventListener('focus', () => this.focusFirstTabbableElement());
-            this._element.parentNode.insertBefore(this._startAnchor, this._element);
-            this._element.parentNode.insertBefore(this._endAnchor, this._element.nextSibling);
-        });
-    }
-    /**
-     * Waits for microtask queue to empty, then focuses
-     * the first tabbable element within the focus trap region.
-     * @return {?}
-     */
-    focusFirstTabbableElementWhenReady() {
-        this._ngZone.onMicrotaskEmpty.first().subscribe(() => this.focusFirstTabbableElement());
-    }
-    /**
-     * Waits for microtask queue to empty, then focuses
-     * the last tabbable element within the focus trap region.
-     * @return {?}
-     */
-    focusLastTabbableElementWhenReady() {
-        this._ngZone.onMicrotaskEmpty.first().subscribe(() => this.focusLastTabbableElement());
-    }
-    /**
-     * Focuses the first tabbable element within the focus trap region.
-     * @return {?}
-     */
-    focusFirstTabbableElement() {
-        let /** @type {?} */ redirectToElement = (this._element.querySelector('[cdk-focus-start]')) ||
-            this._getFirstTabbableElement(this._element);
-        if (redirectToElement) {
-            redirectToElement.focus();
-        }
-    }
-    /**
-     * Focuses the last tabbable element within the focus trap region.
-     * @return {?}
-     */
-    focusLastTabbableElement() {
-        let /** @type {?} */ focusTargets = this._element.querySelectorAll('[cdk-focus-end]');
-        let /** @type {?} */ redirectToElement = null;
-        if (focusTargets.length) {
-            redirectToElement = (focusTargets[focusTargets.length - 1]);
-        }
-        else {
-            redirectToElement = this._getLastTabbableElement(this._element);
-        }
-        if (redirectToElement) {
-            redirectToElement.focus();
-        }
-    }
-    /**
-     * Get the first tabbable element from a DOM subtree (inclusive).
-     * @param {?} root
-     * @return {?}
-     */
-    _getFirstTabbableElement(root) {
-        if (this._checker.isFocusable(root) && this._checker.isTabbable(root)) {
-            return root;
-        }
-        // Iterate in DOM order. Note that IE doesn't have `children` for SVG so we fall
-        // back to `childNodes` which includes text nodes, comments etc.
-        let /** @type {?} */ children = root.children || root.childNodes;
-        for (let /** @type {?} */ i = 0; i < children.length; i++) {
-            let /** @type {?} */ tabbableChild = children[i].nodeType === Node.ELEMENT_NODE ?
-                this._getFirstTabbableElement(/** @type {?} */ (children[i])) :
-                null;
-            if (tabbableChild) {
-                return tabbableChild;
-            }
-        }
-        return null;
-    }
-    /**
-     * Get the last tabbable element from a DOM subtree (inclusive).
-     * @param {?} root
-     * @return {?}
-     */
-    _getLastTabbableElement(root) {
-        if (this._checker.isFocusable(root) && this._checker.isTabbable(root)) {
-            return root;
-        }
-        // Iterate in reverse DOM order.
-        let /** @type {?} */ children = root.children || root.childNodes;
-        for (let /** @type {?} */ i = children.length - 1; i >= 0; i--) {
-            let /** @type {?} */ tabbableChild = children[i].nodeType === Node.ELEMENT_NODE ?
-                this._getLastTabbableElement(/** @type {?} */ (children[i])) :
-                null;
-            if (tabbableChild) {
-                return tabbableChild;
-            }
-        }
-        return null;
-    }
-    /**
-     * Creates an anchor element.
-     * @return {?}
-     */
-    _createAnchor() {
-        let /** @type {?} */ anchor = document.createElement('div');
-        anchor.tabIndex = this._enabled ? 0 : -1;
-        anchor.classList.add('cdk-visually-hidden');
-        anchor.classList.add('cdk-focus-trap-anchor');
-        return anchor;
-    }
-}
-/**
- * Factory that allows easy instantiation of focus traps.
- */
-class FocusTrapFactory {
-    /**
-     * @param {?} _checker
-     * @param {?} _ngZone
-     */
-    constructor(_checker, _ngZone) {
-        this._checker = _checker;
-        this._ngZone = _ngZone;
-    }
-    /**
-     * @param {?} element
-     * @param {?=} deferAnchors
-     * @return {?}
-     */
-    create(element, deferAnchors = false) {
-        return new FocusTrap(element, this._checker, this._ngZone, deferAnchors);
-    }
-}
-FocusTrapFactory.decorators = [
-    { type: Injectable },
-];
-/**
- * @nocollapse
- */
-FocusTrapFactory.ctorParameters = () => [
-    { type: InteractivityChecker, },
-    { type: NgZone, },
-];
-/**
- * Directive for trapping focus within a region.
- * @deprecated
- */
-class FocusTrapDeprecatedDirective {
-    /**
-     * @param {?} _elementRef
-     * @param {?} _focusTrapFactory
-     */
-    constructor(_elementRef, _focusTrapFactory) {
-        this._elementRef = _elementRef;
-        this._focusTrapFactory = _focusTrapFactory;
-        this.focusTrap = this._focusTrapFactory.create(this._elementRef.nativeElement, true);
-    }
-    /**
-     * Whether the focus trap is active.
-     * @return {?}
-     */
-    get disabled() { return !this.focusTrap.enabled; }
-    /**
-     * @param {?} val
-     * @return {?}
-     */
-    set disabled(val) {
-        this.focusTrap.enabled = !coerceBooleanProperty(val);
-    }
-    /**
-     * @return {?}
-     */
-    ngOnDestroy() {
-        this.focusTrap.destroy();
-    }
-    /**
-     * @return {?}
-     */
-    ngAfterContentInit() {
-        this.focusTrap.attachAnchors();
-    }
-}
-FocusTrapDeprecatedDirective.decorators = [
-    { type: Directive, args: [{
-                selector: 'cdk-focus-trap',
-            },] },
-];
-/**
- * @nocollapse
- */
-FocusTrapDeprecatedDirective.ctorParameters = () => [
-    { type: ElementRef, },
-    { type: FocusTrapFactory, },
-];
-FocusTrapDeprecatedDirective.propDecorators = {
-    'disabled': [{ type: Input },],
-};
-/**
- * Directive for trapping focus within a region.
- */
-class FocusTrapDirective {
-    /**
-     * @param {?} _elementRef
-     * @param {?} _focusTrapFactory
-     */
-    constructor(_elementRef, _focusTrapFactory) {
-        this._elementRef = _elementRef;
-        this._focusTrapFactory = _focusTrapFactory;
-        this.focusTrap = this._focusTrapFactory.create(this._elementRef.nativeElement, true);
-    }
-    /**
-     * Whether the focus trap is active.
-     * @return {?}
-     */
-    get enabled() { return this.focusTrap.enabled; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set enabled(value) { this.focusTrap.enabled = coerceBooleanProperty(value); }
-    /**
-     * @return {?}
-     */
-    ngOnDestroy() {
-        this.focusTrap.destroy();
-    }
-    /**
-     * @return {?}
-     */
-    ngAfterContentInit() {
-        this.focusTrap.attachAnchors();
-    }
-}
-FocusTrapDirective.decorators = [
-    { type: Directive, args: [{
-                selector: '[cdkTrapFocus]',
-                exportAs: 'cdkTrapFocus',
-            },] },
-];
-/**
- * @nocollapse
- */
-FocusTrapDirective.ctorParameters = () => [
-    { type: ElementRef, },
-    { type: FocusTrapFactory, },
-];
-FocusTrapDirective.propDecorators = {
-    'enabled': [{ type: Input, args: ['cdkTrapFocus',] },],
-};
-
-const LIVE_ANNOUNCER_ELEMENT_TOKEN = new OpaqueToken('liveAnnouncerElement');
-class LiveAnnouncer {
-    /**
-     * @param {?} elementToken
-     */
-    constructor(elementToken) {
-        // We inject the live element as `any` because the constructor signature cannot reference
-        // browser globals (HTMLElement) on non-browser environments, since having a class decorator
-        // causes TypeScript to preserve the constructor signature types.
-        this._liveElement = elementToken || this._createLiveElement();
-    }
-    /**
-     * Announces a message to screenreaders.
-     * @param {?} message Message to be announced to the screenreader
-     * @param {?=} politeness The politeness of the announcer element
-     * @return {?}
-     */
-    announce(message, politeness = 'polite') {
-        this._liveElement.textContent = '';
-        // TODO: ensure changing the politeness works on all environments we support.
-        this._liveElement.setAttribute('aria-live', politeness);
-        // This 100ms timeout is necessary for some browser + screen-reader combinations:
-        // - Both JAWS and NVDA over IE11 will not announce anything without a non-zero timeout.
-        // - With Chrome and IE11 with NVDA or JAWS, a repeated (identical) message won't be read a
-        //   second time without clearing and then using a non-zero delay.
-        // (using JAWS 17 at time of this writing).
-        setTimeout(() => this._liveElement.textContent = message, 100);
-    }
-    /**
-     * Removes the aria-live element from the DOM.
-     * @return {?}
-     */
-    _removeLiveElement() {
-        if (this._liveElement && this._liveElement.parentNode) {
-            this._liveElement.parentNode.removeChild(this._liveElement);
-        }
-    }
-    /**
-     * @return {?}
-     */
-    _createLiveElement() {
-        let /** @type {?} */ liveEl = document.createElement('div');
-        liveEl.classList.add('cdk-visually-hidden');
-        liveEl.setAttribute('aria-atomic', 'true');
-        liveEl.setAttribute('aria-live', 'polite');
-        document.body.appendChild(liveEl);
-        return liveEl;
-    }
-}
-LiveAnnouncer.decorators = [
-    { type: Injectable },
-];
-/**
- * @nocollapse
- */
-LiveAnnouncer.ctorParameters = () => [
-    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [LIVE_ANNOUNCER_ELEMENT_TOKEN,] },] },
-];
-/**
- * @param {?} parentDispatcher
- * @param {?} liveElement
- * @return {?}
- */
-function LIVE_ANNOUNCER_PROVIDER_FACTORY(parentDispatcher, liveElement) {
-    return parentDispatcher || new LiveAnnouncer(liveElement);
-}
-const LIVE_ANNOUNCER_PROVIDER = {
-    // If there is already a LiveAnnouncer available, use that. Otherwise, provide a new one.
-    provide: LiveAnnouncer,
-    deps: [
-        [new Optional(), new SkipSelf(), LiveAnnouncer],
-        [new Optional(), new Inject(LIVE_ANNOUNCER_ELEMENT_TOKEN)]
-    ],
-    useFactory: LIVE_ANNOUNCER_PROVIDER_FACTORY
-};
-
-let supportedInputTypes;
-/**
- * @return {?} The input types supported by this browser.
- */
-function getSupportedInputTypes() {
-    if (!supportedInputTypes) {
-        let /** @type {?} */ featureTestInput = document.createElement('input');
-        supportedInputTypes = new Set([
-            // `color` must come first. Chrome 56 shows a warning if we change the type to `color` after
-            // first changing it to something else:
-            // The specified value "" does not conform to the required format.
-            // The format is "#rrggbb" where rr, gg, bb are two-digit hexadecimal numbers.
-            'color',
-            'button',
-            'checkbox',
-            'date',
-            'datetime-local',
-            'email',
-            'file',
-            'hidden',
-            'image',
-            'month',
-            'number',
-            'password',
-            'radio',
-            'range',
-            'reset',
-            'search',
-            'submit',
-            'tel',
-            'text',
-            'time',
-            'url',
-            'week',
-        ].filter(value => {
-            featureTestInput.setAttribute('type', value);
-            return featureTestInput.type === value;
-        }));
-    }
-    return supportedInputTypes;
-}
-
-class PlatformModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: PlatformModule,
-            providers: [],
-        };
-    }
-}
-PlatformModule.decorators = [
-    { type: NgModule, args: [{
-                providers: [Platform]
-            },] },
-];
-/**
- * @nocollapse
- */
-PlatformModule.ctorParameters = () => [];
-
-class A11yModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: A11yModule,
-            providers: [],
-        };
-    }
-}
-A11yModule.decorators = [
-    { type: NgModule, args: [{
-                imports: [CommonModule, PlatformModule],
-                declarations: [FocusTrapDirective, FocusTrapDeprecatedDirective],
-                exports: [FocusTrapDirective, FocusTrapDeprecatedDirective],
-                providers: [InteractivityChecker, FocusTrapFactory, LIVE_ANNOUNCER_PROVIDER]
-            },] },
-];
-/**
- * @nocollapse
- */
-A11yModule.ctorParameters = () => [];
 
 /**
  * The FullscreenOverlayContainer is the alternative to OverlayContainer
@@ -4266,6 +3413,28 @@ FullscreenOverlayContainer.decorators = [
  * @nocollapse
  */
 FullscreenOverlayContainer.ctorParameters = () => [];
+
+const OVERLAY_PROVIDERS = [
+    Overlay,
+    OverlayPositionBuilder,
+    VIEWPORT_RULER_PROVIDER,
+    OVERLAY_CONTAINER_PROVIDER,
+    MD_CONNECTED_OVERLAY_SCROLL_STRATEGY_PROVIDER,
+];
+class OverlayModule {
+}
+OverlayModule.decorators = [
+    { type: NgModule, args: [{
+                imports: [PortalModule, ScrollDispatchModule],
+                exports: [ConnectedOverlayDirective, OverlayOrigin, ScrollDispatchModule],
+                declarations: [ConnectedOverlayDirective, OverlayOrigin],
+                providers: [OVERLAY_PROVIDERS],
+            },] },
+];
+/**
+ * @nocollapse
+ */
+OverlayModule.ctorParameters = () => [];
 
 class GestureConfig extends HammerGestureConfig {
     constructor() {
@@ -4449,7 +3618,7 @@ class SelectionModel {
      * @return {?}
      */
     sort(predicate) {
-        if (this._isMulti && this.selected) {
+        if (this._isMulti && this._selected) {
             this._selected.sort(predicate);
         }
     }
@@ -4460,7 +3629,9 @@ class SelectionModel {
     _emitChangeEvent() {
         if (this._selectedToEmit.length || this._deselectedToEmit.length) {
             let /** @type {?} */ eventData = new SelectionChange(this._selectedToEmit, this._deselectedToEmit);
-            this.onChange.next(eventData);
+            if (this.onChange) {
+                this.onChange.next(eventData);
+            }
             this._deselectedToEmit = [];
             this._selectedToEmit = [];
         }
@@ -4521,19 +3692,6 @@ class SelectionChange {
 }
 
 /**
- * Screenreaders will often fire fake mousedown events when a focusable element
- * is activated using the keyboard. We can typically distinguish between these faked
- * mousedown events and real mousedown events using the "buttons" property. While
- * real mousedowns will indicate the mouse button that was pressed (e.g. "1" for
- * the left mouse button), faked mousedowns will usually set the property value to 0.
- * @param {?} event
- * @return {?}
- */
-function isFakeMousedownFromScreenReader(event) {
-    return event.buttons === 0;
-}
-
-/**
  * Class to coordinate unique selection based on name.
  * Intended to be consumed as an Angular service.
  * This service is needed because native radio change events are only fired on the item currently
@@ -4560,10 +3718,16 @@ class UniqueSelectionDispatcher {
     /**
      * Listen for future changes to item selection.
      * @param {?} listener
-     * @return {?}
+     * @return {?} Function used to deregister listener
+     *
      */
     listen(listener) {
         this._listeners.push(listener);
+        return () => {
+            this._listeners = this._listeners.filter((registered) => {
+                return listener !== registered;
+            });
+        };
     }
 }
 UniqueSelectionDispatcher.decorators = [
@@ -4574,12 +3738,16 @@ UniqueSelectionDispatcher.decorators = [
  */
 UniqueSelectionDispatcher.ctorParameters = () => [];
 /**
+ * \@docs-private
  * @param {?} parentDispatcher
  * @return {?}
  */
 function UNIQUE_SELECTION_DISPATCHER_PROVIDER_FACTORY(parentDispatcher) {
     return parentDispatcher || new UniqueSelectionDispatcher();
 }
+/**
+ * \@docs-private
+ */
 const UNIQUE_SELECTION_DISPATCHER_PROVIDER = {
     // If there is already a dispatcher available, use that. Otherwise, provide a new one.
     provide: UniqueSelectionDispatcher,
@@ -4596,9 +3764,11 @@ const TOUCH_BUFFER_MS = 650;
 class FocusOriginMonitor {
     /**
      * @param {?} _ngZone
+     * @param {?} _platform
      */
-    constructor(_ngZone) {
+    constructor(_ngZone, _platform) {
         this._ngZone = _ngZone;
+        this._platform = _platform;
         /**
          * The focus origin that the next focus event is a result of.
          */
@@ -4622,15 +3792,19 @@ class FocusOriginMonitor {
      *     When the element is blurred, null will be emitted.
      */
     monitor(element, renderer, checkChildren) {
+        // Do nothing if we're not on the browser platform.
+        if (!this._platform.isBrowser) {
+            return of(null);
+        }
         // Check if we're already monitoring this element.
         if (this._elementInfo.has(element)) {
-            let /** @type {?} */ info = this._elementInfo.get(element);
-            info.checkChildren = checkChildren;
-            return info.subject.asObservable();
+            let /** @type {?} */ cachedInfo = this._elementInfo.get(element); /** @type {?} */
+            ((cachedInfo)).checkChildren = checkChildren;
+            return ((cachedInfo)).subject.asObservable();
         }
         // Create monitored element info.
         let /** @type {?} */ info = {
-            unlisten: null,
+            unlisten: () => { },
             checkChildren: checkChildren,
             renderer: renderer,
             subject: new Subject()
@@ -4660,26 +3834,29 @@ class FocusOriginMonitor {
         if (elementInfo) {
             elementInfo.unlisten();
             elementInfo.subject.complete();
-            this._setClasses(element, null);
+            this._setClasses(element);
             this._elementInfo.delete(element);
         }
     }
     /**
      * Focuses the element via the specified focus origin.
      * @param {?} element The element to focus.
-     * @param {?} renderer The renderer to use to invoke the focus method on the element.
      * @param {?} origin The focus origin.
      * @return {?}
      */
-    focusVia(element, renderer, origin) {
+    focusVia(element, origin) {
         this._setOriginForCurrentEventQueue(origin);
-        renderer.invokeElementMethod(element, 'focus');
+        element.focus();
     }
     /**
      * Register necessary event listeners on the document and window.
      * @return {?}
      */
     _registerDocumentEvents() {
+        // Do nothing if we're not on the browser platform.
+        if (!this._platform.isBrowser) {
+            return;
+        }
         // Note: we listen to events in the capture phase so we can detect them even if the user stops
         // propagation.
         // On keydown record the origin and clear any touch event that may be in progress.
@@ -4714,16 +3891,22 @@ class FocusOriginMonitor {
     /**
      * Sets the focus classes on the element based on the given focus origin.
      * @param {?} element The element to update the classes on.
-     * @param {?} origin The focus origin.
+     * @param {?=} origin The focus origin.
      * @return {?}
      */
     _setClasses(element, origin) {
-        let /** @type {?} */ renderer = this._elementInfo.get(element).renderer;
-        renderer.setElementClass(element, 'cdk-focused', !!origin);
-        renderer.setElementClass(element, 'cdk-touch-focused', origin === 'touch');
-        renderer.setElementClass(element, 'cdk-keyboard-focused', origin === 'keyboard');
-        renderer.setElementClass(element, 'cdk-mouse-focused', origin === 'mouse');
-        renderer.setElementClass(element, 'cdk-program-focused', origin === 'program');
+        const /** @type {?} */ elementInfo = this._elementInfo.get(element);
+        if (elementInfo) {
+            const /** @type {?} */ toggleClass = (className, shouldSet) => {
+                shouldSet ? elementInfo.renderer.addClass(element, className) :
+                    elementInfo.renderer.removeClass(element, className);
+            };
+            toggleClass('cdk-focused', !!origin);
+            toggleClass('cdk-touch-focused', origin === 'touch');
+            toggleClass('cdk-keyboard-focused', origin === 'keyboard');
+            toggleClass('cdk-mouse-focused', origin === 'mouse');
+            toggleClass('cdk-program-focused', origin === 'program');
+        }
     }
     /**
      * Sets the origin and schedules an async function to clear it at the end of the event queue.
@@ -4774,7 +3957,8 @@ class FocusOriginMonitor {
         // it. (This only matters for elements that have includesChildren = true).
         // If we are not counting child-element-focus as focused, make sure that the event target is the
         // monitored element itself.
-        if (!this._elementInfo.get(element).checkChildren && element !== event.target) {
+        const /** @type {?} */ elementInfo = this._elementInfo.get(element);
+        if (!elementInfo || (!elementInfo.checkChildren && element !== event.target)) {
             return;
         }
         // If we couldn't detect a cause for the focus event, it's due to one of three reasons:
@@ -4795,7 +3979,7 @@ class FocusOriginMonitor {
             }
         }
         this._setClasses(element, this._origin);
-        this._elementInfo.get(element).subject.next(this._origin);
+        elementInfo.subject.next(this._origin);
         this._lastFocusOrigin = this._origin;
         this._origin = null;
     }
@@ -4808,12 +3992,13 @@ class FocusOriginMonitor {
     _onBlur(event, element) {
         // If we are counting child-element-focus as focused, make sure that we aren't just blurring in
         // order to focus another child of the monitored element.
-        if (this._elementInfo.get(element).checkChildren && event.relatedTarget instanceof Node &&
-            element.contains(event.relatedTarget)) {
+        const /** @type {?} */ elementInfo = this._elementInfo.get(element);
+        if (!elementInfo || (elementInfo.checkChildren && event.relatedTarget instanceof Node &&
+            element.contains(event.relatedTarget))) {
             return;
         }
-        this._setClasses(element, null);
-        this._elementInfo.get(element).subject.next(null);
+        this._setClasses(element);
+        elementInfo.subject.next(null);
     }
 }
 FocusOriginMonitor.decorators = [
@@ -4824,6 +4009,7 @@ FocusOriginMonitor.decorators = [
  */
 FocusOriginMonitor.ctorParameters = () => [
     { type: NgZone, },
+    { type: Platform, },
 ];
 /**
  * Directive that determines how a particular element was focused (via keyboard, mouse, touch, or
@@ -4844,7 +4030,7 @@ class CdkMonitorFocus {
         this._elementRef = _elementRef;
         this._focusOriginMonitor = _focusOriginMonitor;
         this.cdkFocusChange = new EventEmitter();
-        this._focusOriginMonitor.monitor(this._elementRef.nativeElement, renderer, this._elementRef.nativeElement.hasAttribute('cdkMonitorSubtreeFocus'))
+        this._monitorSubscription = this._focusOriginMonitor.monitor(this._elementRef.nativeElement, renderer, this._elementRef.nativeElement.hasAttribute('cdkMonitorSubtreeFocus'))
             .subscribe(origin => this.cdkFocusChange.emit(origin));
     }
     /**
@@ -4852,6 +4038,7 @@ class CdkMonitorFocus {
      */
     ngOnDestroy() {
         this._focusOriginMonitor.stopMonitoring(this._elementRef.nativeElement);
+        this._monitorSubscription.unsubscribe();
     }
 }
 CdkMonitorFocus.decorators = [
@@ -4865,23 +4052,28 @@ CdkMonitorFocus.decorators = [
 CdkMonitorFocus.ctorParameters = () => [
     { type: ElementRef, },
     { type: FocusOriginMonitor, },
-    { type: Renderer, },
+    { type: Renderer2, },
 ];
 CdkMonitorFocus.propDecorators = {
     'cdkFocusChange': [{ type: Output },],
 };
 /**
+ * \@docs-private
  * @param {?} parentDispatcher
  * @param {?} ngZone
+ * @param {?} platform
  * @return {?}
  */
-function FOCUS_ORIGIN_MONITOR_PROVIDER_FACTORY(parentDispatcher, ngZone) {
-    return parentDispatcher || new FocusOriginMonitor(ngZone);
+function FOCUS_ORIGIN_MONITOR_PROVIDER_FACTORY(parentDispatcher, ngZone, platform) {
+    return parentDispatcher || new FocusOriginMonitor(ngZone, platform);
 }
+/**
+ * \@docs-private
+ */
 const FOCUS_ORIGIN_MONITOR_PROVIDER = {
     // If there is already a FocusOriginMonitor available, use that. Otherwise, provide a new one.
     provide: FocusOriginMonitor,
-    deps: [[new Optional(), new SkipSelf(), FocusOriginMonitor], NgZone],
+    deps: [[new Optional(), new SkipSelf(), FocusOriginMonitor], NgZone, Platform],
     useFactory: FOCUS_ORIGIN_MONITOR_PROVIDER_FACTORY
 };
 
@@ -4903,6 +4095,7 @@ class StyleModule {
 }
 StyleModule.decorators = [
     { type: NgModule, args: [{
+                imports: [PlatformModule],
                 declarations: [CdkMonitorFocus],
                 exports: [CdkMonitorFocus],
                 providers: [FOCUS_ORIGIN_MONITOR_PROVIDER],
@@ -4932,37 +4125,631 @@ AnimationDurations.ENTERING = '225ms';
 AnimationDurations.EXITING = '195ms';
 
 /**
- * Coerces a data-bound value (typically a string) to a number.
- * @param {?} value
- * @param {?=} fallbackValue
+ * Adapts type `D` to be usable as a date by cdk-based components that work with dates.
+ * @abstract
+ */
+class DateAdapter {
+    /**
+     * Gets the year component of the given date.
+     * @abstract
+     * @param {?} date The date to extract the year from.
+     * @return {?} The year component.
+     */
+    getYear(date) { }
+    /**
+     * Gets the month component of the given date.
+     * @abstract
+     * @param {?} date The date to extract the month from.
+     * @return {?} The month component (0-indexed, 0 = January).
+     */
+    getMonth(date) { }
+    /**
+     * Gets the date of the month component of the given date.
+     * @abstract
+     * @param {?} date The date to extract the date of the month from.
+     * @return {?} The month component (1-indexed, 1 = first of month).
+     */
+    getDate(date) { }
+    /**
+     * Gets the day of the week component of the given date.
+     * @abstract
+     * @param {?} date The date to extract the day of the week from.
+     * @return {?} The month component (0-indexed, 0 = Sunday).
+     */
+    getDayOfWeek(date) { }
+    /**
+     * Gets a list of names for the months.
+     * @abstract
+     * @param {?} style The naming style (e.g. long = 'January', short = 'Jan', narrow = 'J').
+     * @return {?} An ordered list of all month names, starting with January.
+     */
+    getMonthNames(style$$1) { }
+    /**
+     * Gets a list of names for the dates of the month.
+     * @abstract
+     * @return {?} An ordered list of all date of the month names, starting with '1'.
+     */
+    getDateNames() { }
+    /**
+     * Gets a list of names for the days of the week.
+     * @abstract
+     * @param {?} style The naming style (e.g. long = 'Sunday', short = 'Sun', narrow = 'S').
+     * @return {?} An ordered list of all weekday names, starting with Sunday.
+     */
+    getDayOfWeekNames(style$$1) { }
+    /**
+     * Gets the name for the year of the given date.
+     * @abstract
+     * @param {?} date The date to get the year name for.
+     * @return {?} The name of the given year (e.g. '2017').
+     */
+    getYearName(date) { }
+    /**
+     * Gets the first day of the week.
+     * @abstract
+     * @return {?} The first day of the week (0-indexed, 0 = Sunday).
+     */
+    getFirstDayOfWeek() { }
+    /**
+     * Gets the number of days in the month of the given date.
+     * @abstract
+     * @param {?} date The date whose month should be checked.
+     * @return {?} The number of days in the month of the given date.
+     */
+    getNumDaysInMonth(date) { }
+    /**
+     * Clones the given date.
+     * @abstract
+     * @param {?} date The date to clone
+     * @return {?} A new date equal to the given date.
+     */
+    clone(date) { }
+    /**
+     * Creates a date with the given year, month, and date. Does not allow over/under-flow of the
+     * month and date.
+     * @abstract
+     * @param {?} year The full year of the date. (e.g. 89 means the year 89, not the year 1989).
+     * @param {?} month The month of the date (0-indexed, 0 = January). Must be an integer 0 - 11.
+     * @param {?} date The date of month of the date. Must be an integer 1 - length of the given month.
+     * @return {?} The new date, or null if invalid.
+     */
+    createDate(year, month, date) { }
+    /**
+     * Gets today's date.
+     * @abstract
+     * @return {?} Today's date.
+     */
+    today() { }
+    /**
+     * Parses a date from a value.
+     * @abstract
+     * @param {?} value The value to parse.
+     * @param {?} parseFormat The expected format of the value being parsed
+     *     (type is implementation-dependent).
+     * @return {?} The parsed date.
+     */
+    parse(value, parseFormat) { }
+    /**
+     * Formats a date as a string.
+     * @abstract
+     * @param {?} date The value to format.
+     * @param {?} displayFormat The format to use to display the date as a string.
+     * @return {?} The formatted date string.
+     */
+    format(date, displayFormat) { }
+    /**
+     * Adds the given number of years to the date. Years are counted as if flipping 12 pages on the
+     * calendar for each year and then finding the closest date in the new month. For example when
+     * adding 1 year to Feb 29, 2016, the resulting date will be Feb 28, 2017.
+     * @abstract
+     * @param {?} date The date to add years to.
+     * @param {?} years The number of years to add (may be negative).
+     * @return {?} A new date equal to the given one with the specified number of years added.
+     */
+    addCalendarYears(date, years) { }
+    /**
+     * Adds the given number of months to the date. Months are counted as if flipping a page on the
+     * calendar for each month and then finding the closest date in the new month. For example when
+     * adding 1 month to Jan 31, 2017, the resulting date will be Feb 28, 2017.
+     * @abstract
+     * @param {?} date The date to add months to.
+     * @param {?} months The number of months to add (may be negative).
+     * @return {?} A new date equal to the given one with the specified number of months added.
+     */
+    addCalendarMonths(date, months) { }
+    /**
+     * Adds the given number of days to the date. Days are counted as if moving one cell on the
+     * calendar for each day.
+     * @abstract
+     * @param {?} date The date to add days to.
+     * @param {?} days The number of days to add (may be negative).
+     * @return {?} A new date equal to the given one with the specified number of days added.
+     */
+    addCalendarDays(date, days) { }
+    /**
+     * Gets the RFC 3339 compatible date string (https://tools.ietf.org/html/rfc3339)  for the given
+     * date.
+     * @abstract
+     * @param {?} date The date to get the ISO date string for.
+     * @return {?} The ISO date string date string.
+     */
+    getISODateString(date) { }
+    /**
+     * Checks whether the given object is considered a date instance by this DateAdapter.
+     * @abstract
+     * @param {?} obj The object to check
+     * @return {?} Whether the object is a date instance.
+     */
+    isDateInstance(obj) { }
+    /**
+     * Checks whether the given date is valid.
+     * @abstract
+     * @param {?} date The date to check.
+     * @return {?} Whether the date is valid.
+     */
+    isValid(date) { }
+    /**
+     * Sets the locale used for all dates.
+     * @param {?} locale The new locale.
+     * @return {?}
+     */
+    setLocale(locale) {
+        this.locale = locale;
+    }
+    /**
+     * Compares two dates.
+     * @param {?} first The first date to compare.
+     * @param {?} second The second date to compare.
+     * @return {?} 0 if the dates are equal, a number less than 0 if the first date is earlier,
+     *     a number greater than 0 if the first date is later.
+     */
+    compareDate(first$$1, second) {
+        return this.getYear(first$$1) - this.getYear(second) ||
+            this.getMonth(first$$1) - this.getMonth(second) ||
+            this.getDate(first$$1) - this.getDate(second);
+    }
+    /**
+     * Checks if two dates are equal.
+     * @param {?} first The first date to check.
+     * @param {?} second The second date to check.
+     *     Null dates are considered equal to other null dates.
+     * @return {?}
+     */
+    sameDate(first$$1, second) {
+        return first$$1 && second ? !this.compareDate(first$$1, second) : first$$1 == second;
+    }
+    /**
+     * Clamp the given date between min and max dates.
+     * @param {?} date The date to clamp.
+     * @param {?=} min The minimum value to allow. If null or omitted no min is enforced.
+     * @param {?=} max The maximum value to allow. If null or omitted no max is enforced.
+     * @return {?} `min` if `date` is less than `min`, `max` if date is greater than `max`,
+     *     otherwise `date`.
+     */
+    clampDate(date, min, max) {
+        if (min && this.compareDate(date, min) < 0) {
+            return min;
+        }
+        if (max && this.compareDate(date, max) > 0) {
+            return max;
+        }
+        return date;
+    }
+}
+
+/**
+ * Extends an object with the *enumerable* and *own* properties of one or more source objects,
+ * similar to Object.assign.
+ *
+ * @param {?} dest The object which will have properties copied to it.
+ * @param {...?} sources The source objects from which properties will be copied.
  * @return {?}
  */
-function coerceNumberProperty(value, fallbackValue = 0) {
-    // parseFloat(value) handles most of the cases we're interested in (it treats null, empty string,
-    // and other non-number values as NaN, where Number just uses 0) but it considers the string
-    // '123hello' to be a valid number. Therefore we also check if Number(value) is NaN.
-    return isNaN(parseFloat(/** @type {?} */ (value))) || isNaN(Number(value)) ? fallbackValue : Number(value);
+function extendObject(dest, ...sources) {
+    if (dest == null) {
+        throw TypeError('Cannot convert undefined or null to object');
+    }
+    for (let /** @type {?} */ source of sources) {
+        if (source != null) {
+            for (let /** @type {?} */ key in source) {
+                if (source.hasOwnProperty(key)) {
+                    dest[key] = source[key];
+                }
+            }
+        }
+    }
+    return dest;
+}
+
+/**
+ * Whether the browser supports the Intl API.
+ */
+const SUPPORTS_INTL_API = typeof Intl != 'undefined';
+/**
+ * The default month names to use if Intl API is not available.
+ */
+const DEFAULT_MONTH_NAMES = {
+    'long': [
+        'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September',
+        'October', 'November', 'December'
+    ],
+    'short': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    'narrow': ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
+};
+/**
+ * The default date names to use if Intl API is not available.
+ */
+const DEFAULT_DATE_NAMES = range(31, i => String(i + 1));
+/**
+ * The default day of the week names to use if Intl API is not available.
+ */
+const DEFAULT_DAY_OF_WEEK_NAMES = {
+    'long': ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+    'short': ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+    'narrow': ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+};
+/**
+ * Creates an array and fills it with values.
+ * @template T
+ * @param {?} length
+ * @param {?} valueFunction
+ * @return {?}
+ */
+function range(length, valueFunction) {
+    const /** @type {?} */ valuesArray = Array(length);
+    for (let /** @type {?} */ i = 0; i < length; i++) {
+        valuesArray[i] = valueFunction(i);
+    }
+    return valuesArray;
+}
+/**
+ * Adapts the native JS Date for use with cdk-based components that work with dates.
+ */
+class NativeDateAdapter extends DateAdapter {
+    /**
+     * @param {?} localeId
+     */
+    constructor(localeId) {
+        super();
+        /**
+         * Whether to use `timeZone: 'utc'` with `Intl.DateTimeFormat` when formatting dates.
+         * Without this `Intl.DateTimeFormat` sometimes chooses the wrong timeZone, which can throw off
+         * the result. (e.g. in the en-US locale `new Date(1800, 7, 14).toLocaleDateString()`
+         * will produce `'8/13/1800'`.
+         */
+        this.useUtcForDisplay = true;
+        super.setLocale(localeId);
+    }
+    /**
+     * @param {?} date
+     * @return {?}
+     */
+    getYear(date) {
+        return date.getFullYear();
+    }
+    /**
+     * @param {?} date
+     * @return {?}
+     */
+    getMonth(date) {
+        return date.getMonth();
+    }
+    /**
+     * @param {?} date
+     * @return {?}
+     */
+    getDate(date) {
+        return date.getDate();
+    }
+    /**
+     * @param {?} date
+     * @return {?}
+     */
+    getDayOfWeek(date) {
+        return date.getDay();
+    }
+    /**
+     * @param {?} style
+     * @return {?}
+     */
+    getMonthNames(style$$1) {
+        if (SUPPORTS_INTL_API) {
+            let /** @type {?} */ dtf = new Intl.DateTimeFormat(this.locale, { month: style$$1 });
+            return range(12, i => this._stripDirectionalityCharacters(dtf.format(new Date(2017, i, 1))));
+        }
+        return DEFAULT_MONTH_NAMES[style$$1];
+    }
+    /**
+     * @return {?}
+     */
+    getDateNames() {
+        if (SUPPORTS_INTL_API) {
+            let /** @type {?} */ dtf = new Intl.DateTimeFormat(this.locale, { day: 'numeric' });
+            return range(31, i => this._stripDirectionalityCharacters(dtf.format(new Date(2017, 0, i + 1))));
+        }
+        return DEFAULT_DATE_NAMES;
+    }
+    /**
+     * @param {?} style
+     * @return {?}
+     */
+    getDayOfWeekNames(style$$1) {
+        if (SUPPORTS_INTL_API) {
+            let /** @type {?} */ dtf = new Intl.DateTimeFormat(this.locale, { weekday: style$$1 });
+            return range(7, i => this._stripDirectionalityCharacters(dtf.format(new Date(2017, 0, i + 1))));
+        }
+        return DEFAULT_DAY_OF_WEEK_NAMES[style$$1];
+    }
+    /**
+     * @param {?} date
+     * @return {?}
+     */
+    getYearName(date) {
+        if (SUPPORTS_INTL_API) {
+            let /** @type {?} */ dtf = new Intl.DateTimeFormat(this.locale, { year: 'numeric' });
+            return this._stripDirectionalityCharacters(dtf.format(date));
+        }
+        return String(this.getYear(date));
+    }
+    /**
+     * @return {?}
+     */
+    getFirstDayOfWeek() {
+        // We can't tell using native JS Date what the first day of the week is, we default to Sunday.
+        return 0;
+    }
+    /**
+     * @param {?} date
+     * @return {?}
+     */
+    getNumDaysInMonth(date) {
+        return this.getDate(this._createDateWithOverflow(this.getYear(date), this.getMonth(date) + 1, 0));
+    }
+    /**
+     * @param {?} date
+     * @return {?}
+     */
+    clone(date) {
+        return this.createDate(this.getYear(date), this.getMonth(date), this.getDate(date));
+    }
+    /**
+     * @param {?} year
+     * @param {?} month
+     * @param {?} date
+     * @return {?}
+     */
+    createDate(year, month, date) {
+        // Check for invalid month and date (except upper bound on date which we have to check after
+        // creating the Date).
+        if (month < 0 || month > 11) {
+            throw Error(`Invalid month index "${month}". Month index has to be between 0 and 11.`);
+        }
+        if (date < 1) {
+            throw Error(`Invalid date "${date}". Date has to be greater than 0.`);
+        }
+        let /** @type {?} */ result = this._createDateWithOverflow(year, month, date);
+        // Check that the date wasn't above the upper bound for the month, causing the month to overflow
+        if (result.getMonth() != month) {
+            throw Error(`Invalid date "${date}" for month with index "${month}".`);
+        }
+        return result;
+    }
+    /**
+     * @return {?}
+     */
+    today() {
+        return new Date();
+    }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    parse(value) {
+        // We have no way using the native JS Date to set the parse format or locale, so we ignore these
+        // parameters.
+        if (typeof value == 'number') {
+            return new Date(value);
+        }
+        return value ? new Date(Date.parse(value)) : null;
+    }
+    /**
+     * @param {?} date
+     * @param {?} displayFormat
+     * @return {?}
+     */
+    format(date, displayFormat) {
+        if (!this.isValid(date)) {
+            throw Error('NativeDateAdapter: Cannot format invalid date.');
+        }
+        if (SUPPORTS_INTL_API) {
+            if (this.useUtcForDisplay) {
+                date = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds()));
+                displayFormat = extendObject({}, displayFormat, { timeZone: 'utc' });
+            }
+            let /** @type {?} */ dtf = new Intl.DateTimeFormat(this.locale, displayFormat);
+            return this._stripDirectionalityCharacters(dtf.format(date));
+        }
+        return this._stripDirectionalityCharacters(date.toDateString());
+    }
+    /**
+     * @param {?} date
+     * @param {?} years
+     * @return {?}
+     */
+    addCalendarYears(date, years) {
+        return this.addCalendarMonths(date, years * 12);
+    }
+    /**
+     * @param {?} date
+     * @param {?} months
+     * @return {?}
+     */
+    addCalendarMonths(date, months) {
+        let /** @type {?} */ newDate = this._createDateWithOverflow(this.getYear(date), this.getMonth(date) + months, this.getDate(date));
+        // It's possible to wind up in the wrong month if the original month has more days than the new
+        // month. In this case we want to go to the last day of the desired month.
+        // Note: the additional + 12 % 12 ensures we end up with a positive number, since JS % doesn't
+        // guarantee this.
+        if (this.getMonth(newDate) != ((this.getMonth(date) + months) % 12 + 12) % 12) {
+            newDate = this._createDateWithOverflow(this.getYear(newDate), this.getMonth(newDate), 0);
+        }
+        return newDate;
+    }
+    /**
+     * @param {?} date
+     * @param {?} days
+     * @return {?}
+     */
+    addCalendarDays(date, days) {
+        return this._createDateWithOverflow(this.getYear(date), this.getMonth(date), this.getDate(date) + days);
+    }
+    /**
+     * @param {?} date
+     * @return {?}
+     */
+    getISODateString(date) {
+        return [
+            date.getUTCFullYear(),
+            this._2digit(date.getUTCMonth() + 1),
+            this._2digit(date.getUTCDate())
+        ].join('-');
+    }
+    /**
+     * @param {?} obj
+     * @return {?}
+     */
+    isDateInstance(obj) {
+        return obj instanceof Date;
+    }
+    /**
+     * @param {?} date
+     * @return {?}
+     */
+    isValid(date) {
+        return !isNaN(date.getTime());
+    }
+    /**
+     * Creates a date but allows the month and date to overflow.
+     * @param {?} year
+     * @param {?} month
+     * @param {?} date
+     * @return {?}
+     */
+    _createDateWithOverflow(year, month, date) {
+        let /** @type {?} */ result = new Date(year, month, date);
+        // We need to correct for the fact that JS native Date treats years in range [0, 99] as
+        // abbreviations for 19xx.
+        if (year >= 0 && year < 100) {
+            result.setFullYear(this.getYear(result) - 1900);
+        }
+        return result;
+    }
+    /**
+     * Pads a number to make it two digits.
+     * @param {?} n The number to pad.
+     * @return {?} The padded number.
+     */
+    _2digit(n) {
+        return ('00' + n).slice(-2);
+    }
+    /**
+     * Strip out unicode LTR and RTL characters. Edge and IE insert these into formatted dates while
+     * other browsers do not. We remove them to make output consistent and because they interfere with
+     * date parsing.
+     * @param {?} str The string to strip direction characters from.
+     * @return {?} The stripped string.
+     */
+    _stripDirectionalityCharacters(str) {
+        return str.replace(/[\u200e\u200f]/g, '');
+    }
+}
+NativeDateAdapter.decorators = [
+    { type: Injectable },
+];
+/**
+ * @nocollapse
+ */
+NativeDateAdapter.ctorParameters = () => [
+    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [LOCALE_ID,] },] },
+];
+
+const MD_DATE_FORMATS = new InjectionToken('md-date-formats');
+
+const MD_NATIVE_DATE_FORMATS = {
+    parse: {
+        dateInput: null,
+    },
+    display: {
+        dateInput: { year: 'numeric', month: 'numeric', day: 'numeric' },
+        monthYearLabel: { year: 'numeric', month: 'short' },
+        dateA11yLabel: { year: 'numeric', month: 'long', day: 'numeric' },
+        monthYearA11yLabel: { year: 'numeric', month: 'long' },
+    }
+};
+
+class NativeDateModule {
+}
+NativeDateModule.decorators = [
+    { type: NgModule, args: [{
+                providers: [{ provide: DateAdapter, useClass: NativeDateAdapter }],
+            },] },
+];
+/**
+ * @nocollapse
+ */
+NativeDateModule.ctorParameters = () => [];
+class MdNativeDateModule {
+}
+MdNativeDateModule.decorators = [
+    { type: NgModule, args: [{
+                imports: [NativeDateModule],
+                providers: [{ provide: MD_DATE_FORMATS, useValue: MD_NATIVE_DATE_FORMATS }],
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdNativeDateModule.ctorParameters = () => [];
+
+/**
+ * InjectionToken that can be used to specify the global placeholder options.
+ */
+const MD_PLACEHOLDER_GLOBAL_OPTIONS = new InjectionToken('md-placeholder-global-options');
+
+/**
+ * Injection token that can be used to specify the global error options.
+ */
+const MD_ERROR_GLOBAL_OPTIONS = new InjectionToken('md-error-global-options');
+/**
+ * Returns whether control is invalid and is either touched or is a part of a submitted form.
+ * @param {?} control
+ * @param {?} form
+ * @return {?}
+ */
+function defaultErrorStateMatcher(control, form) {
+    const /** @type {?} */ isSubmitted = form && form.submitted;
+    return !!(control.invalid && (control.touched || isSubmitted));
+}
+/**
+ * Returns whether control is invalid and is either dirty or is a part of a submitted form.
+ * @param {?} control
+ * @param {?} form
+ * @return {?}
+ */
+function showOnDirtyErrorStateMatcher(control, form) {
+    const /** @type {?} */ isSubmitted = form && form.submitted;
+    return !!(control.invalid && (control.dirty || isSubmitted));
 }
 
 class MdCoreModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdCoreModule,
-            providers: [],
-        };
-    }
 }
 MdCoreModule.decorators = [
     { type: NgModule, args: [{
                 imports: [
                     MdLineModule,
-                    RtlModule,
+                    BidiModule,
                     MdRippleModule,
-                    ObserveContentModule,
+                    ObserversModule,
                     PortalModule,
                     OverlayModule,
                     A11yModule,
@@ -4971,9 +4758,9 @@ MdCoreModule.decorators = [
                 ],
                 exports: [
                     MdLineModule,
-                    RtlModule,
+                    BidiModule,
                     MdRippleModule,
-                    ObserveContentModule,
+                    ObserversModule,
                     PortalModule,
                     OverlayModule,
                     A11yModule,
@@ -4987,6 +4774,12 @@ MdCoreModule.decorators = [
  */
 MdCoreModule.ctorParameters = () => [];
 
+/**
+ * \@docs-private
+ */
+class MdButtonToggleGroupBase {
+}
+const _MdButtonToggleGroupMixinBase = mixinDisabled(MdButtonToggleGroupBase);
 /**
  * Provider Expression that allows md-button-toggle-group to register as a ControlValueAccessor.
  * This allows it to support [(ngModel)].
@@ -5006,8 +4799,13 @@ class MdButtonToggleChange {
 /**
  * Exclusive selection button toggle group that behaves like a radio-button group.
  */
-class MdButtonToggleGroup {
-    constructor() {
+class MdButtonToggleGroup extends _MdButtonToggleGroupMixinBase {
+    /**
+     * @param {?} _changeDetector
+     */
+    constructor(_changeDetector) {
+        super();
+        this._changeDetector = _changeDetector;
         /**
          * The value for the button toggle group. Should match currently selected button toggle.
          */
@@ -5017,10 +4815,6 @@ class MdButtonToggleGroup {
          */
         this._name = `md-button-toggle-group-${_uniqueIdCounter$1++}`;
         /**
-         * Disables all toggles in the group.
-         */
-        this._disabled = null;
-        /**
          * Whether the button toggle group should be vertical.
          */
         this._vertical = false;
@@ -5029,32 +4823,18 @@ class MdButtonToggleGroup {
          */
         this._selected = null;
         /**
-         * Whether the button toggle group is initialized or not.
-         */
-        this._isInitialized = false;
-        /**
          * The method to be called in order to update ngModel.
          * Now `ngModel` binding is not supported in multiple selection mode.
          */
-        this._controlValueAccessorChangeFn = (value) => { };
+        this._controlValueAccessorChangeFn = () => { };
         /**
          * onTouch function registered via registerOnTouch (ControlValueAccessor).
          */
         this.onTouched = () => { };
         /**
-         * Child button toggle buttons.
-         */
-        this._buttonToggles = null;
-        /**
          * Event emitted when the group's value changes.
          */
         this.change = new EventEmitter();
-    }
-    /**
-     * @return {?}
-     */
-    ngAfterViewInit() {
-        this._isInitialized = true;
     }
     /**
      * `name` attribute for the underlying `input` element.
@@ -5070,20 +4850,6 @@ class MdButtonToggleGroup {
     set name(value) {
         this._name = value;
         this._updateButtonToggleNames();
-    }
-    /**
-     * Whether the toggle group is disabled.
-     * @return {?}
-     */
-    get disabled() {
-        return this._disabled;
-    }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set disabled(value) {
-        this._disabled = coerceBooleanProperty(value);
     }
     /**
      * Whether the toggle group is vertical.
@@ -5114,11 +4880,6 @@ class MdButtonToggleGroup {
         if (this._value != newValue) {
             this._value = newValue;
             this._updateSelectedButtonToggleFromValue();
-            // Only emit a change event if the view is completely initialized.
-            // We don't want to emit a change event for the initial values.
-            if (this._isInitialized) {
-                this._emitChangeEvent();
-            }
         }
     }
     /**
@@ -5185,6 +4946,7 @@ class MdButtonToggleGroup {
      */
     writeValue(value) {
         this.value = value;
+        this._changeDetector.markForCheck();
     }
     /**
      * Registers a callback that will be triggered when the value has changed.
@@ -5217,9 +4979,10 @@ MdButtonToggleGroup.decorators = [
     { type: Directive, args: [{
                 selector: 'md-button-toggle-group:not([multiple]), mat-button-toggle-group:not([multiple])',
                 providers: [MD_BUTTON_TOGGLE_GROUP_VALUE_ACCESSOR],
+                inputs: ['disabled'],
                 host: {
-                    '[class.mat-button-toggle-group]': 'true',
                     'role': 'radiogroup',
+                    'class': 'mat-button-toggle-group',
                     '[class.mat-button-toggle-vertical]': 'vertical'
                 },
                 exportAs: 'mdButtonToggleGroup',
@@ -5228,11 +4991,12 @@ MdButtonToggleGroup.decorators = [
 /**
  * @nocollapse
  */
-MdButtonToggleGroup.ctorParameters = () => [];
+MdButtonToggleGroup.ctorParameters = () => [
+    { type: ChangeDetectorRef, },
+];
 MdButtonToggleGroup.propDecorators = {
     '_buttonToggles': [{ type: ContentChildren, args: [forwardRef(() => MdButtonToggle),] },],
     'name': [{ type: Input },],
-    'disabled': [{ type: Input },],
     'vertical': [{ type: Input },],
     'value': [{ type: Input },],
     'selected': [{ type: Input },],
@@ -5241,30 +5005,13 @@ MdButtonToggleGroup.propDecorators = {
 /**
  * Multiple selection button-toggle group. `ngModel` is not supported in this mode.
  */
-class MdButtonToggleGroupMultiple {
+class MdButtonToggleGroupMultiple extends _MdButtonToggleGroupMixinBase {
     constructor() {
-        /**
-         * Disables all toggles in the group.
-         */
-        this._disabled = null;
+        super(...arguments);
         /**
          * Whether the button toggle group should be vertical.
          */
         this._vertical = false;
-    }
-    /**
-     * Whether the toggle group is disabled.
-     * @return {?}
-     */
-    get disabled() {
-        return this._disabled;
-    }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set disabled(value) {
-        this._disabled = (value != null && value !== false) ? true : null;
     }
     /**
      * Whether the toggle group is vertical.
@@ -5285,9 +5032,11 @@ MdButtonToggleGroupMultiple.decorators = [
     { type: Directive, args: [{
                 selector: 'md-button-toggle-group[multiple], mat-button-toggle-group[multiple]',
                 exportAs: 'mdButtonToggleGroup',
+                inputs: ['disabled'],
                 host: {
-                    '[class.mat-button-toggle-group]': 'true',
-                    '[class.mat-button-toggle-vertical]': 'vertical'
+                    'class': 'mat-button-toggle-group',
+                    '[class.mat-button-toggle-vertical]': 'vertical',
+                    'role': 'group'
                 }
             },] },
 ];
@@ -5296,7 +5045,6 @@ MdButtonToggleGroupMultiple.decorators = [
  */
 MdButtonToggleGroupMultiple.ctorParameters = () => [];
 MdButtonToggleGroupMultiple.propDecorators = {
-    'disabled': [{ type: Input },],
     'vertical': [{ type: Input },],
 };
 /**
@@ -5306,16 +5054,27 @@ class MdButtonToggle {
     /**
      * @param {?} toggleGroup
      * @param {?} toggleGroupMultiple
+     * @param {?} _changeDetectorRef
      * @param {?} _buttonToggleDispatcher
      * @param {?} _renderer
      * @param {?} _elementRef
      * @param {?} _focusOriginMonitor
      */
-    constructor(toggleGroup, toggleGroupMultiple, _buttonToggleDispatcher, _renderer, _elementRef, _focusOriginMonitor) {
+    constructor(toggleGroup, toggleGroupMultiple, _changeDetectorRef, _buttonToggleDispatcher, _renderer, _elementRef, _focusOriginMonitor) {
+        this._changeDetectorRef = _changeDetectorRef;
         this._buttonToggleDispatcher = _buttonToggleDispatcher;
         this._renderer = _renderer;
         this._elementRef = _elementRef;
         this._focusOriginMonitor = _focusOriginMonitor;
+        /**
+         * Attached to the aria-label attribute of the host element. In most cases, arial-labelledby will
+         * take precedence so this may be omitted.
+         */
+        this.ariaLabel = '';
+        /**
+         * Users can specify the `aria-labelledby` attribute which will be forwarded to the input element
+         */
+        this.ariaLabelledby = null;
         /**
          * Whether or not this button toggle is checked.
          */
@@ -5323,7 +5082,7 @@ class MdButtonToggle {
         /**
          * Whether or not this button toggle is disabled.
          */
-        this._disabled = null;
+        this._disabled = false;
         /**
          * Value assigned to this button toggle.
          */
@@ -5331,7 +5090,11 @@ class MdButtonToggle {
         /**
          * Whether or not the button toggle is a single selection.
          */
-        this._isSingleSelector = null;
+        this._isSingleSelector = false;
+        /**
+         * Unregister function for _buttonToggleDispatcher *
+         */
+        this._removeUniqueSelectionListener = () => { };
         /**
          * Event emitted when the group value changes.
          */
@@ -5339,11 +5102,13 @@ class MdButtonToggle {
         this.buttonToggleGroup = toggleGroup;
         this.buttonToggleGroupMultiple = toggleGroupMultiple;
         if (this.buttonToggleGroup) {
-            _buttonToggleDispatcher.listen((id, name) => {
-                if (id != this.id && name == this.name) {
-                    this.checked = false;
-                }
-            });
+            this._removeUniqueSelectionListener =
+                _buttonToggleDispatcher.listen((id, name) => {
+                    if (id != this.id && name == this.name) {
+                        this.checked = false;
+                        this._changeDetectorRef.markForCheck();
+                    }
+                });
             this._type = 'radio';
             this.name = this.buttonToggleGroup.name;
             this._isSingleSelector = true;
@@ -5366,19 +5131,16 @@ class MdButtonToggle {
      * Whether the button is checked.
      * @return {?}
      */
-    get checked() {
-        return this._checked;
-    }
+    get checked() { return this._checked; }
     /**
      * @param {?} newCheckedState
      * @return {?}
      */
     set checked(newCheckedState) {
-        if (this._isSingleSelector) {
-            if (newCheckedState) {
-                // Notify all button toggles with the same name (in the same group) to un-check.
-                this._buttonToggleDispatcher.notify(this.id, this.name);
-            }
+        if (this._isSingleSelector && newCheckedState) {
+            // Notify all button toggles with the same name (in the same group) to un-check.
+            this._buttonToggleDispatcher.notify(this.id, this.name);
+            this._changeDetectorRef.markForCheck();
         }
         this._checked = newCheckedState;
         if (newCheckedState && this._isSingleSelector && this.buttonToggleGroup.value != this.value) {
@@ -5417,7 +5179,7 @@ class MdButtonToggle {
      * @return {?}
      */
     set disabled(value) {
-        this._disabled = (value != null && value !== false) ? true : null;
+        this._disabled = coerceBooleanProperty(value);
     }
     /**
      * @return {?}
@@ -5436,7 +5198,7 @@ class MdButtonToggle {
      * @return {?}
      */
     focus() {
-        this._renderer.invokeElementMethod(this._inputElement.nativeElement, 'focus');
+        this._inputElement.nativeElement.focus();
     }
     /**
      * Toggle the state of the current button toggle.
@@ -5455,9 +5217,13 @@ class MdButtonToggle {
         if (this._isSingleSelector) {
             // Propagate the change one-way via the group, which will in turn mark this
             // button toggle as checked.
+            let /** @type {?} */ groupValueChanged = this.buttonToggleGroup.selected != this;
             this.checked = true;
             this.buttonToggleGroup.selected = this;
             this.buttonToggleGroup.onTouched();
+            if (groupValueChanged) {
+                this.buttonToggleGroup._emitChangeEvent();
+            }
         }
         else {
             this._toggle();
@@ -5489,14 +5255,25 @@ class MdButtonToggle {
         event.value = this._value;
         this.change.emit(event);
     }
+    /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        this._removeUniqueSelectionListener();
+    }
 }
 MdButtonToggle.decorators = [
     { type: Component, args: [{selector: 'md-button-toggle, mat-button-toggle',
-                template: "<label [attr.for]=\"inputId\" class=\"mat-button-toggle-label\"> <input #input class=\"mat-button-toggle-input cdk-visually-hidden\" [type]=\"_type\" [id]=\"inputId\" [checked]=\"checked\" [disabled]=\"disabled\" [name]=\"name\" (change)=\"_onInputChange($event)\" (click)=\"_onInputClick($event)\"> <div class=\"mat-button-toggle-label-content\"> <ng-content></ng-content> </div> </label> <!-- the touchstart handler prevents the overlay from capturing the initial tap on touch devices --> <div class=\"mat-button-toggle-focus-overlay\" (touchstart)=\"$event.preventDefault()\"></div> ",
-                styles: [".mat-button-toggle-group{box-shadow:0 3px 1px -2px rgba(0,0,0,.2),0 2px 2px 0 rgba(0,0,0,.14),0 1px 5px 0 rgba(0,0,0,.12);position:relative;display:inline-flex;flex-direction:row;border-radius:2px;cursor:pointer;white-space:nowrap}.mat-button-toggle-vertical{flex-direction:column}.mat-button-toggle-vertical .mat-button-toggle-label-content{display:block}.mat-button-toggle-disabled .mat-button-toggle-label-content{cursor:default}.mat-button-toggle{white-space:nowrap;font-family:Roboto,\"Helvetica Neue\",sans-serif;position:relative}.mat-button-toggle.cdk-keyboard-focused .mat-button-toggle-focus-overlay{opacity:1}.mat-button-toggle-label-content{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;display:inline-block;line-height:36px;padding:0 16px;cursor:pointer}.mat-button-toggle-label-content>*{vertical-align:middle}.mat-button-toggle-focus-overlay{border-radius:inherit;pointer-events:none;opacity:0;position:absolute;top:0;left:0;right:0;bottom:0} /*# sourceMappingURL=button-toggle.css.map */ "],
+                template: "<label [attr.for]=\"inputId\" class=\"mat-button-toggle-label\"><input #input class=\"mat-button-toggle-input cdk-visually-hidden\" [type]=\"_type\" [id]=\"inputId\" [checked]=\"checked\" [disabled]=\"disabled || null\" [name]=\"name\" [attr.aria-label]=\"ariaLabel\" [attr.aria-labelledby]=\"ariaLabelledby\" (change)=\"_onInputChange($event)\" (click)=\"_onInputClick($event)\"><div class=\"mat-button-toggle-label-content\"><ng-content></ng-content></div></label><div class=\"mat-button-toggle-focus-overlay\"></div>",
+                styles: [".mat-button-toggle-group,.mat-button-toggle-standalone{box-shadow:0 3px 1px -2px rgba(0,0,0,.2),0 2px 2px 0 rgba(0,0,0,.14),0 1px 5px 0 rgba(0,0,0,.12);position:relative;display:inline-flex;flex-direction:row;border-radius:2px;cursor:pointer;white-space:nowrap}.mat-button-toggle-vertical{flex-direction:column}.mat-button-toggle-vertical .mat-button-toggle-label-content{display:block}.mat-button-toggle-disabled .mat-button-toggle-label-content{cursor:default}.mat-button-toggle{white-space:nowrap;position:relative}.mat-button-toggle.cdk-keyboard-focused .mat-button-toggle-focus-overlay{opacity:1}.mat-button-toggle-label-content{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;display:inline-block;line-height:36px;padding:0 16px;cursor:pointer}.mat-button-toggle-label-content>*{vertical-align:middle}.mat-button-toggle-focus-overlay{border-radius:inherit;pointer-events:none;opacity:0;position:absolute;top:0;left:0;right:0;bottom:0}"],
                 encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
                 host: {
-                    '[class.mat-button-toggle]': 'true'
+                    '[class.mat-button-toggle-standalone]': '!buttonToggleGroup && !buttonToggleGroupMultiple',
+                    '[class.mat-button-toggle-checked]': 'checked',
+                    '[class.mat-button-toggle-disabled]': 'disabled',
+                    'class': 'mat-button-toggle',
+                    '[attr.id]': 'id',
                 }
             },] },
 ];
@@ -5506,44 +5283,37 @@ MdButtonToggle.decorators = [
 MdButtonToggle.ctorParameters = () => [
     { type: MdButtonToggleGroup, decorators: [{ type: Optional },] },
     { type: MdButtonToggleGroupMultiple, decorators: [{ type: Optional },] },
+    { type: ChangeDetectorRef, },
     { type: UniqueSelectionDispatcher, },
-    { type: Renderer, },
+    { type: Renderer2, },
     { type: ElementRef, },
     { type: FocusOriginMonitor, },
 ];
 MdButtonToggle.propDecorators = {
+    'ariaLabel': [{ type: Input, args: ['aria-label',] },],
+    'ariaLabelledby': [{ type: Input, args: ['aria-labelledby',] },],
     '_inputElement': [{ type: ViewChild, args: ['input',] },],
-    'id': [{ type: HostBinding }, { type: Input },],
+    'id': [{ type: Input },],
     'name': [{ type: Input },],
-    'checked': [{ type: HostBinding, args: ['class.mat-button-toggle-checked',] }, { type: Input },],
+    'checked': [{ type: Input },],
     'value': [{ type: Input },],
-    'disabled': [{ type: HostBinding, args: ['class.mat-button-toggle-disabled',] }, { type: Input },],
+    'disabled': [{ type: Input },],
     'change': [{ type: Output },],
 };
 
 class MdButtonToggleModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdButtonToggleModule,
-            providers: []
-        };
-    }
 }
 MdButtonToggleModule.decorators = [
     { type: NgModule, args: [{
-                imports: [FormsModule, CompatibilityModule],
+                imports: [MdCommonModule, StyleModule],
                 exports: [
                     MdButtonToggleGroup,
                     MdButtonToggleGroupMultiple,
                     MdButtonToggle,
-                    CompatibilityModule,
+                    MdCommonModule,
                 ],
                 declarations: [MdButtonToggleGroup, MdButtonToggleGroupMultiple, MdButtonToggle],
-                providers: [UNIQUE_SELECTION_DISPATCHER_PROVIDER, FocusOriginMonitor]
+                providers: [UNIQUE_SELECTION_DISPATCHER_PROVIDER]
             },] },
 ];
 /**
@@ -5552,32 +5322,77 @@ MdButtonToggleModule.decorators = [
 MdButtonToggleModule.ctorParameters = () => [];
 
 /**
- * Mixin to augment a directive with a `disabled` property.
+ * Mixin to augment a directive with a `color` property.
+ * @template T
+ * @param {?} base
+ * @param {?=} defaultColor
+ * @return {?}
+ */
+function mixinColor(base, defaultColor) {
+    return class extends base {
+        /**
+         * @return {?}
+         */
+        get color() { return this._color; }
+        /**
+         * @param {?} value
+         * @return {?}
+         */
+        set color(value) {
+            const /** @type {?} */ colorPalette = value || defaultColor;
+            if (colorPalette !== this._color) {
+                if (this._color) {
+                    this._renderer.removeClass(this._elementRef.nativeElement, `mat-${this._color}`);
+                }
+                if (colorPalette) {
+                    this._renderer.addClass(this._elementRef.nativeElement, `mat-${colorPalette}`);
+                }
+                this._color = colorPalette;
+            }
+        }
+        /**
+         * @param {...?} args
+         */
+        constructor(...args) {
+            super(...args);
+            // Set the default color that can be specified from the mixin.
+            this.color = defaultColor;
+        }
+    };
+}
+
+/**
+ * Mixin to augment a directive with a `disableRipple` property.
  * @template T
  * @param {?} base
  * @return {?}
  */
-function mixinDisabled(base) {
+function mixinDisableRipple(base) {
     return class extends base {
         /**
          * @param {...?} args
          */
         constructor(...args) {
             super(...args);
-            this._disabled = false;
+            this._disableRipple = false;
         }
         /**
+         * Whether the ripple effect is disabled or not.
          * @return {?}
          */
-        get disabled() { return this._disabled; }
+        get disableRipple() { return this._disableRipple; }
         /**
          * @param {?} value
          * @return {?}
          */
-        set disabled(value) { this._disabled = coerceBooleanProperty(value); }
+        set disableRipple(value) { this._disableRipple = coerceBooleanProperty(value); }
     };
 }
 
+/**
+ * Default color palette for round buttons (md-fab and md-mini-fab)
+ */
+const DEFAULT_ROUND_BUTTON_COLOR = 'accent';
 /**
  * Directive whose purpose is to add the mat- CSS styling to this selector.
  * \@docs-private
@@ -5587,9 +5402,7 @@ class MdButtonCssMatStyler {
 MdButtonCssMatStyler.decorators = [
     { type: Directive, args: [{
                 selector: 'button[md-button], button[mat-button], a[md-button], a[mat-button]',
-                host: {
-                    '[class.mat-button]': 'true'
-                }
+                host: { 'class': 'mat-button' }
             },] },
 ];
 /**
@@ -5606,9 +5419,7 @@ MdRaisedButtonCssMatStyler.decorators = [
     { type: Directive, args: [{
                 selector: 'button[md-raised-button], button[mat-raised-button], ' +
                     'a[md-raised-button], a[mat-raised-button]',
-                host: {
-                    '[class.mat-raised-button]': 'true'
-                }
+                host: { 'class': 'mat-raised-button' }
             },] },
 ];
 /**
@@ -5624,9 +5435,7 @@ class MdIconButtonCssMatStyler {
 MdIconButtonCssMatStyler.decorators = [
     { type: Directive, args: [{
                 selector: 'button[md-icon-button], button[mat-icon-button], a[md-icon-button], a[mat-icon-button]',
-                host: {
-                    '[class.mat-icon-button]': 'true',
-                }
+                host: { 'class': 'mat-icon-button' }
             },] },
 ];
 /**
@@ -5637,54 +5446,84 @@ MdIconButtonCssMatStyler.ctorParameters = () => [];
  * Directive whose purpose is to add the mat- CSS styling to this selector.
  * \@docs-private
  */
-class MdFabCssMatStyler {
+class MdFab {
+    /**
+     * @param {?} button
+     * @param {?} anchor
+     */
+    constructor(button, anchor) {
+        // Set the default color palette for the md-fab components.
+        (button || anchor).color = DEFAULT_ROUND_BUTTON_COLOR;
+    }
 }
-MdFabCssMatStyler.decorators = [
+MdFab.decorators = [
     { type: Directive, args: [{
                 selector: 'button[md-fab], button[mat-fab], a[md-fab], a[mat-fab]',
-                host: {
-                    '[class.mat-fab]': 'true'
-                }
+                host: { 'class': 'mat-fab' }
             },] },
 ];
 /**
  * @nocollapse
  */
-MdFabCssMatStyler.ctorParameters = () => [];
+MdFab.ctorParameters = () => [
+    { type: MdButton, decorators: [{ type: Self }, { type: Optional }, { type: Inject, args: [forwardRef(() => MdButton),] },] },
+    { type: MdAnchor, decorators: [{ type: Self }, { type: Optional }, { type: Inject, args: [forwardRef(() => MdAnchor),] },] },
+];
 /**
- * Directive whose purpose is to add the mat- CSS styling to this selector.
+ * Directive that targets mini-fab buttons and anchors. It's used to apply the `mat-` class
+ * to all mini-fab buttons and also is responsible for setting the default color palette.
  * \@docs-private
  */
-class MdMiniFabCssMatStyler {
+class MdMiniFab {
+    /**
+     * @param {?} button
+     * @param {?} anchor
+     */
+    constructor(button, anchor) {
+        // Set the default color palette for the md-mini-fab components.
+        (button || anchor).color = DEFAULT_ROUND_BUTTON_COLOR;
+    }
 }
-MdMiniFabCssMatStyler.decorators = [
+MdMiniFab.decorators = [
     { type: Directive, args: [{
                 selector: 'button[md-mini-fab], button[mat-mini-fab], a[md-mini-fab], a[mat-mini-fab]',
-                host: {
-                    '[class.mat-mini-fab]': 'true'
-                }
+                host: { 'class': 'mat-mini-fab' }
             },] },
 ];
 /**
  * @nocollapse
  */
-MdMiniFabCssMatStyler.ctorParameters = () => [];
+MdMiniFab.ctorParameters = () => [
+    { type: MdButton, decorators: [{ type: Self }, { type: Optional }, { type: Inject, args: [forwardRef(() => MdButton),] },] },
+    { type: MdAnchor, decorators: [{ type: Self }, { type: Optional }, { type: Inject, args: [forwardRef(() => MdAnchor),] },] },
+];
+/**
+ * \@docs-private
+ */
 class MdButtonBase {
+    /**
+     * @param {?} _renderer
+     * @param {?} _elementRef
+     */
+    constructor(_renderer, _elementRef) {
+        this._renderer = _renderer;
+        this._elementRef = _elementRef;
+    }
 }
-const _MdButtonMixinBase = mixinDisabled(MdButtonBase);
+const _MdButtonMixinBase = mixinColor(mixinDisabled(mixinDisableRipple(MdButtonBase)));
 /**
  * Material design button.
  */
 class MdButton extends _MdButtonMixinBase {
     /**
-     * @param {?} _elementRef
-     * @param {?} _renderer
+     * @param {?} renderer
+     * @param {?} elementRef
+     * @param {?} _platform
      * @param {?} _focusOriginMonitor
      */
-    constructor(_elementRef, _renderer, _focusOriginMonitor) {
-        super();
-        this._elementRef = _elementRef;
-        this._renderer = _renderer;
+    constructor(renderer, elementRef, _platform, _focusOriginMonitor) {
+        super(renderer, elementRef);
+        this._platform = _platform;
         this._focusOriginMonitor = _focusOriginMonitor;
         /**
          * Whether the button is round.
@@ -5694,22 +5533,8 @@ class MdButton extends _MdButtonMixinBase {
          * Whether the button is icon button.
          */
         this._isIconButton = this._hasAttributeWithPrefix('icon-button');
-        /**
-         * Whether the ripple effect on click should be disabled.
-         */
-        this._disableRipple = false;
         this._focusOriginMonitor.monitor(this._elementRef.nativeElement, this._renderer, true);
     }
-    /**
-     * Whether the ripple effect for this button is disabled.
-     * @return {?}
-     */
-    get disableRipple() { return this._disableRipple; }
-    /**
-     * @param {?} v
-     * @return {?}
-     */
-    set disableRipple(v) { this._disableRipple = coerceBooleanProperty(v); }
     /**
      * @return {?}
      */
@@ -5717,40 +5542,11 @@ class MdButton extends _MdButtonMixinBase {
         this._focusOriginMonitor.stopMonitoring(this._elementRef.nativeElement);
     }
     /**
-     * The color of the button. Can be `primary`, `accent`, or `warn`.
-     * @return {?}
-     */
-    get color() { return this._color; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set color(value) { this._updateColor(value); }
-    /**
-     * @param {?} newColor
-     * @return {?}
-     */
-    _updateColor(newColor) {
-        this._setElementColor(this._color, false);
-        this._setElementColor(newColor, true);
-        this._color = newColor;
-    }
-    /**
-     * @param {?} color
-     * @param {?} isAdd
-     * @return {?}
-     */
-    _setElementColor(color, isAdd) {
-        if (color != null && color != '') {
-            this._renderer.setElementClass(this._getHostElement(), `mat-${color}`, isAdd);
-        }
-    }
-    /**
      * Focuses the button.
      * @return {?}
      */
     focus() {
-        this._renderer.invokeElementMethod(this._getHostElement(), 'focus');
+        this._getHostElement().focus();
     }
     /**
      * @return {?}
@@ -5771,6 +5567,12 @@ class MdButton extends _MdButtonMixinBase {
      * @return {?}
      */
     _hasAttributeWithPrefix(...unprefixedAttributeNames) {
+        // If not on the browser, say that there are none of the attributes present.
+        // Since these only affect how the ripple displays (and ripples only happen on the client),
+        // detecting these attributes isn't necessary when not on the browser.
+        if (!this._platform.isBrowser) {
+            return false;
+        }
         return unprefixedAttributeNames.some(suffix => {
             const /** @type {?} */ el = this._getHostElement();
             return el.hasAttribute('md-' + suffix) || el.hasAttribute('mat-' + suffix);
@@ -5785,9 +5587,9 @@ MdButton.decorators = [
                 host: {
                     '[disabled]': 'disabled || null',
                 },
-                inputs: ['disabled'],
-                template: "<span class=\"mat-button-wrapper\"><ng-content></ng-content></span> <div md-ripple *ngIf=\"!_isRippleDisabled()\" class=\"mat-button-ripple\" [class.mat-button-ripple-round]=\"_isRoundButton || _isIconButton\" [mdRippleCentered]=\"_isIconButton\" [mdRippleTrigger]=\"_getHostElement()\"></div> <!-- the touchstart handler prevents the overlay from capturing the initial tap on touch devices --> <div class=\"mat-button-focus-overlay\" (touchstart)=\"$event.preventDefault()\"></div> ",
-                styles: [".mat-button,.mat-fab,.mat-icon-button,.mat-mini-fab,.mat-raised-button{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;cursor:pointer;outline:0;border:none;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;font-size:14px;font-family:Roboto,\"Helvetica Neue\",sans-serif;font-weight:500;text-align:center;margin:0;min-width:88px;line-height:36px;padding:0 16px;border-radius:2px}[disabled].mat-button,[disabled].mat-fab,[disabled].mat-icon-button,[disabled].mat-mini-fab,[disabled].mat-raised-button{cursor:default}.cdk-keyboard-focused.mat-button .mat-button-focus-overlay,.cdk-keyboard-focused.mat-fab .mat-button-focus-overlay,.cdk-keyboard-focused.mat-icon-button .mat-button-focus-overlay,.cdk-keyboard-focused.mat-mini-fab .mat-button-focus-overlay,.cdk-keyboard-focused.mat-raised-button .mat-button-focus-overlay{opacity:1}.mat-button::-moz-focus-inner,.mat-fab::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-mini-fab::-moz-focus-inner,.mat-raised-button::-moz-focus-inner{border:0}.mat-fab,.mat-mini-fab,.mat-raised-button{box-shadow:0 3px 1px -2px rgba(0,0,0,.2),0 2px 2px 0 rgba(0,0,0,.14),0 1px 5px 0 rgba(0,0,0,.12);transform:translate3d(0,0,0);transition:background .4s cubic-bezier(.25,.8,.25,1),box-shadow 280ms cubic-bezier(.4,0,.2,1)}.mat-fab:not([disabled]):active,.mat-mini-fab:not([disabled]):active,.mat-raised-button:not([disabled]):active{box-shadow:0 5px 5px -3px rgba(0,0,0,.2),0 8px 10px 1px rgba(0,0,0,.14),0 3px 14px 2px rgba(0,0,0,.12)}[disabled].mat-fab,[disabled].mat-mini-fab,[disabled].mat-raised-button{box-shadow:none}.mat-button .mat-button-focus-overlay,.mat-icon-button .mat-button-focus-overlay{transition:none;opacity:0}.mat-button:hover .mat-button-focus-overlay{opacity:1}.mat-fab{box-shadow:0 3px 5px -1px rgba(0,0,0,.2),0 6px 10px 0 rgba(0,0,0,.14),0 1px 18px 0 rgba(0,0,0,.12);min-width:0;border-radius:50%;width:56px;height:56px;padding:0;flex-shrink:0}.mat-fab:not([disabled]):active{box-shadow:0 7px 8px -4px rgba(0,0,0,.2),0 12px 17px 2px rgba(0,0,0,.14),0 5px 22px 4px rgba(0,0,0,.12)}.mat-fab .mat-icon,.mat-fab i{padding:16px 0;line-height:24px}.mat-mini-fab{box-shadow:0 3px 5px -1px rgba(0,0,0,.2),0 6px 10px 0 rgba(0,0,0,.14),0 1px 18px 0 rgba(0,0,0,.12);min-width:0;border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0}.mat-mini-fab:not([disabled]):active{box-shadow:0 7px 8px -4px rgba(0,0,0,.2),0 12px 17px 2px rgba(0,0,0,.14),0 5px 22px 4px rgba(0,0,0,.12)}.mat-mini-fab .mat-icon,.mat-mini-fab i{padding:8px 0;line-height:24px}.mat-icon-button{padding:0;min-width:0;width:40px;height:40px;flex-shrink:0;line-height:40px;border-radius:50%}.mat-icon-button .mat-icon,.mat-icon-button i{line-height:24px}.mat-button,.mat-icon-button,.mat-raised-button{color:currentColor}.mat-button .mat-button-wrapper>*,.mat-icon-button .mat-button-wrapper>*,.mat-raised-button .mat-button-wrapper>*{vertical-align:middle}.mat-button-focus-overlay,.mat-button-ripple{position:absolute;top:0;left:0;bottom:0;right:0}.mat-button-focus-overlay{background-color:rgba(0,0,0,.12);border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .2s cubic-bezier(.35,0,.25,1),background-color .2s cubic-bezier(.35,0,.25,1)}@media screen and (-ms-high-contrast:active){.mat-button-focus-overlay{background-color:rgba(255,255,255,.5)}}.mat-button-ripple-round{border-radius:50%;z-index:1}@media screen and (-ms-high-contrast:active){.mat-button,.mat-fab,.mat-icon-button,.mat-mini-fab,.mat-raised-button{outline:solid 1px}} /*# sourceMappingURL=button.css.map */ "],
+                template: "<span class=\"mat-button-wrapper\"><ng-content></ng-content></span><div md-ripple class=\"mat-button-ripple\" [class.mat-button-ripple-round]=\"_isRoundButton || _isIconButton\" [mdRippleDisabled]=\"_isRippleDisabled()\" [mdRippleCentered]=\"_isIconButton\" [mdRippleTrigger]=\"_getHostElement()\"></div><div class=\"mat-button-focus-overlay\"></div>",
+                styles: [".mat-button,.mat-fab,.mat-icon-button,.mat-mini-fab,.mat-raised-button{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;cursor:pointer;outline:0;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:88px;line-height:36px;padding:0 16px;border-radius:2px}[disabled].mat-button,[disabled].mat-fab,[disabled].mat-icon-button,[disabled].mat-mini-fab,[disabled].mat-raised-button{cursor:default}.cdk-keyboard-focused.mat-button .mat-button-focus-overlay,.cdk-keyboard-focused.mat-fab .mat-button-focus-overlay,.cdk-keyboard-focused.mat-icon-button .mat-button-focus-overlay,.cdk-keyboard-focused.mat-mini-fab .mat-button-focus-overlay,.cdk-keyboard-focused.mat-raised-button .mat-button-focus-overlay{opacity:1}.mat-button::-moz-focus-inner,.mat-fab::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-mini-fab::-moz-focus-inner,.mat-raised-button::-moz-focus-inner{border:0}.mat-fab,.mat-mini-fab,.mat-raised-button{box-shadow:0 3px 1px -2px rgba(0,0,0,.2),0 2px 2px 0 rgba(0,0,0,.14),0 1px 5px 0 rgba(0,0,0,.12);transform:translate3d(0,0,0);transition:background .4s cubic-bezier(.25,.8,.25,1),box-shadow 280ms cubic-bezier(.4,0,.2,1)}.mat-fab:not([disabled]):active,.mat-mini-fab:not([disabled]):active,.mat-raised-button:not([disabled]):active{box-shadow:0 5px 5px -3px rgba(0,0,0,.2),0 8px 10px 1px rgba(0,0,0,.14),0 3px 14px 2px rgba(0,0,0,.12)}[disabled].mat-fab,[disabled].mat-mini-fab,[disabled].mat-raised-button{box-shadow:none}.mat-button .mat-button-focus-overlay,.mat-icon-button .mat-button-focus-overlay{transition:none;opacity:0}.mat-button:hover .mat-button-focus-overlay{opacity:1}.mat-fab{box-shadow:0 3px 5px -1px rgba(0,0,0,.2),0 6px 10px 0 rgba(0,0,0,.14),0 1px 18px 0 rgba(0,0,0,.12);min-width:0;border-radius:50%;width:56px;height:56px;padding:0;flex-shrink:0}.mat-fab:not([disabled]):active{box-shadow:0 7px 8px -4px rgba(0,0,0,.2),0 12px 17px 2px rgba(0,0,0,.14),0 5px 22px 4px rgba(0,0,0,.12)}.mat-fab .mat-button-wrapper{padding:16px 0;display:inline-block;line-height:24px}.mat-mini-fab{box-shadow:0 3px 5px -1px rgba(0,0,0,.2),0 6px 10px 0 rgba(0,0,0,.14),0 1px 18px 0 rgba(0,0,0,.12);min-width:0;border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0}.mat-mini-fab:not([disabled]):active{box-shadow:0 7px 8px -4px rgba(0,0,0,.2),0 12px 17px 2px rgba(0,0,0,.14),0 5px 22px 4px rgba(0,0,0,.12)}.mat-mini-fab .mat-button-wrapper{padding:8px 0;display:inline-block;line-height:24px}.mat-icon-button{padding:0;min-width:0;width:40px;height:40px;flex-shrink:0;line-height:40px;border-radius:50%}.mat-icon-button .mat-icon,.mat-icon-button i{line-height:24px}.mat-button,.mat-icon-button,.mat-raised-button{color:currentColor}.mat-button .mat-button-wrapper>*,.mat-icon-button .mat-button-wrapper>*,.mat-raised-button .mat-button-wrapper>*{vertical-align:middle}.mat-button-focus-overlay,.mat-button-ripple{position:absolute;top:0;left:0;bottom:0;right:0;pointer-events:none}.mat-button-focus-overlay{background-color:rgba(0,0,0,.12);border-radius:inherit;opacity:0;transition:opacity .2s cubic-bezier(.35,0,.25,1),background-color .2s cubic-bezier(.35,0,.25,1)}@media screen and (-ms-high-contrast:active){.mat-button-focus-overlay{background-color:rgba(255,255,255,.5)}}.mat-button-ripple-round{border-radius:50%;z-index:1}@media screen and (-ms-high-contrast:active){.mat-button,.mat-fab,.mat-icon-button,.mat-mini-fab,.mat-raised-button{outline:solid 1px}}"],
+                inputs: ['disabled', 'disableRipple', 'color'],
                 encapsulation: ViewEncapsulation.None,
                 changeDetection: ChangeDetectionStrategy.OnPush,
             },] },
@@ -5796,38 +5598,23 @@ MdButton.decorators = [
  * @nocollapse
  */
 MdButton.ctorParameters = () => [
+    { type: Renderer2, },
     { type: ElementRef, },
-    { type: Renderer, },
+    { type: Platform, },
     { type: FocusOriginMonitor, },
 ];
-MdButton.propDecorators = {
-    'disableRipple': [{ type: Input },],
-    'color': [{ type: Input },],
-};
 /**
  * Raised Material design button.
  */
 class MdAnchor extends MdButton {
     /**
+     * @param {?} platform
+     * @param {?} focusOriginMonitor
      * @param {?} elementRef
      * @param {?} renderer
-     * @param {?} focusOriginMonitor
      */
-    constructor(elementRef, renderer, focusOriginMonitor) {
-        super(elementRef, renderer, focusOriginMonitor);
-    }
-    /**
-     * \@docs-private
-     * @return {?}
-     */
-    get tabIndex() {
-        return this.disabled ? -1 : 0;
-    }
-    /**
-     * @return {?}
-     */
-    get _isAriaDisabled() {
-        return this.disabled ? 'true' : 'false';
+    constructor(platform, focusOriginMonitor, elementRef, renderer) {
+        super(renderer, elementRef, platform, focusOriginMonitor);
     }
     /**
      * @param {?} event
@@ -5845,66 +5632,56 @@ MdAnchor.decorators = [
     { type: Component, args: [{selector: `a[md-button], a[md-raised-button], a[md-icon-button], a[md-fab], a[md-mini-fab],
              a[mat-button], a[mat-raised-button], a[mat-icon-button], a[mat-fab], a[mat-mini-fab]`,
                 host: {
+                    '[attr.tabindex]': 'disabled ? -1 : 0',
                     '[attr.disabled]': 'disabled || null',
-                    '[attr.aria-disabled]': '_isAriaDisabled',
+                    '[attr.aria-disabled]': 'disabled.toString()',
                     '(click)': '_haltDisabledEvents($event)',
                 },
-                inputs: ['disabled'],
-                template: "<span class=\"mat-button-wrapper\"><ng-content></ng-content></span> <div md-ripple *ngIf=\"!_isRippleDisabled()\" class=\"mat-button-ripple\" [class.mat-button-ripple-round]=\"_isRoundButton || _isIconButton\" [mdRippleCentered]=\"_isIconButton\" [mdRippleTrigger]=\"_getHostElement()\"></div> <!-- the touchstart handler prevents the overlay from capturing the initial tap on touch devices --> <div class=\"mat-button-focus-overlay\" (touchstart)=\"$event.preventDefault()\"></div> ",
-                styles: [".mat-button,.mat-fab,.mat-icon-button,.mat-mini-fab,.mat-raised-button{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;cursor:pointer;outline:0;border:none;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;font-size:14px;font-family:Roboto,\"Helvetica Neue\",sans-serif;font-weight:500;text-align:center;margin:0;min-width:88px;line-height:36px;padding:0 16px;border-radius:2px}[disabled].mat-button,[disabled].mat-fab,[disabled].mat-icon-button,[disabled].mat-mini-fab,[disabled].mat-raised-button{cursor:default}.cdk-keyboard-focused.mat-button .mat-button-focus-overlay,.cdk-keyboard-focused.mat-fab .mat-button-focus-overlay,.cdk-keyboard-focused.mat-icon-button .mat-button-focus-overlay,.cdk-keyboard-focused.mat-mini-fab .mat-button-focus-overlay,.cdk-keyboard-focused.mat-raised-button .mat-button-focus-overlay{opacity:1}.mat-button::-moz-focus-inner,.mat-fab::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-mini-fab::-moz-focus-inner,.mat-raised-button::-moz-focus-inner{border:0}.mat-fab,.mat-mini-fab,.mat-raised-button{box-shadow:0 3px 1px -2px rgba(0,0,0,.2),0 2px 2px 0 rgba(0,0,0,.14),0 1px 5px 0 rgba(0,0,0,.12);transform:translate3d(0,0,0);transition:background .4s cubic-bezier(.25,.8,.25,1),box-shadow 280ms cubic-bezier(.4,0,.2,1)}.mat-fab:not([disabled]):active,.mat-mini-fab:not([disabled]):active,.mat-raised-button:not([disabled]):active{box-shadow:0 5px 5px -3px rgba(0,0,0,.2),0 8px 10px 1px rgba(0,0,0,.14),0 3px 14px 2px rgba(0,0,0,.12)}[disabled].mat-fab,[disabled].mat-mini-fab,[disabled].mat-raised-button{box-shadow:none}.mat-button .mat-button-focus-overlay,.mat-icon-button .mat-button-focus-overlay{transition:none;opacity:0}.mat-button:hover .mat-button-focus-overlay{opacity:1}.mat-fab{box-shadow:0 3px 5px -1px rgba(0,0,0,.2),0 6px 10px 0 rgba(0,0,0,.14),0 1px 18px 0 rgba(0,0,0,.12);min-width:0;border-radius:50%;width:56px;height:56px;padding:0;flex-shrink:0}.mat-fab:not([disabled]):active{box-shadow:0 7px 8px -4px rgba(0,0,0,.2),0 12px 17px 2px rgba(0,0,0,.14),0 5px 22px 4px rgba(0,0,0,.12)}.mat-fab .mat-icon,.mat-fab i{padding:16px 0;line-height:24px}.mat-mini-fab{box-shadow:0 3px 5px -1px rgba(0,0,0,.2),0 6px 10px 0 rgba(0,0,0,.14),0 1px 18px 0 rgba(0,0,0,.12);min-width:0;border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0}.mat-mini-fab:not([disabled]):active{box-shadow:0 7px 8px -4px rgba(0,0,0,.2),0 12px 17px 2px rgba(0,0,0,.14),0 5px 22px 4px rgba(0,0,0,.12)}.mat-mini-fab .mat-icon,.mat-mini-fab i{padding:8px 0;line-height:24px}.mat-icon-button{padding:0;min-width:0;width:40px;height:40px;flex-shrink:0;line-height:40px;border-radius:50%}.mat-icon-button .mat-icon,.mat-icon-button i{line-height:24px}.mat-button,.mat-icon-button,.mat-raised-button{color:currentColor}.mat-button .mat-button-wrapper>*,.mat-icon-button .mat-button-wrapper>*,.mat-raised-button .mat-button-wrapper>*{vertical-align:middle}.mat-button-focus-overlay,.mat-button-ripple{position:absolute;top:0;left:0;bottom:0;right:0}.mat-button-focus-overlay{background-color:rgba(0,0,0,.12);border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .2s cubic-bezier(.35,0,.25,1),background-color .2s cubic-bezier(.35,0,.25,1)}@media screen and (-ms-high-contrast:active){.mat-button-focus-overlay{background-color:rgba(255,255,255,.5)}}.mat-button-ripple-round{border-radius:50%;z-index:1}@media screen and (-ms-high-contrast:active){.mat-button,.mat-fab,.mat-icon-button,.mat-mini-fab,.mat-raised-button{outline:solid 1px}} /*# sourceMappingURL=button.css.map */ "],
-                encapsulation: ViewEncapsulation.None
+                inputs: ['disabled', 'disableRipple', 'color'],
+                template: "<span class=\"mat-button-wrapper\"><ng-content></ng-content></span><div md-ripple class=\"mat-button-ripple\" [class.mat-button-ripple-round]=\"_isRoundButton || _isIconButton\" [mdRippleDisabled]=\"_isRippleDisabled()\" [mdRippleCentered]=\"_isIconButton\" [mdRippleTrigger]=\"_getHostElement()\"></div><div class=\"mat-button-focus-overlay\"></div>",
+                styles: [".mat-button,.mat-fab,.mat-icon-button,.mat-mini-fab,.mat-raised-button{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;cursor:pointer;outline:0;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:88px;line-height:36px;padding:0 16px;border-radius:2px}[disabled].mat-button,[disabled].mat-fab,[disabled].mat-icon-button,[disabled].mat-mini-fab,[disabled].mat-raised-button{cursor:default}.cdk-keyboard-focused.mat-button .mat-button-focus-overlay,.cdk-keyboard-focused.mat-fab .mat-button-focus-overlay,.cdk-keyboard-focused.mat-icon-button .mat-button-focus-overlay,.cdk-keyboard-focused.mat-mini-fab .mat-button-focus-overlay,.cdk-keyboard-focused.mat-raised-button .mat-button-focus-overlay{opacity:1}.mat-button::-moz-focus-inner,.mat-fab::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-mini-fab::-moz-focus-inner,.mat-raised-button::-moz-focus-inner{border:0}.mat-fab,.mat-mini-fab,.mat-raised-button{box-shadow:0 3px 1px -2px rgba(0,0,0,.2),0 2px 2px 0 rgba(0,0,0,.14),0 1px 5px 0 rgba(0,0,0,.12);transform:translate3d(0,0,0);transition:background .4s cubic-bezier(.25,.8,.25,1),box-shadow 280ms cubic-bezier(.4,0,.2,1)}.mat-fab:not([disabled]):active,.mat-mini-fab:not([disabled]):active,.mat-raised-button:not([disabled]):active{box-shadow:0 5px 5px -3px rgba(0,0,0,.2),0 8px 10px 1px rgba(0,0,0,.14),0 3px 14px 2px rgba(0,0,0,.12)}[disabled].mat-fab,[disabled].mat-mini-fab,[disabled].mat-raised-button{box-shadow:none}.mat-button .mat-button-focus-overlay,.mat-icon-button .mat-button-focus-overlay{transition:none;opacity:0}.mat-button:hover .mat-button-focus-overlay{opacity:1}.mat-fab{box-shadow:0 3px 5px -1px rgba(0,0,0,.2),0 6px 10px 0 rgba(0,0,0,.14),0 1px 18px 0 rgba(0,0,0,.12);min-width:0;border-radius:50%;width:56px;height:56px;padding:0;flex-shrink:0}.mat-fab:not([disabled]):active{box-shadow:0 7px 8px -4px rgba(0,0,0,.2),0 12px 17px 2px rgba(0,0,0,.14),0 5px 22px 4px rgba(0,0,0,.12)}.mat-fab .mat-button-wrapper{padding:16px 0;display:inline-block;line-height:24px}.mat-mini-fab{box-shadow:0 3px 5px -1px rgba(0,0,0,.2),0 6px 10px 0 rgba(0,0,0,.14),0 1px 18px 0 rgba(0,0,0,.12);min-width:0;border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0}.mat-mini-fab:not([disabled]):active{box-shadow:0 7px 8px -4px rgba(0,0,0,.2),0 12px 17px 2px rgba(0,0,0,.14),0 5px 22px 4px rgba(0,0,0,.12)}.mat-mini-fab .mat-button-wrapper{padding:8px 0;display:inline-block;line-height:24px}.mat-icon-button{padding:0;min-width:0;width:40px;height:40px;flex-shrink:0;line-height:40px;border-radius:50%}.mat-icon-button .mat-icon,.mat-icon-button i{line-height:24px}.mat-button,.mat-icon-button,.mat-raised-button{color:currentColor}.mat-button .mat-button-wrapper>*,.mat-icon-button .mat-button-wrapper>*,.mat-raised-button .mat-button-wrapper>*{vertical-align:middle}.mat-button-focus-overlay,.mat-button-ripple{position:absolute;top:0;left:0;bottom:0;right:0;pointer-events:none}.mat-button-focus-overlay{background-color:rgba(0,0,0,.12);border-radius:inherit;opacity:0;transition:opacity .2s cubic-bezier(.35,0,.25,1),background-color .2s cubic-bezier(.35,0,.25,1)}@media screen and (-ms-high-contrast:active){.mat-button-focus-overlay{background-color:rgba(255,255,255,.5)}}.mat-button-ripple-round{border-radius:50%;z-index:1}@media screen and (-ms-high-contrast:active){.mat-button,.mat-fab,.mat-icon-button,.mat-mini-fab,.mat-raised-button{outline:solid 1px}}"],
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
             },] },
 ];
 /**
  * @nocollapse
  */
 MdAnchor.ctorParameters = () => [
-    { type: ElementRef, },
-    { type: Renderer, },
+    { type: Platform, },
     { type: FocusOriginMonitor, },
+    { type: ElementRef, },
+    { type: Renderer2, },
 ];
-MdAnchor.propDecorators = {
-    'tabIndex': [{ type: HostBinding, args: ['tabIndex',] },],
-};
 
 class MdButtonModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdButtonModule,
-            providers: []
-        };
-    }
 }
 MdButtonModule.decorators = [
     { type: NgModule, args: [{
                 imports: [
                     CommonModule,
                     MdRippleModule,
-                    CompatibilityModule,
+                    MdCommonModule,
                     StyleModule,
                 ],
                 exports: [
                     MdButton,
                     MdAnchor,
-                    CompatibilityModule,
+                    MdMiniFab,
+                    MdFab,
+                    MdCommonModule,
                     MdButtonCssMatStyler,
                     MdRaisedButtonCssMatStyler,
                     MdIconButtonCssMatStyler,
-                    MdFabCssMatStyler,
-                    MdMiniFabCssMatStyler,
                 ],
                 declarations: [
                     MdButton,
                     MdAnchor,
+                    MdMiniFab,
+                    MdFab,
                     MdButtonCssMatStyler,
                     MdRaisedButtonCssMatStyler,
                     MdIconButtonCssMatStyler,
-                    MdFabCssMatStyler,
-                    MdMiniFabCssMatStyler,
                 ],
             },] },
 ];
@@ -5913,10 +5690,8 @@ MdButtonModule.decorators = [
  */
 MdButtonModule.ctorParameters = () => [];
 
-/**
- * Monotonically increasing integer used to auto-generate unique ids for checkbox components.
- */
-let nextId = 0;
+// Increasing integer for generating unique ids for checkbox components.
+let nextUniqueId$1 = 0;
 /**
  * Provider Expression that allows md-checkbox to register as a ControlValueAccessor.
  * This allows it to support [(ngModel)].
@@ -5942,6 +5717,20 @@ TransitionCheckState[TransitionCheckState.Indeterminate] = "Indeterminate";
 class MdCheckboxChange {
 }
 /**
+ * \@docs-private
+ */
+class MdCheckboxBase {
+    /**
+     * @param {?} _renderer
+     * @param {?} _elementRef
+     */
+    constructor(_renderer, _elementRef) {
+        this._renderer = _renderer;
+        this._elementRef = _elementRef;
+    }
+}
+const _MdCheckboxMixinBase = mixinColor(mixinDisableRipple(mixinDisabled(MdCheckboxBase)), 'accent');
+/**
  * A material design checkbox component. Supports all of the functionality of an HTML5 checkbox,
  * and exposes a similar API. A MdCheckbox can be either checked, unchecked, indeterminate, or
  * disabled. Note that all additional accessibility attributes are taken care of by the component,
@@ -5949,16 +5738,15 @@ class MdCheckboxChange {
  * have the checkbox be accessible, you may supply an [aria-label] input.
  * See: https://www.google.com/design/spec/components/selection-controls.html
  */
-class MdCheckbox {
+class MdCheckbox extends _MdCheckboxMixinBase {
     /**
-     * @param {?} _renderer
-     * @param {?} _elementRef
+     * @param {?} renderer
+     * @param {?} elementRef
      * @param {?} _changeDetectorRef
      * @param {?} _focusOriginMonitor
      */
-    constructor(_renderer, _elementRef, _changeDetectorRef, _focusOriginMonitor) {
-        this._renderer = _renderer;
-        this._elementRef = _elementRef;
+    constructor(renderer, elementRef, _changeDetectorRef, _focusOriginMonitor) {
+        super(renderer, elementRef);
         this._changeDetectorRef = _changeDetectorRef;
         this._focusOriginMonitor = _focusOriginMonitor;
         /**
@@ -5970,15 +5758,15 @@ class MdCheckbox {
          * Users can specify the `aria-labelledby` attribute which will be forwarded to the input element
          */
         this.ariaLabelledby = null;
+        this._uniqueId = `md-checkbox-${++nextUniqueId$1}`;
         /**
-         * A unique id for the checkbox. If one is not supplied, it is auto-generated.
+         * A unique id for the checkbox input. If none is supplied, it will be auto-generated.
          */
-        this.id = `md-checkbox-${++nextId}`;
+        this.id = this._uniqueId;
         /**
          * Whether the label should appear after or before the checkbox. Defaults to 'after'
          */
         this.labelPosition = 'after';
-        this._disabled = false;
         /**
          * Tabindex value that is passed to the underlying input element.
          */
@@ -6004,26 +5792,13 @@ class MdCheckbox {
         this._currentCheckState = TransitionCheckState.Init;
         this._checked = false;
         this._indeterminate = false;
-        this._controlValueAccessorChangeFn = (value) => { };
-        this.color = 'accent';
+        this._controlValueAccessorChangeFn = () => { };
     }
     /**
-     * Whether the ripple effect for this checkbox is disabled.
+     * Returns the unique id for the visual hidden input.
      * @return {?}
      */
-    get disableRipple() { return this._disableRipple; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set disableRipple(value) { this._disableRipple = coerceBooleanProperty(value); }
-    /**
-     * ID of the native input element inside `<md-checkbox>`
-     * @return {?}
-     */
-    get inputId() {
-        return `input-${this.id}`;
-    }
+    get inputId() { return `${this.id || this._uniqueId}-input`; }
     /**
      * Whether the checkbox is required.
      * @return {?}
@@ -6051,16 +5826,6 @@ class MdCheckbox {
     set align(v) {
         this.labelPosition = (v == 'start') ? 'after' : 'before';
     }
-    /**
-     * Whether the checkbox is disabled.
-     * @return {?}
-     */
-    get disabled() { return this._disabled; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set disabled(value) { this._disabled = coerceBooleanProperty(value); }
     /**
      * @return {?}
      */
@@ -6120,39 +5885,20 @@ class MdCheckbox {
         }
     }
     /**
-     * The color of the button. Can be `primary`, `accent`, or `warn`.
-     * @return {?}
-     */
-    get color() { return this._color; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set color(value) { this._updateColor(value); }
-    /**
-     * @param {?} newColor
-     * @return {?}
-     */
-    _updateColor(newColor) {
-        this._setElementColor(this._color, false);
-        this._setElementColor(newColor, true);
-        this._color = newColor;
-    }
-    /**
-     * @param {?} color
-     * @param {?} isAdd
-     * @return {?}
-     */
-    _setElementColor(color, isAdd) {
-        if (color != null && color != '') {
-            this._renderer.setElementClass(this._elementRef.nativeElement, `mat-${color}`, isAdd);
-        }
-    }
-    /**
      * @return {?}
      */
     _isRippleDisabled() {
         return this.disableRipple || this.disabled;
+    }
+    /**
+     * Method being called whenever the label text changes.
+     * @return {?}
+     */
+    _onLabelTextChange() {
+        // This method is getting called whenever the label of the checkbox changes.
+        // Since the checkbox uses the OnPush strategy we need to notify it about the change
+        // that has been recognized by the cdkObserveContent directive.
+        this._changeDetectorRef.markForCheck();
     }
     /**
      * Sets the model value. Implemented as part of ControlValueAccessor.
@@ -6201,12 +5947,12 @@ class MdCheckbox {
             return;
         }
         if (this._currentAnimationClass.length > 0) {
-            renderer.setElementClass(elementRef.nativeElement, this._currentAnimationClass, false);
+            renderer.removeClass(elementRef.nativeElement, this._currentAnimationClass);
         }
         this._currentAnimationClass = this._getAnimationClassForCheckStateTransition(oldState, newState);
         this._currentCheckState = newState;
         if (this._currentAnimationClass.length > 0) {
-            renderer.setElementClass(elementRef.nativeElement, this._currentAnimationClass, true);
+            renderer.addClass(elementRef.nativeElement, this._currentAnimationClass);
         }
     }
     /**
@@ -6279,7 +6025,7 @@ class MdCheckbox {
      * @return {?}
      */
     focus() {
-        this._focusOriginMonitor.focusVia(this._inputElement.nativeElement, this._renderer, 'keyboard');
+        this._focusOriginMonitor.focusVia(this._inputElement.nativeElement, 'keyboard');
     }
     /**
      * @param {?} event
@@ -6297,7 +6043,7 @@ class MdCheckbox {
      * @return {?}
      */
     _getAnimationClassForCheckStateTransition(oldState, newState) {
-        let /** @type {?} */ animSuffix;
+        let /** @type {?} */ animSuffix = '';
         switch (oldState) {
             case TransitionCheckState.Init:
                 // Handle edge case where user interacts with checkbox that does not have [(ngModel)] or
@@ -6323,6 +6069,7 @@ class MdCheckbox {
             case TransitionCheckState.Indeterminate:
                 animSuffix = newState === TransitionCheckState.Checked ?
                     'indeterminate-checked' : 'indeterminate-unchecked';
+                break;
         }
         return `mat-checkbox-anim-${animSuffix}`;
     }
@@ -6339,16 +6086,18 @@ class MdCheckbox {
 }
 MdCheckbox.decorators = [
     { type: Component, args: [{selector: 'md-checkbox, mat-checkbox',
-                template: "<label class=\"mat-checkbox-layout\" #label> <div class=\"mat-checkbox-inner-container\"> <input #input class=\"mat-checkbox-input cdk-visually-hidden\" type=\"checkbox\" [id]=\"inputId\" [required]=\"required\" [checked]=\"checked\" [value]=\"value\" [disabled]=\"disabled\" [name]=\"name\" [tabIndex]=\"tabIndex\" [indeterminate]=\"indeterminate\" [attr.aria-label]=\"ariaLabel\" [attr.aria-labelledby]=\"ariaLabelledby\" (change)=\"_onInteractionEvent($event)\" (click)=\"_onInputClick($event)\"> <div md-ripple class=\"mat-checkbox-ripple\" [mdRippleTrigger]=\"label\" [mdRippleDisabled]=\"_isRippleDisabled()\" [mdRippleCentered]=\"true\"></div> <div class=\"mat-checkbox-frame\"></div> <div class=\"mat-checkbox-background\"> <svg version=\"1.1\" class=\"mat-checkbox-checkmark\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" xml:space=\"preserve\"> <path class=\"mat-checkbox-checkmark-path\" fill=\"none\" stroke=\"white\" d=\"M4.1,12.7 9,17.6 20.3,6.3\"/> </svg> <!-- Element for rendering the indeterminate state checkbox. --> <div class=\"mat-checkbox-mixedmark\"></div> </div> </div> <span class=\"mat-checkbox-label\"> <ng-content></ng-content> </span> </label> ",
-                styles: ["@keyframes mat-checkbox-fade-in-background{0%{opacity:0}50%{opacity:1}}@keyframes mat-checkbox-fade-out-background{0%,50%{opacity:1}100%{opacity:0}}@keyframes mat-checkbox-unchecked-checked-checkmark-path{0%,50%{stroke-dashoffset:22.91026}50%{animation-timing-function:cubic-bezier(0,0,.2,.1)}100%{stroke-dashoffset:0}}@keyframes mat-checkbox-unchecked-indeterminate-mixedmark{0%,68.2%{transform:scaleX(0)}68.2%{animation-timing-function:cubic-bezier(0,0,0,1)}100%{transform:scaleX(1)}}@keyframes mat-checkbox-checked-unchecked-checkmark-path{from{animation-timing-function:cubic-bezier(.4,0,1,1);stroke-dashoffset:0}to{stroke-dashoffset:-22.91026}}@keyframes mat-checkbox-checked-indeterminate-checkmark{from{animation-timing-function:cubic-bezier(0,0,.2,.1);opacity:1;transform:rotate(0)}to{opacity:0;transform:rotate(45deg)}}@keyframes mat-checkbox-indeterminate-checked-checkmark{from{animation-timing-function:cubic-bezier(.14,0,0,1);opacity:0;transform:rotate(45deg)}to{opacity:1;transform:rotate(360deg)}}@keyframes mat-checkbox-checked-indeterminate-mixedmark{from{animation-timing-function:cubic-bezier(0,0,.2,.1);opacity:0;transform:rotate(-45deg)}to{opacity:1;transform:rotate(0)}}@keyframes mat-checkbox-indeterminate-checked-mixedmark{from{animation-timing-function:cubic-bezier(.14,0,0,1);opacity:1;transform:rotate(0)}to{opacity:0;transform:rotate(315deg)}}@keyframes mat-checkbox-indeterminate-unchecked-mixedmark{0%{animation-timing-function:linear;opacity:1;transform:scaleX(1)}100%,32.8%{opacity:0;transform:scaleX(0)}}.mat-checkbox-background,.mat-checkbox-checkmark,.mat-checkbox-frame{bottom:0;left:0;position:absolute;right:0;top:0}.mat-checkbox-checkmark,.mat-checkbox-mixedmark{width:calc(100% - 4px)}.mat-checkbox-background,.mat-checkbox-frame{border-radius:2px;box-sizing:border-box;pointer-events:none}.mat-checkbox{font-family:Roboto,\"Helvetica Neue\",sans-serif;transition:background .4s cubic-bezier(.25,.8,.25,1),box-shadow 280ms cubic-bezier(.4,0,.2,1)}.mat-checkbox-label{cursor:pointer}.mat-checkbox-layout{cursor:inherit;align-items:baseline;vertical-align:middle;display:inline-flex}.mat-checkbox-inner-container{display:inline-block;height:20px;line-height:0;margin:auto;margin-right:8px;order:0;position:relative;vertical-align:middle;white-space:nowrap;width:20px;flex-shrink:0}[dir=rtl] .mat-checkbox-inner-container{margin-left:8px;margin-right:auto}.mat-checkbox-layout .mat-checkbox-label{line-height:24px}.mat-checkbox-frame{background-color:transparent;transition:border-color 90ms cubic-bezier(0,0,.2,.1);border-width:2px;border-style:solid}.mat-checkbox-background{align-items:center;display:inline-flex;justify-content:center;transition:background-color 90ms cubic-bezier(0,0,.2,.1),opacity 90ms cubic-bezier(0,0,.2,.1)}.mat-checkbox-checkmark{width:100%}.mat-checkbox-checkmark-path{stroke-dashoffset:22.91026;stroke-dasharray:22.91026;stroke-width:2.66667px}.mat-checkbox-mixedmark{height:2px;opacity:0;transform:scaleX(0) rotate(0)}.mat-checkbox-label-before .mat-checkbox-inner-container{order:1;margin-left:8px;margin-right:auto}[dir=rtl] .mat-checkbox-label-before .mat-checkbox-inner-container{margin-left:auto;margin-right:8px}.mat-checkbox-checked .mat-checkbox-checkmark{opacity:1}.mat-checkbox-checked .mat-checkbox-checkmark-path{stroke-dashoffset:0}.mat-checkbox-checked .mat-checkbox-mixedmark{transform:scaleX(1) rotate(-45deg)}.mat-checkbox-indeterminate .mat-checkbox-checkmark{opacity:0;transform:rotate(45deg)}.mat-checkbox-indeterminate .mat-checkbox-checkmark-path{stroke-dashoffset:0}.mat-checkbox-indeterminate .mat-checkbox-mixedmark{opacity:1;transform:scaleX(1) rotate(0)}.mat-checkbox-unchecked .mat-checkbox-background{background-color:transparent}.mat-checkbox-disabled{cursor:default}.mat-checkbox-anim-unchecked-checked .mat-checkbox-background{animation:180ms linear 0s mat-checkbox-fade-in-background}.mat-checkbox-anim-unchecked-checked .mat-checkbox-checkmark-path{animation:180ms linear 0s mat-checkbox-unchecked-checked-checkmark-path}.mat-checkbox-anim-unchecked-indeterminate .mat-checkbox-background{animation:180ms linear 0s mat-checkbox-fade-in-background}.mat-checkbox-anim-unchecked-indeterminate .mat-checkbox-mixedmark{animation:90ms linear 0s mat-checkbox-unchecked-indeterminate-mixedmark}.mat-checkbox-anim-checked-unchecked .mat-checkbox-background{animation:180ms linear 0s mat-checkbox-fade-out-background}.mat-checkbox-anim-checked-unchecked .mat-checkbox-checkmark-path{animation:90ms linear 0s mat-checkbox-checked-unchecked-checkmark-path}.mat-checkbox-anim-checked-indeterminate .mat-checkbox-checkmark{animation:90ms linear 0s mat-checkbox-checked-indeterminate-checkmark}.mat-checkbox-anim-checked-indeterminate .mat-checkbox-mixedmark{animation:90ms linear 0s mat-checkbox-checked-indeterminate-mixedmark}.mat-checkbox-anim-indeterminate-checked .mat-checkbox-checkmark{animation:.5s linear 0s mat-checkbox-indeterminate-checked-checkmark}.mat-checkbox-anim-indeterminate-checked .mat-checkbox-mixedmark{animation:.5s linear 0s mat-checkbox-indeterminate-checked-mixedmark}.mat-checkbox-anim-indeterminate-unchecked .mat-checkbox-background{animation:180ms linear 0s mat-checkbox-fade-out-background}.mat-checkbox-anim-indeterminate-unchecked .mat-checkbox-mixedmark{animation:.3s linear 0s mat-checkbox-indeterminate-unchecked-mixedmark}.mat-checkbox-input{bottom:0;left:50%}.mat-checkbox-ripple{position:absolute;left:-15px;top:-15px;right:-15px;bottom:-15px;border-radius:50%;z-index:1;pointer-events:none} /*# sourceMappingURL=checkbox.css.map */ "],
+                template: "<label [attr.for]=\"inputId\" class=\"mat-checkbox-layout\" #label><div class=\"mat-checkbox-inner-container\" [class.mat-checkbox-inner-container-no-side-margin]=\"!checkboxLabel.textContent || !checkboxLabel.textContent.trim()\"><input #input class=\"mat-checkbox-input cdk-visually-hidden\" type=\"checkbox\" [id]=\"inputId\" [required]=\"required\" [checked]=\"checked\" [value]=\"value\" [disabled]=\"disabled\" [name]=\"name\" [tabIndex]=\"tabIndex\" [indeterminate]=\"indeterminate\" [attr.aria-label]=\"ariaLabel\" [attr.aria-labelledby]=\"ariaLabelledby\" (change)=\"_onInteractionEvent($event)\" (click)=\"_onInputClick($event)\"><div md-ripple class=\"mat-checkbox-ripple\" [mdRippleTrigger]=\"label\" [mdRippleDisabled]=\"_isRippleDisabled()\" [mdRippleCentered]=\"true\"></div><div class=\"mat-checkbox-frame\"></div><div class=\"mat-checkbox-background\"><svg version=\"1.1\" focusable=\"false\" class=\"mat-checkbox-checkmark\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" xml:space=\"preserve\"><path class=\"mat-checkbox-checkmark-path\" fill=\"none\" stroke=\"white\" d=\"M4.1,12.7 9,17.6 20.3,6.3\"/></svg><div class=\"mat-checkbox-mixedmark\"></div></div></div><span class=\"mat-checkbox-label\" #checkboxLabel (cdkObserveContent)=\"_onLabelTextChange()\"><span style=\"display:none\">&nbsp;</span><ng-content></ng-content></span></label>",
+                styles: ["@keyframes mat-checkbox-fade-in-background{0%{opacity:0}50%{opacity:1}}@keyframes mat-checkbox-fade-out-background{0%,50%{opacity:1}100%{opacity:0}}@keyframes mat-checkbox-unchecked-checked-checkmark-path{0%,50%{stroke-dashoffset:22.91026}50%{animation-timing-function:cubic-bezier(0,0,.2,.1)}100%{stroke-dashoffset:0}}@keyframes mat-checkbox-unchecked-indeterminate-mixedmark{0%,68.2%{transform:scaleX(0)}68.2%{animation-timing-function:cubic-bezier(0,0,0,1)}100%{transform:scaleX(1)}}@keyframes mat-checkbox-checked-unchecked-checkmark-path{from{animation-timing-function:cubic-bezier(.4,0,1,1);stroke-dashoffset:0}to{stroke-dashoffset:-22.91026}}@keyframes mat-checkbox-checked-indeterminate-checkmark{from{animation-timing-function:cubic-bezier(0,0,.2,.1);opacity:1;transform:rotate(0)}to{opacity:0;transform:rotate(45deg)}}@keyframes mat-checkbox-indeterminate-checked-checkmark{from{animation-timing-function:cubic-bezier(.14,0,0,1);opacity:0;transform:rotate(45deg)}to{opacity:1;transform:rotate(360deg)}}@keyframes mat-checkbox-checked-indeterminate-mixedmark{from{animation-timing-function:cubic-bezier(0,0,.2,.1);opacity:0;transform:rotate(-45deg)}to{opacity:1;transform:rotate(0)}}@keyframes mat-checkbox-indeterminate-checked-mixedmark{from{animation-timing-function:cubic-bezier(.14,0,0,1);opacity:1;transform:rotate(0)}to{opacity:0;transform:rotate(315deg)}}@keyframes mat-checkbox-indeterminate-unchecked-mixedmark{0%{animation-timing-function:linear;opacity:1;transform:scaleX(1)}100%,32.8%{opacity:0;transform:scaleX(0)}}.mat-checkbox-background,.mat-checkbox-checkmark,.mat-checkbox-frame{bottom:0;left:0;position:absolute;right:0;top:0}.mat-checkbox-checkmark,.mat-checkbox-mixedmark{width:calc(100% - 4px)}.mat-checkbox-background,.mat-checkbox-frame{border-radius:2px;box-sizing:border-box;pointer-events:none}.mat-checkbox{transition:background .4s cubic-bezier(.25,.8,.25,1),box-shadow 280ms cubic-bezier(.4,0,.2,1);cursor:pointer}.mat-checkbox-layout{cursor:inherit;align-items:baseline;vertical-align:middle;display:inline-flex}.mat-checkbox-inner-container{display:inline-block;height:20px;line-height:0;margin:auto;margin-right:8px;order:0;position:relative;vertical-align:middle;white-space:nowrap;width:20px;flex-shrink:0}[dir=rtl] .mat-checkbox-inner-container{margin-left:8px;margin-right:auto}.mat-checkbox-inner-container-no-side-margin{margin-left:0;margin-right:0}.mat-checkbox-frame{background-color:transparent;transition:border-color 90ms cubic-bezier(0,0,.2,.1);border-width:2px;border-style:solid}.mat-checkbox-background{align-items:center;display:inline-flex;justify-content:center;transition:background-color 90ms cubic-bezier(0,0,.2,.1),opacity 90ms cubic-bezier(0,0,.2,.1)}.mat-checkbox-checkmark{width:100%}.mat-checkbox-checkmark-path{stroke-dashoffset:22.91026;stroke-dasharray:22.91026;stroke-width:2.66667px}.mat-checkbox-mixedmark{height:2px;opacity:0;transform:scaleX(0) rotate(0)}.mat-checkbox-label-before .mat-checkbox-inner-container{order:1;margin-left:8px;margin-right:auto}[dir=rtl] .mat-checkbox-label-before .mat-checkbox-inner-container{margin-left:auto;margin-right:8px}.mat-checkbox-checked .mat-checkbox-checkmark{opacity:1}.mat-checkbox-checked .mat-checkbox-checkmark-path{stroke-dashoffset:0}.mat-checkbox-checked .mat-checkbox-mixedmark{transform:scaleX(1) rotate(-45deg)}.mat-checkbox-indeterminate .mat-checkbox-checkmark{opacity:0;transform:rotate(45deg)}.mat-checkbox-indeterminate .mat-checkbox-checkmark-path{stroke-dashoffset:0}.mat-checkbox-indeterminate .mat-checkbox-mixedmark{opacity:1;transform:scaleX(1) rotate(0)}.mat-checkbox-unchecked .mat-checkbox-background{background-color:transparent}.mat-checkbox-disabled{cursor:default}.mat-checkbox-anim-unchecked-checked .mat-checkbox-background{animation:180ms linear 0s mat-checkbox-fade-in-background}.mat-checkbox-anim-unchecked-checked .mat-checkbox-checkmark-path{animation:180ms linear 0s mat-checkbox-unchecked-checked-checkmark-path}.mat-checkbox-anim-unchecked-indeterminate .mat-checkbox-background{animation:180ms linear 0s mat-checkbox-fade-in-background}.mat-checkbox-anim-unchecked-indeterminate .mat-checkbox-mixedmark{animation:90ms linear 0s mat-checkbox-unchecked-indeterminate-mixedmark}.mat-checkbox-anim-checked-unchecked .mat-checkbox-background{animation:180ms linear 0s mat-checkbox-fade-out-background}.mat-checkbox-anim-checked-unchecked .mat-checkbox-checkmark-path{animation:90ms linear 0s mat-checkbox-checked-unchecked-checkmark-path}.mat-checkbox-anim-checked-indeterminate .mat-checkbox-checkmark{animation:90ms linear 0s mat-checkbox-checked-indeterminate-checkmark}.mat-checkbox-anim-checked-indeterminate .mat-checkbox-mixedmark{animation:90ms linear 0s mat-checkbox-checked-indeterminate-mixedmark}.mat-checkbox-anim-indeterminate-checked .mat-checkbox-checkmark{animation:.5s linear 0s mat-checkbox-indeterminate-checked-checkmark}.mat-checkbox-anim-indeterminate-checked .mat-checkbox-mixedmark{animation:.5s linear 0s mat-checkbox-indeterminate-checked-mixedmark}.mat-checkbox-anim-indeterminate-unchecked .mat-checkbox-background{animation:180ms linear 0s mat-checkbox-fade-out-background}.mat-checkbox-anim-indeterminate-unchecked .mat-checkbox-mixedmark{animation:.3s linear 0s mat-checkbox-indeterminate-unchecked-mixedmark}.mat-checkbox-input{bottom:0;left:50%}.mat-checkbox-ripple{position:absolute;left:-15px;top:-15px;right:-15px;bottom:-15px;border-radius:50%;z-index:1;pointer-events:none}"],
                 host: {
-                    '[class.mat-checkbox]': 'true',
+                    'class': 'mat-checkbox',
+                    '[id]': 'id',
                     '[class.mat-checkbox-indeterminate]': 'indeterminate',
                     '[class.mat-checkbox-checked]': 'checked',
                     '[class.mat-checkbox-disabled]': 'disabled',
                     '[class.mat-checkbox-label-before]': 'labelPosition == "before"',
                 },
                 providers: [MD_CHECKBOX_CONTROL_VALUE_ACCESSOR],
+                inputs: ['disabled', 'disableRipple', 'color'],
                 encapsulation: ViewEncapsulation.None,
                 changeDetection: ChangeDetectionStrategy.OnPush
             },] },
@@ -6357,7 +6106,7 @@ MdCheckbox.decorators = [
  * @nocollapse
  */
 MdCheckbox.ctorParameters = () => [
-    { type: Renderer, },
+    { type: Renderer2, },
     { type: ElementRef, },
     { type: ChangeDetectorRef, },
     { type: FocusOriginMonitor, },
@@ -6366,11 +6115,9 @@ MdCheckbox.propDecorators = {
     'ariaLabel': [{ type: Input, args: ['aria-label',] },],
     'ariaLabelledby': [{ type: Input, args: ['aria-labelledby',] },],
     'id': [{ type: Input },],
-    'disableRipple': [{ type: Input },],
     'required': [{ type: Input },],
     'align': [{ type: Input },],
     'labelPosition': [{ type: Input },],
-    'disabled': [{ type: Input },],
     'tabIndex': [{ type: Input },],
     'name': [{ type: Input },],
     'change': [{ type: Output },],
@@ -6380,26 +6127,43 @@ MdCheckbox.propDecorators = {
     '_ripple': [{ type: ViewChild, args: [MdRipple,] },],
     'checked': [{ type: Input },],
     'indeterminate': [{ type: Input },],
-    'color': [{ type: Input },],
 };
 
+const _MdCheckboxRequiredValidator = CheckboxRequiredValidator;
+const MD_CHECKBOX_REQUIRED_VALIDATOR = {
+    provide: NG_VALIDATORS,
+    useExisting: forwardRef(() => MdCheckboxRequiredValidator),
+    multi: true
+};
+/**
+ * Validator for Material checkbox's required attribute in template-driven checkbox.
+ * Current CheckboxRequiredValidator only work with `input type=checkbox` and does not
+ * work with `md-checkbox`.
+ */
+class MdCheckboxRequiredValidator extends _MdCheckboxRequiredValidator {
+}
+MdCheckboxRequiredValidator.decorators = [
+    { type: Directive, args: [{
+                selector: 'md-checkbox[required][formControlName],' +
+                    'mat-checkbox[required][formControlName],' +
+                    'md-checkbox[required][formControl],md-checkbox[required][ngModel],' +
+                    'mat-checkbox[required][formControl],mat-checkbox[required][ngModel]',
+                providers: [MD_CHECKBOX_REQUIRED_VALIDATOR],
+                host: { '[attr.required]': 'required ? "" : null' }
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdCheckboxRequiredValidator.ctorParameters = () => [];
+
 class MdCheckboxModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdCheckboxModule,
-            providers: []
-        };
-    }
 }
 MdCheckboxModule.decorators = [
     { type: NgModule, args: [{
-                imports: [CommonModule, MdRippleModule, CompatibilityModule],
-                exports: [MdCheckbox, CompatibilityModule],
-                declarations: [MdCheckbox],
+                imports: [CommonModule, MdRippleModule, MdCommonModule, ObserversModule],
+                exports: [MdCheckbox, MdCheckboxRequiredValidator, MdCommonModule],
+                declarations: [MdCheckbox, MdCheckboxRequiredValidator],
                 providers: [FocusOriginMonitor]
             },] },
 ];
@@ -6408,6 +6172,8 @@ MdCheckboxModule.decorators = [
  */
 MdCheckboxModule.ctorParameters = () => [];
 
+// Increasing integer for generating unique ids for radio components.
+let nextUniqueId$2 = 0;
 /**
  * Provider Expression that allows md-radio-group to register as a ControlValueAccessor. This
  * allows it to support [(ngModel)] and ngControl.
@@ -6418,17 +6184,27 @@ const MD_RADIO_GROUP_CONTROL_VALUE_ACCESSOR = {
     useExisting: forwardRef(() => MdRadioGroup),
     multi: true
 };
-let _uniqueIdCounter$2 = 0;
 /**
  * Change event object emitted by MdRadio and MdRadioGroup.
  */
 class MdRadioChange {
 }
 /**
+ * \@docs-private
+ */
+class MdRadioGroupBase {
+}
+const _MdRadioGroupMixinBase = mixinDisabled(MdRadioGroupBase);
+/**
  * A group of radio buttons. May contain one or more `<md-radio-button>` elements.
  */
-class MdRadioGroup {
-    constructor() {
+class MdRadioGroup extends _MdRadioGroupMixinBase {
+    /**
+     * @param {?} _changeDetector
+     */
+    constructor(_changeDetector) {
+        super();
+        this._changeDetector = _changeDetector;
         /**
          * Selected value for group. Should equal the value of the selected radio button if there *is*
          * a corresponding radio button with a matching value. If there is *not* such a corresponding
@@ -6439,11 +6215,7 @@ class MdRadioGroup {
         /**
          * The HTML name attribute applied to radio buttons in this group.
          */
-        this._name = `md-radio-group-${_uniqueIdCounter$2++}`;
-        /**
-         * Disables all individual radio buttons assigned to this group.
-         */
-        this._disabled = false;
+        this._name = `md-radio-group-${nextUniqueId$2++}`;
         /**
          * The currently selected radio button. Should match value.
          */
@@ -6453,9 +6225,21 @@ class MdRadioGroup {
          */
         this._isInitialized = false;
         /**
+         * Whether the labels should appear after or before the radio-buttons. Defaults to 'after'
+         */
+        this._labelPosition = 'after';
+        /**
+         * Whether the radio group is disabled.
+         */
+        this._disabled = false;
+        /**
+         * Whether the radio group is required.
+         */
+        this._required = false;
+        /**
          * The method to be called in order to update ngModel
          */
-        this._controlValueAccessorChangeFn = (value) => { };
+        this._controlValueAccessorChangeFn = () => { };
         /**
          * onTouch function registered via registerOnTouch (ControlValueAccessor).
          * \@docs-private
@@ -6467,14 +6251,6 @@ class MdRadioGroup {
          * a radio button (the same behavior as `<input type-"radio">`).
          */
         this.change = new EventEmitter();
-        /**
-         * Child radio buttons.
-         */
-        this._radios = null;
-        /**
-         * Whether the labels should appear after or before the radio-buttons. Defaults to 'after'
-         */
-        this.labelPosition = 'after';
     }
     /**
      * Name of the radio button group. All radio buttons inside this group will use this name.
@@ -6507,17 +6283,19 @@ class MdRadioGroup {
         this.labelPosition = (v == 'start') ? 'after' : 'before';
     }
     /**
-     * Whether the radio button is disabled.
+     * Whether the labels should appear after or before the radio-buttons. Defaults to 'after'
      * @return {?}
      */
-    get disabled() { return this._disabled; }
+    get labelPosition() {
+        return this._labelPosition;
+    }
     /**
-     * @param {?} value
+     * @param {?} v
      * @return {?}
      */
-    set disabled(value) {
-        // The presence of *any* disabled value makes the component disabled, *except* for false.
-        this._disabled = (value != null && value !== false) ? true : null;
+    set labelPosition(v) {
+        this._labelPosition = (v == 'before') ? 'before' : 'after';
+        this._markRadiosForCheck();
     }
     /**
      * Value of the radio button.
@@ -6540,7 +6318,7 @@ class MdRadioGroup {
      * @return {?}
      */
     _checkSelectedRadioButton() {
-        if (this.selected && !this._selected.checked) {
+        if (this._selected && !this._selected.checked) {
             this._selected.checked = true;
         }
     }
@@ -6557,6 +6335,32 @@ class MdRadioGroup {
         this._selected = selected;
         this.value = selected ? selected.value : null;
         this._checkSelectedRadioButton();
+    }
+    /**
+     * Whether the radio group is disabled
+     * @return {?}
+     */
+    get disabled() { return this._disabled; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set disabled(value) {
+        this._disabled = coerceBooleanProperty(value);
+        this._markRadiosForCheck();
+    }
+    /**
+     * Whether the radio group is required
+     * @return {?}
+     */
+    get required() { return this._required; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set required(value) {
+        this._required = coerceBooleanProperty(value);
+        this._markRadiosForCheck();
     }
     /**
      * Initialize properties once content children are available.
@@ -6595,7 +6399,7 @@ class MdRadioGroup {
      */
     _updateSelectedRadioFromValue() {
         // If the value already matches the selected radio, do nothing.
-        let /** @type {?} */ isAlreadySelected = this._selected != null && this._selected.value == this._value;
+        const /** @type {?} */ isAlreadySelected = this._selected != null && this._selected.value == this._value;
         if (this._radios != null && !isAlreadySelected) {
             this._selected = null;
             this._radios.forEach(radio => {
@@ -6612,10 +6416,18 @@ class MdRadioGroup {
      */
     _emitChangeEvent() {
         if (this._isInitialized) {
-            let /** @type {?} */ event = new MdRadioChange();
+            const /** @type {?} */ event = new MdRadioChange();
             event.source = this._selected;
             event.value = this._value;
             this.change.emit(event);
+        }
+    }
+    /**
+     * @return {?}
+     */
+    _markRadiosForCheck() {
+        if (this._radios) {
+            this._radios.forEach(radio => radio._markForCheck());
         }
     }
     /**
@@ -6625,6 +6437,7 @@ class MdRadioGroup {
      */
     writeValue(value) {
         this.value = value;
+        this._changeDetector.markForCheck();
     }
     /**
      * Registers a callback to be triggered when the model value changes.
@@ -6651,6 +6464,7 @@ class MdRadioGroup {
      */
     setDisabledState(isDisabled) {
         this.disabled = isDisabled;
+        this._changeDetector.markForCheck();
     }
 }
 MdRadioGroup.decorators = [
@@ -6659,46 +6473,66 @@ MdRadioGroup.decorators = [
                 providers: [MD_RADIO_GROUP_CONTROL_VALUE_ACCESSOR],
                 host: {
                     'role': 'radiogroup',
-                    '[class.mat-radio-group]': 'true',
+                    'class': 'mat-radio-group',
                 },
+                inputs: ['disabled'],
             },] },
 ];
 /**
  * @nocollapse
  */
-MdRadioGroup.ctorParameters = () => [];
+MdRadioGroup.ctorParameters = () => [
+    { type: ChangeDetectorRef, },
+];
 MdRadioGroup.propDecorators = {
     'change': [{ type: Output },],
     '_radios': [{ type: ContentChildren, args: [forwardRef(() => MdRadioButton),] },],
     'name': [{ type: Input },],
     'align': [{ type: Input },],
     'labelPosition': [{ type: Input },],
-    'disabled': [{ type: Input },],
     'value': [{ type: Input },],
     'selected': [{ type: Input },],
+    'disabled': [{ type: Input },],
+    'required': [{ type: Input },],
 };
+/**
+ * \@docs-private
+ */
+class MdRadioButtonBase {
+    /**
+     * @param {?} _renderer
+     * @param {?} _elementRef
+     */
+    constructor(_renderer, _elementRef) {
+        this._renderer = _renderer;
+        this._elementRef = _elementRef;
+    }
+}
+// As per Material design specifications the selection control radio should use the accent color
+// palette by default. https://material.io/guidelines/components/selection-controls.html
+const _MdRadioButtonMixinBase = mixinColor(mixinDisableRipple(MdRadioButtonBase), 'accent');
 /**
  * A radio-button. May be inside of
  */
-class MdRadioButton {
+class MdRadioButton extends _MdRadioButtonMixinBase {
     /**
      * @param {?} radioGroup
-     * @param {?} _elementRef
-     * @param {?} _renderer
+     * @param {?} elementRef
+     * @param {?} renderer
+     * @param {?} _changeDetector
      * @param {?} _focusOriginMonitor
      * @param {?} _radioDispatcher
      */
-    constructor(radioGroup, _elementRef, _renderer, _focusOriginMonitor, _radioDispatcher) {
-        // Assertions. Ideally these should be stripped out by the compiler.
-        // TODO(jelbourn): Assert that there's no name binding AND a parent radio group.
-        this._elementRef = _elementRef;
-        this._renderer = _renderer;
+    constructor(radioGroup, elementRef, renderer, _changeDetector, _focusOriginMonitor, _radioDispatcher) {
+        super(renderer, elementRef);
+        this._changeDetector = _changeDetector;
         this._focusOriginMonitor = _focusOriginMonitor;
         this._radioDispatcher = _radioDispatcher;
+        this._uniqueId = `md-radio-${++nextUniqueId$2}`;
         /**
          * The unique ID for the radio button.
          */
-        this.id = `md-radio-${_uniqueIdCounter$2++}`;
+        this.id = this._uniqueId;
         /**
          * Event emitted when the checked state of this radio button changes.
          * Change events are only emitted when the value changes due to user interaction with
@@ -6713,23 +6547,20 @@ class MdRadioButton {
          * Value assigned to this radio.
          */
         this._value = null;
+        /**
+         * Unregister function for _radioDispatcher *
+         */
+        this._removeUniqueSelectionListener = () => { };
+        // Assertions. Ideally these should be stripped out by the compiler.
+        // TODO(jelbourn): Assert that there's no name binding AND a parent radio group.
         this.radioGroup = radioGroup;
-        _radioDispatcher.listen((id, name) => {
-            if (id != this.id && name == this.name) {
-                this.checked = false;
-            }
-        });
+        this._removeUniqueSelectionListener =
+            _radioDispatcher.listen((id, name) => {
+                if (id != this.id && name == this.name) {
+                    this.checked = false;
+                }
+            });
     }
-    /**
-     * Whether the ripple effect for this radio button is disabled.
-     * @return {?}
-     */
-    get disableRipple() { return this._disableRipple; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set disableRipple(value) { this._disableRipple = coerceBooleanProperty(value); }
     /**
      * Whether this radio button is checked.
      * @return {?}
@@ -6756,6 +6587,7 @@ class MdRadioButton {
                 // Notify all radio buttons with the same name to un-check.
                 this._radioDispatcher.notify(this.id, this.name);
             }
+            this._changeDetector.markForCheck();
         }
     }
     /**
@@ -6826,22 +6658,44 @@ class MdRadioButton {
      * @return {?}
      */
     set disabled(value) {
-        // The presence of *any* disabled value makes the component disabled, *except* for false.
-        this._disabled = (value != null && value !== false) ? true : null;
+        this._disabled = coerceBooleanProperty(value);
+    }
+    /**
+     * Whether the radio button is required.
+     * @return {?}
+     */
+    get required() {
+        return this._required || (this.radioGroup && this.radioGroup.required);
+    }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set required(value) {
+        this._required = coerceBooleanProperty(value);
     }
     /**
      * ID of the native input element inside `<md-radio-button>`
      * @return {?}
      */
-    get inputId() {
-        return `${this.id}-input`;
-    }
+    get inputId() { return `${this.id || this._uniqueId}-input`; }
     /**
      * Focuses the radio button.
      * @return {?}
      */
     focus() {
-        this._focusOriginMonitor.focusVia(this._inputElement.nativeElement, this._renderer, 'keyboard');
+        this._focusOriginMonitor.focusVia(this._inputElement.nativeElement, 'keyboard');
+    }
+    /**
+     * Marks the radio button as needing checking for change detection.
+     * This method is exposed because the parent radio group will directly
+     * update bound properties of the radio button.
+     * @return {?}
+     */
+    _markForCheck() {
+        // When group value changes, the button will not be notified. Use `markForCheck` to explicit
+        // update radio button's status
+        this._changeDetector.markForCheck();
     }
     /**
      * @return {?}
@@ -6867,13 +6721,14 @@ class MdRadioButton {
      */
     ngOnDestroy() {
         this._focusOriginMonitor.stopMonitoring(this._inputElement.nativeElement);
+        this._removeUniqueSelectionListener();
     }
     /**
      * Dispatch change event with current value.
      * @return {?}
      */
     _emitChangeEvent() {
-        let /** @type {?} */ event = new MdRadioChange();
+        const /** @type {?} */ event = new MdRadioChange();
         event.source = this;
         event.value = this._value;
         this.change.emit(event);
@@ -6909,7 +6764,7 @@ class MdRadioButton {
         // Otherwise the change event, from the input element, will bubble up and
         // emit its event object to the `change` output.
         event.stopPropagation();
-        let /** @type {?} */ groupValueChanged = this.radioGroup && this.value != this.radioGroup.value;
+        const /** @type {?} */ groupValueChanged = this.radioGroup && this.value != this.radioGroup.value;
         this.checked = true;
         this._emitChangeEvent();
         if (this.radioGroup) {
@@ -6942,15 +6797,21 @@ class MdRadioButton {
 }
 MdRadioButton.decorators = [
     { type: Component, args: [{selector: 'md-radio-button, mat-radio-button',
-                template: "<!-- TODO(jelbourn): render the radio on either side of the content --> <!-- TODO(mtlin): Evaluate trade-offs of using native radio vs. cost of additional bindings. --> <label [attr.for]=\"inputId\" class=\"mat-radio-label\" #label> <!-- The actual 'radio' part of the control. --> <div class=\"mat-radio-container\"> <div class=\"mat-radio-outer-circle\"></div> <div class=\"mat-radio-inner-circle\"></div> <div md-ripple class=\"mat-radio-ripple\" [mdRippleTrigger]=\"label\" [mdRippleDisabled]=\"_isRippleDisabled()\" [mdRippleCentered]=\"true\"></div> </div> <input #input class=\"mat-radio-input cdk-visually-hidden\" type=\"radio\" [id]=\"inputId\" [checked]=\"checked\" [disabled]=\"disabled\" [name]=\"name\" [attr.aria-label]=\"ariaLabel\" [attr.aria-labelledby]=\"ariaLabelledby\" (change)=\"_onInputChange($event)\" (click)=\"_onInputClick($event)\"> <!-- The label content for radio control. --> <div class=\"mat-radio-label-content\" [class.mat-radio-label-before]=\"labelPosition == 'before'\"> <ng-content></ng-content> </div> </label> ",
-                styles: [".mat-radio-button{display:inline-block;font-family:Roboto,\"Helvetica Neue\",sans-serif}.mat-radio-label{cursor:pointer;display:inline-flex;align-items:baseline;white-space:nowrap}.mat-radio-container{box-sizing:border-box;display:inline-block;height:20px;position:relative;width:20px;top:2px}.mat-radio-outer-circle{box-sizing:border-box;height:20px;left:0;position:absolute;top:0;transition:border-color ease 280ms;width:20px;border-width:2px;border-style:solid;border-radius:50%}.mat-radio-inner-circle{border-radius:50%;box-sizing:border-box;height:20px;left:0;position:absolute;top:0;transition:transform ease 280ms,background-color ease 280ms;transform:scale(0);width:20px}.mat-radio-checked .mat-radio-inner-circle{transform:scale(.5)}.mat-radio-label-content{display:inline-block;order:0;line-height:inherit;padding-left:8px;padding-right:0}[dir=rtl] .mat-radio-label-content{padding-right:8px;padding-left:0}.mat-radio-label-content.mat-radio-label-before{order:-1;padding-left:0;padding-right:8px}[dir=rtl] .mat-radio-label-content.mat-radio-label-before{padding-right:0;padding-left:8px}.mat-radio-disabled,.mat-radio-disabled .mat-radio-label{cursor:default}.mat-radio-ripple{position:absolute;left:-15px;top:-15px;right:-15px;bottom:-15px;border-radius:50%;z-index:1;pointer-events:none} /*# sourceMappingURL=radio.css.map */ "],
+                template: "<label [attr.for]=\"inputId\" class=\"mat-radio-label\" #label><div class=\"mat-radio-container\"><div class=\"mat-radio-outer-circle\"></div><div class=\"mat-radio-inner-circle\"></div><div md-ripple class=\"mat-radio-ripple\" [mdRippleTrigger]=\"label\" [mdRippleDisabled]=\"_isRippleDisabled()\" [mdRippleCentered]=\"true\"></div></div><input #input class=\"mat-radio-input cdk-visually-hidden\" type=\"radio\" [id]=\"inputId\" [checked]=\"checked\" [disabled]=\"disabled\" [name]=\"name\" [required]=\"required\" [attr.aria-label]=\"ariaLabel\" [attr.aria-labelledby]=\"ariaLabelledby\" (change)=\"_onInputChange($event)\" (click)=\"_onInputClick($event)\"><div class=\"mat-radio-label-content\" [class.mat-radio-label-before]=\"labelPosition == 'before'\"><span style=\"display:none\">&nbsp;</span><ng-content></ng-content></div></label>",
+                styles: [".mat-radio-button{display:inline-block}.mat-radio-label{cursor:pointer;display:inline-flex;align-items:center;white-space:nowrap;vertical-align:middle}.mat-radio-container{box-sizing:border-box;display:inline-block;height:20px;position:relative;width:20px}.mat-radio-outer-circle{box-sizing:border-box;height:20px;left:0;position:absolute;top:0;transition:border-color ease 280ms;width:20px;border-width:2px;border-style:solid;border-radius:50%}.mat-radio-inner-circle{border-radius:50%;box-sizing:border-box;height:20px;left:0;position:absolute;top:0;transition:transform ease 280ms,background-color ease 280ms;width:20px;transform:scale(.001)}.mat-radio-checked .mat-radio-inner-circle{transform:scale(.5)}.mat-radio-label-content{display:inline-block;order:0;line-height:inherit;padding-left:8px;padding-right:0}[dir=rtl] .mat-radio-label-content{padding-right:8px;padding-left:0}.mat-radio-label-content.mat-radio-label-before{order:-1;padding-left:0;padding-right:8px}[dir=rtl] .mat-radio-label-content.mat-radio-label-before{padding-right:0;padding-left:8px}.mat-radio-disabled,.mat-radio-disabled .mat-radio-label{cursor:default}.mat-radio-ripple{position:absolute;left:-15px;top:-15px;right:-15px;bottom:-15px;border-radius:50%;z-index:1;pointer-events:none}"],
+                inputs: ['color', 'disableRipple'],
                 encapsulation: ViewEncapsulation.None,
                 host: {
-                    '[class.mat-radio-button]': 'true',
+                    'class': 'mat-radio-button',
                     '[class.mat-radio-checked]': 'checked',
                     '[class.mat-radio-disabled]': 'disabled',
                     '[attr.id]': 'id',
-                }
+                    // Note: under normal conditions focus shouldn't land on this element, however it may be
+                    // programmatically set, for example inside of a focus trap, in this case we want to forward
+                    // the focus to the native element.
+                    '(focus)': '_inputElement.nativeElement.focus()',
+                },
+                changeDetection: ChangeDetectionStrategy.OnPush,
             },] },
 ];
 /**
@@ -6959,7 +6820,8 @@ MdRadioButton.decorators = [
 MdRadioButton.ctorParameters = () => [
     { type: MdRadioGroup, decorators: [{ type: Optional },] },
     { type: ElementRef, },
-    { type: Renderer, },
+    { type: Renderer2, },
+    { type: ChangeDetectorRef, },
     { type: FocusOriginMonitor, },
     { type: UniqueSelectionDispatcher, },
 ];
@@ -6968,33 +6830,23 @@ MdRadioButton.propDecorators = {
     'name': [{ type: Input },],
     'ariaLabel': [{ type: Input, args: ['aria-label',] },],
     'ariaLabelledby': [{ type: Input, args: ['aria-labelledby',] },],
-    'disableRipple': [{ type: Input },],
     'checked': [{ type: Input },],
     'value': [{ type: Input },],
     'align': [{ type: Input },],
     'labelPosition': [{ type: Input },],
     'disabled': [{ type: Input },],
+    'required': [{ type: Input },],
     'change': [{ type: Output },],
     '_ripple': [{ type: ViewChild, args: [MdRipple,] },],
     '_inputElement': [{ type: ViewChild, args: ['input',] },],
 };
 
 class MdRadioModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdRadioModule,
-            providers: [],
-        };
-    }
 }
 MdRadioModule.decorators = [
     { type: NgModule, args: [{
-                imports: [CommonModule, MdRippleModule, CompatibilityModule],
-                exports: [MdRadioGroup, MdRadioButton, CompatibilityModule],
+                imports: [CommonModule, MdRippleModule, MdCommonModule],
+                exports: [MdRadioGroup, MdRadioButton, MdCommonModule],
                 providers: [UNIQUE_SELECTION_DISPATCHER_PROVIDER, VIEWPORT_RULER_PROVIDER, FocusOriginMonitor],
                 declarations: [MdRadioGroup, MdRadioButton],
             },] },
@@ -7004,200 +6856,7 @@ MdRadioModule.decorators = [
  */
 MdRadioModule.ctorParameters = () => [];
 
-/**
- * This class manages keyboard events for selectable lists. If you pass it a query list
- * of items, it will set the active item correctly when arrow events occur.
- */
-class ListKeyManager {
-    /**
-     * @param {?} _items
-     */
-    constructor(_items) {
-        this._items = _items;
-        this._activeItemIndex = null;
-        this._tabOut = new Subject();
-        this._wrap = false;
-    }
-    /**
-     * Turns on wrapping mode, which ensures that the active item will wrap to
-     * the other end of list when there are no more items in the given direction.
-     *
-     * @return {?} The ListKeyManager that the method was called on.
-     */
-    withWrap() {
-        this._wrap = true;
-        return this;
-    }
-    /**
-     * Sets the active item to the item at the index specified.
-     *
-     * @param {?} index The index of the item to be set as active.
-     * @return {?}
-     */
-    setActiveItem(index) {
-        this._activeItemIndex = index;
-        this._activeItem = this._items.toArray()[index];
-    }
-    /**
-     * Sets the active item depending on the key event passed in.
-     * @param {?} event Keyboard event to be used for determining which element should be active.
-     * @return {?}
-     */
-    onKeydown(event) {
-        switch (event.keyCode) {
-            case DOWN_ARROW:
-                this.setNextItemActive();
-                break;
-            case UP_ARROW:
-                this.setPreviousItemActive();
-                break;
-            case HOME:
-                this.setFirstItemActive();
-                break;
-            case END:
-                this.setLastItemActive();
-                break;
-            case TAB:
-                // Note that we shouldn't prevent the default action on tab.
-                this._tabOut.next(null);
-                return;
-            default:
-                return;
-        }
-        event.preventDefault();
-    }
-    /**
-     * Returns the index of the currently active item.
-     * @return {?}
-     */
-    get activeItemIndex() {
-        return this._activeItemIndex;
-    }
-    /**
-     * Returns the currently active item.
-     * @return {?}
-     */
-    get activeItem() {
-        return this._activeItem;
-    }
-    /**
-     * Sets the active item to the first enabled item in the list.
-     * @return {?}
-     */
-    setFirstItemActive() {
-        this._setActiveItemByIndex(0, 1);
-    }
-    /**
-     * Sets the active item to the last enabled item in the list.
-     * @return {?}
-     */
-    setLastItemActive() {
-        this._setActiveItemByIndex(this._items.length - 1, -1);
-    }
-    /**
-     * Sets the active item to the next enabled item in the list.
-     * @return {?}
-     */
-    setNextItemActive() {
-        this._activeItemIndex === null ? this.setFirstItemActive() : this._setActiveItemByDelta(1);
-    }
-    /**
-     * Sets the active item to a previous enabled item in the list.
-     * @return {?}
-     */
-    setPreviousItemActive() {
-        this._activeItemIndex === null && this._wrap ? this.setLastItemActive()
-            : this._setActiveItemByDelta(-1);
-    }
-    /**
-     * Allows setting of the activeItemIndex without any other effects.
-     * @param {?} index The new activeItemIndex.
-     * @return {?}
-     */
-    updateActiveItemIndex(index) {
-        this._activeItemIndex = index;
-    }
-    /**
-     * Observable that emits any time the TAB key is pressed, so components can react
-     * when focus is shifted off of the list.
-     * @return {?}
-     */
-    get tabOut() {
-        return this._tabOut.asObservable();
-    }
-    /**
-     * This method sets the active item, given a list of items and the delta between the
-     * currently active item and the new active item. It will calculate differently
-     * depending on whether wrap mode is turned on.
-     * @param {?} delta
-     * @param {?=} items
-     * @return {?}
-     */
-    _setActiveItemByDelta(delta, items = this._items.toArray()) {
-        this._wrap ? this._setActiveInWrapMode(delta, items)
-            : this._setActiveInDefaultMode(delta, items);
-    }
-    /**
-     * Sets the active item properly given "wrap" mode. In other words, it will continue to move
-     * down the list until it finds an item that is not disabled, and it will wrap if it
-     * encounters either end of the list.
-     * @param {?} delta
-     * @param {?} items
-     * @return {?}
-     */
-    _setActiveInWrapMode(delta, items) {
-        // when active item would leave menu, wrap to beginning or end
-        this._activeItemIndex =
-            (this._activeItemIndex + delta + items.length) % items.length;
-        // skip all disabled menu items recursively until an enabled one is reached
-        if (items[this._activeItemIndex].disabled) {
-            this._setActiveInWrapMode(delta, items);
-        }
-        else {
-            this.setActiveItem(this._activeItemIndex);
-        }
-    }
-    /**
-     * Sets the active item properly given the default mode. In other words, it will
-     * continue to move down the list until it finds an item that is not disabled. If
-     * it encounters either end of the list, it will stop and not wrap.
-     * @param {?} delta
-     * @param {?} items
-     * @return {?}
-     */
-    _setActiveInDefaultMode(delta, items) {
-        this._setActiveItemByIndex(this._activeItemIndex + delta, delta, items);
-    }
-    /**
-     * Sets the active item to the first enabled item starting at the index specified. If the
-     * item is disabled, it will move in the fallbackDelta direction until it either
-     * finds an enabled item or encounters the end of the list.
-     * @param {?} index
-     * @param {?} fallbackDelta
-     * @param {?=} items
-     * @return {?}
-     */
-    _setActiveItemByIndex(index, fallbackDelta, items = this._items.toArray()) {
-        if (!items[index]) {
-            return;
-        }
-        while (items[index].disabled) {
-            index += fallbackDelta;
-            if (!items[index]) {
-                return;
-            }
-        }
-        this.setActiveItem(index);
-    }
-}
-
 class FocusKeyManager extends ListKeyManager {
-    /**
-     * @param {?} items
-     */
-    constructor(items) {
-        super(items);
-    }
     /**
      * This method sets the active item to the item at the specified index.
      * It also adds focuses the newly active item.
@@ -7221,20 +6880,20 @@ const transformPlaceholder = trigger('transformPlaceholder', [
     state('floating-ltr', style({
         top: '-22px',
         left: '-2px',
-        transform: `scale(0.75)`
+        transform: 'scale(0.75)'
     })),
     state('floating-rtl', style({
         top: '-22px',
         left: '2px',
-        transform: `scale(0.75)`
+        transform: 'scale(0.75)'
     })),
-    transition('* => *', animate(`400ms cubic-bezier(0.25, 0.8, 0.25, 1)`))
+    transition('* => *', animate('400ms cubic-bezier(0.25, 0.8, 0.25, 1)'))
 ]);
 /**
  * This animation transforms the select's overlay panel on and off the page.
  *
- * When the panel is attached to the DOM, it expands its width 32px, scales it up to
- * 100% on the Y axis, fades in its border, and translates slightly up and to the
+ * When the panel is attached to the DOM, it expands its width by the amount of padding, scales it
+ * up to 100% on the Y axis, fades in its border, and translates slightly up and to the
  * side to ensure the option text correctly overlaps the trigger text.
  *
  * When the panel is removed from the DOM, it simply fades out linearly.
@@ -7243,15 +6902,20 @@ const transformPanel = trigger('transformPanel', [
     state('showing', style({
         opacity: 1,
         minWidth: 'calc(100% + 32px)',
-        transform: `scaleY(1)`
+        transform: 'scaleY(1)'
+    })),
+    state('showing-multiple', style({
+        opacity: 1,
+        minWidth: 'calc(100% + 64px)',
+        transform: 'scaleY(1)'
     })),
     transition('void => *', [
         style({
             opacity: 0,
             minWidth: '100%',
-            transform: `scaleY(0)`
+            transform: 'scaleY(0)'
         }),
-        animate(`150ms cubic-bezier(0.25, 0.8, 0.25, 1)`)
+        animate('150ms cubic-bezier(0.25, 0.8, 0.25, 1)')
     ]),
     transition('* => void', [
         animate('250ms 100ms linear', style({ opacity: 0 }))
@@ -7266,34 +6930,34 @@ const fadeInContent = trigger('fadeInContent', [
     state('showing', style({ opacity: 1 })),
     transition('void => showing', [
         style({ opacity: 0 }),
-        animate(`150ms 100ms cubic-bezier(0.55, 0, 0.55, 0.2)`)
+        animate('150ms 100ms cubic-bezier(0.55, 0, 0.55, 0.2)')
     ])
 ]);
 
 /**
- * Exception thrown when attempting to change a select's `multiple` option after initialization.
+ * Returns an exception to be thrown when attempting to change a s
+ * elect's `multiple` option after initialization.
  * \@docs-private
+ * @return {?}
  */
-class MdSelectDynamicMultipleError extends MdError {
-    constructor() {
-        super('Cannot change `multiple` mode of select after initialization.');
-    }
+function getMdSelectDynamicMultipleError() {
+    return Error('Cannot change `multiple` mode of select after initialization.');
 }
 /**
- * Exception thrown when attempting to assign a non-array value to a select in `multiple` mode.
- * Note that `undefined` and `null` are still valid values to allow for resetting the value.
+ * Returns an exception to be thrown when attempting to assign a non-array value to a select
+ * in `multiple` mode. Note that `undefined` and `null` are still valid values to allow for
+ * resetting the value.
  * \@docs-private
+ * @return {?}
  */
-class MdSelectNonArrayValueError extends MdError {
-    constructor() {
-        super('Cannot assign truthy non-array value to select in `multiple` mode.');
-    }
+function getMdSelectNonArrayValueError() {
+    return Error('Cannot assign truthy non-array value to select in `multiple` mode.');
 }
 
 /**
- * The fixed height of every option element.
+ * The fixed height of every option element (option, group header etc.).
  */
-const SELECT_OPTION_HEIGHT = 48;
+const SELECT_ITEM_HEIGHT = 48;
 /**
  * The max height of the select's overlay panel
  */
@@ -7301,7 +6965,7 @@ const SELECT_PANEL_MAX_HEIGHT = 256;
 /**
  * The max number of options visible at once in the select panel.
  */
-const SELECT_MAX_OPTIONS_DISPLAYED = 5;
+const SELECT_MAX_OPTIONS_DISPLAYED = Math.floor(SELECT_PANEL_MAX_HEIGHT / SELECT_ITEM_HEIGHT);
 /**
  * The fixed height of the select's trigger element.
  */
@@ -7309,13 +6973,16 @@ const SELECT_TRIGGER_HEIGHT = 30;
 /**
  * Must adjust for the difference in height between the option and the trigger,
  * so the text will align on the y axis.
- * (SELECT_OPTION_HEIGHT (48) - SELECT_TRIGGER_HEIGHT (30)) / 2 = 9
  */
-const SELECT_OPTION_HEIGHT_ADJUSTMENT = 9;
+const SELECT_OPTION_HEIGHT_ADJUSTMENT = (SELECT_ITEM_HEIGHT - SELECT_TRIGGER_HEIGHT) / 2;
 /**
  * The panel's padding on the x-axis
  */
 const SELECT_PANEL_PADDING_X = 16;
+/**
+ * The panel's x axis padding if it is indented (e.g. there is an option group).
+ */
+const SELECT_PANEL_INDENT_PADDING_X = SELECT_PANEL_PADDING_X * 2;
 /**
  * Distance between the panel edge and the option text in
  * multi-selection mode.
@@ -7337,6 +7004,32 @@ const SELECT_PANEL_PADDING_Y = 16;
  */
 const SELECT_PANEL_VIEWPORT_PADDING = 8;
 /**
+ * Default minimum width of the trigger based on the CSS.
+ * Used as a fallback for server-side rendering.
+ * \@docs-private
+ */
+const SELECT_TRIGGER_MIN_WIDTH = 112;
+/**
+ * Injection token that determines the scroll handling while a select is open.
+ */
+const MD_SELECT_SCROLL_STRATEGY = new InjectionToken('md-select-scroll-strategy');
+/**
+ * \@docs-private
+ * @param {?} overlay
+ * @return {?}
+ */
+function MD_SELECT_SCROLL_STRATEGY_PROVIDER_FACTORY(overlay) {
+    return () => overlay.scrollStrategies.reposition();
+}
+/**
+ * \@docs-private
+ */
+const MD_SELECT_SCROLL_STRATEGY_PROVIDER = {
+    provide: MD_SELECT_SCROLL_STRATEGY,
+    deps: [Overlay],
+    useFactory: MD_SELECT_SCROLL_STRATEGY_PROVIDER_FACTORY,
+};
+/**
  * Change event object that is emitted when the select value has changed.
  */
 class MdSelectChange {
@@ -7349,25 +7042,61 @@ class MdSelectChange {
         this.value = value;
     }
 }
-class MdSelect {
+/**
+ * \@docs-private
+ */
+class MdSelectBase {
     /**
-     * @param {?} _element
      * @param {?} _renderer
+     * @param {?} _elementRef
+     */
+    constructor(_renderer, _elementRef) {
+        this._renderer = _renderer;
+        this._elementRef = _elementRef;
+    }
+}
+const _MdSelectMixinBase = mixinColor(mixinDisabled(MdSelectBase), 'primary');
+/**
+ * Allows the user to customize the trigger that is displayed when the select has a value.
+ */
+class MdSelectTrigger {
+}
+MdSelectTrigger.decorators = [
+    { type: Directive, args: [{
+                selector: 'md-select-trigger, mat-select-trigger'
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdSelectTrigger.ctorParameters = () => [];
+class MdSelect extends _MdSelectMixinBase {
+    /**
      * @param {?} _viewportRuler
      * @param {?} _changeDetectorRef
-     * @param {?} _scrollDispatcher
+     * @param {?} _overlay
+     * @param {?} _platform
+     * @param {?} renderer
+     * @param {?} elementRef
      * @param {?} _dir
+     * @param {?} _parentForm
+     * @param {?} _parentFormGroup
      * @param {?} _control
      * @param {?} tabIndex
+     * @param {?} placeholderOptions
+     * @param {?} _scrollStrategyFactory
      */
-    constructor(_element, _renderer, _viewportRuler, _changeDetectorRef, _scrollDispatcher, _dir, _control, tabIndex) {
-        this._element = _element;
-        this._renderer = _renderer;
+    constructor(_viewportRuler, _changeDetectorRef, _overlay, _platform, renderer, elementRef, _dir, _parentForm, _parentFormGroup, _control, tabIndex, placeholderOptions, _scrollStrategyFactory) {
+        super(renderer, elementRef);
         this._viewportRuler = _viewportRuler;
         this._changeDetectorRef = _changeDetectorRef;
-        this._scrollDispatcher = _scrollDispatcher;
+        this._overlay = _overlay;
+        this._platform = _platform;
         this._dir = _dir;
+        this._parentForm = _parentForm;
+        this._parentFormGroup = _parentFormGroup;
         this._control = _control;
+        this._scrollStrategyFactory = _scrollStrategyFactory;
         /**
          * Whether or not the overlay panel is open.
          */
@@ -7376,10 +7105,6 @@ class MdSelect {
          * Whether filling out the select is required in the form.
          */
         this._required = false;
-        /**
-         * Whether the select is disabled.
-         */
-        this._disabled = false;
         /**
          * The scroll position of the overlay panel, calculated to center the selected option.
          */
@@ -7395,7 +7120,7 @@ class MdSelect {
         /**
          * View -> model callback called when value changes
          */
-        this._onChange = (value) => { };
+        this._onChange = () => { };
         /**
          * View -> model callback called when select has been touched
          */
@@ -7412,6 +7137,10 @@ class MdSelect {
          * Whether the panel's animation is done.
          */
         this._panelDoneAnimating = false;
+        /**
+         * Strategy that will be used to handle scrolling while the select panel is open.
+         */
+        this._scrollStrategy = this._scrollStrategyFactory();
         /**
          * The y-offset of the overlay panel in relation to the trigger's top start corner.
          * This must be adjusted to align the selected option text over the trigger text.
@@ -7438,7 +7167,7 @@ class MdSelect {
                 overlayY: 'bottom',
             },
         ];
-        this._floatPlaceholder = 'auto';
+        this._disableRipple = false;
         /**
          * Aria label of the select. If not specified, the placeholder will be used as label.
          */
@@ -7459,10 +7188,18 @@ class MdSelect {
          * Event emitted when the selected value has been changed by the user.
          */
         this.change = new EventEmitter();
+        /**
+         * Event that emits whenever the raw value of the select changes. This is here primarily
+         * to facilitate the two-way binding for the `value` input.
+         * \@docs-private
+         */
+        this.valueChange = new EventEmitter();
         if (this._control) {
             this._control.valueAccessor = this;
         }
         this._tabIndex = parseInt(tabIndex) || 0;
+        this._placeholderOptions = placeholderOptions ? placeholderOptions : {};
+        this.floatPlaceholder = this._placeholderOptions.float || 'auto';
     }
     /**
      * Placeholder to be shown if no value has been selected.
@@ -7477,18 +7214,6 @@ class MdSelect {
         this._placeholder = value;
         // Must wait to record the trigger width to ensure placeholder width is included.
         Promise.resolve(null).then(() => this._setTriggerWidth());
-    }
-    /**
-     * Whether the component is disabled.
-     * @return {?}
-     */
-    get disabled() { return this._disabled; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set disabled(value) {
-        this._disabled = coerceBooleanProperty(value);
     }
     /**
      * Whether the component is required.
@@ -7511,7 +7236,7 @@ class MdSelect {
      */
     set multiple(value) {
         if (this._selectionModel) {
-            throw new MdSelectDynamicMultipleError();
+            throw getMdSelectDynamicMultipleError();
         }
         this._multiple = coerceBooleanProperty(value);
     }
@@ -7525,13 +7250,13 @@ class MdSelect {
      * @return {?}
      */
     set floatPlaceholder(value) {
-        this._floatPlaceholder = value || 'auto';
+        this._floatPlaceholder = value || this._placeholderOptions.float || 'auto';
     }
     /**
      * Tab index for the select element.
      * @return {?}
      */
-    get tabIndex() { return this._disabled ? -1 : this._tabIndex; }
+    get tabIndex() { return this.disabled ? -1 : this._tabIndex; }
     /**
      * @param {?} value
      * @return {?}
@@ -7542,47 +7267,56 @@ class MdSelect {
         }
     }
     /**
-     * Theme color for the component.
+     * Value of the select control.
      * @return {?}
      */
-    get color() { return this._color; }
+    get value() { return this._value; }
+    /**
+     * @param {?} newValue
+     * @return {?}
+     */
+    set value(newValue) {
+        this.writeValue(newValue);
+        this._value = newValue;
+    }
+    /**
+     * Whether ripples for all options in the select are disabled.
+     * @return {?}
+     */
+    get disableRipple() { return this._disableRipple; }
     /**
      * @param {?} value
      * @return {?}
      */
-    set color(value) {
-        if (value && value !== this._color) {
-            this._renderer.removeClass(this._element.nativeElement, `mat-${this._color}`);
-            this._renderer.addClass(this._element.nativeElement, `mat-${value}`);
-            this._color = value;
-        }
+    set disableRipple(value) {
+        this._disableRipple = coerceBooleanProperty(value);
+        this._setOptionDisableRipple();
     }
     /**
      * Combined stream of all of the child options' change events.
      * @return {?}
      */
     get optionSelectionChanges() {
-        return Observable.merge(...this.options.map(option => option.onSelectionChange));
+        return merge(...this.options.map(option => option.onSelectionChange));
     }
     /**
      * @return {?}
      */
     ngOnInit() {
-        this._selectionModel = new SelectionModel(this.multiple, null, false);
-        this.color = this.color || 'primary';
+        this._selectionModel = new SelectionModel(this.multiple, undefined, false);
     }
     /**
      * @return {?}
      */
     ngAfterContentInit() {
         this._initKeyManager();
-        this._changeSubscription = this.options.changes.startWith(null).subscribe(() => {
+        this._changeSubscription = startWith.call(this.options.changes, null).subscribe(() => {
             this._resetOptions();
-            if (this._control) {
-                // Defer setting the value in order to avoid the "Expression
-                // has changed after it was checked" errors from Angular.
-                Promise.resolve(null).then(() => this._setSelectionByValue(this._control.value));
-            }
+            // Defer setting the value in order to avoid the "Expression
+            // has changed after it was checked" errors from Angular.
+            Promise.resolve().then(() => {
+                this._setSelectionByValue(this._control ? this._control.value : this._value);
+            });
         });
     }
     /**
@@ -7618,9 +7352,7 @@ class MdSelect {
         this._calculateOverlayPosition();
         this._placeholderState = this._floatPlaceholderState();
         this._panelOpen = true;
-        this._scrollSubscription = this._scrollDispatcher.scrolled(0, () => {
-            this.overlayDir.overlayRef.updatePosition();
-        });
+        this._changeDetectorRef.markForCheck();
     }
     /**
      * Closes the overlay panel and focuses the host element.
@@ -7632,11 +7364,8 @@ class MdSelect {
             if (this._selectionModel.isEmpty()) {
                 this._placeholderState = '';
             }
-            if (this._scrollSubscription) {
-                this._scrollSubscription.unsubscribe();
-                this._scrollSubscription = null;
-            }
-            this._focusHost();
+            this._changeDetectorRef.markForCheck();
+            this.focus();
         }
     }
     /**
@@ -7682,6 +7411,7 @@ class MdSelect {
      */
     setDisabledState(isDisabled) {
         this.disabled = isDisabled;
+        this._changeDetectorRef.markForCheck();
     }
     /**
      * Whether or not the overlay panel is open.
@@ -7725,33 +7455,39 @@ class MdSelect {
      * @return {?}
      */
     _setTriggerWidth() {
-        this._triggerWidth = this._getTriggerRect().width;
+        this._triggerWidth = this._platform.isBrowser ? this._getTriggerRect().width :
+            SELECT_TRIGGER_MIN_WIDTH;
+        this._changeDetectorRef.markForCheck();
     }
     /**
-     * Ensures the panel opens if activated by the keyboard.
+     * Handles the keyboard interactions of a closed select.
      * @param {?} event
      * @return {?}
      */
-    _handleKeydown(event) {
-        if (event.keyCode === ENTER || event.keyCode === SPACE) {
-            this.open();
-        }
-        else if (!this.disabled) {
-            let /** @type {?} */ prevActiveItem = this._keyManager.activeItem;
-            // Cycle though the select options even when the select is closed,
-            // matching the behavior of the native select element.
-            // TODO(crisbeto): native selects also cycle through the options with left/right arrows,
-            // however the key manager only supports up/down at the moment.
-            this._keyManager.onKeydown(event);
-            let /** @type {?} */ currentActiveItem = (this._keyManager.activeItem);
-            if (this._multiple) {
+    _handleClosedKeydown(event) {
+        if (!this.disabled) {
+            if (event.keyCode === ENTER || event.keyCode === SPACE) {
+                event.preventDefault(); // prevents the page from scrolling down when pressing space
                 this.open();
             }
-            else if (currentActiveItem !== prevActiveItem) {
-                this._clearSelection();
-                this._setSelectionByValue(currentActiveItem.value);
-                this._propagateChanges();
+            else if (event.keyCode === UP_ARROW || event.keyCode === DOWN_ARROW) {
+                this._handleArrowKey(event);
             }
+        }
+    }
+    /**
+     * Handles keypresses inside the panel.
+     * @param {?} event
+     * @return {?}
+     */
+    _handlePanelKeydown(event) {
+        if (event.keyCode === HOME || event.keyCode === END) {
+            event.preventDefault();
+            event.keyCode === HOME ? this._keyManager.setFirstItemActive() :
+                this._keyManager.setLastItemActive();
+        }
+        else {
+            this._keyManager.onKeydown(event);
         }
     }
     /**
@@ -7768,6 +7504,7 @@ class MdSelect {
             this.onClose.emit();
             this._panelDoneAnimating = false;
             this.overlayDir.offsetX = 0;
+            this._changeDetectorRef.markForCheck();
         }
     }
     /**
@@ -7777,6 +7514,7 @@ class MdSelect {
      */
     _onFadeInDone() {
         this._panelDoneAnimating = this.panelOpen;
+        this._changeDetectorRef.markForCheck();
     }
     /**
      * Calls the touched callback only if the panel is closed. Otherwise, the trigger will
@@ -7784,8 +7522,9 @@ class MdSelect {
      * @return {?}
      */
     _onBlur() {
-        if (!this.panelOpen) {
+        if (!this.disabled && !this.panelOpen) {
             this._onTouched();
+            this._changeDetectorRef.markForCheck();
         }
     }
     /**
@@ -7797,33 +7536,52 @@ class MdSelect {
         this._setScrollTop();
     }
     /**
+     * Whether the select has a value.
+     * @return {?}
+     */
+    _hasValue() {
+        return this._selectionModel && this._selectionModel.hasValue();
+    }
+    /**
+     * Whether the select is in an error state.
+     * @return {?}
+     */
+    _isErrorState() {
+        const /** @type {?} */ isInvalid = this._control && this._control.invalid;
+        const /** @type {?} */ isTouched = this._control && this._control.touched;
+        const /** @type {?} */ isSubmitted = (this._parentFormGroup && this._parentFormGroup.submitted) ||
+            (this._parentForm && this._parentForm.submitted);
+        return !!(isInvalid && (isTouched || isSubmitted));
+    }
+    /**
      * Sets the scroll position of the scroll container. This must be called after
      * the overlay pane is attached or the scroll container element will not yet be
      * present in the DOM.
      * @return {?}
      */
     _setScrollTop() {
-        const /** @type {?} */ scrollContainer = this.overlayDir.overlayRef.overlayElement.querySelector('.mat-select-panel');
-        scrollContainer.scrollTop = this._scrollTop;
+        const /** @type {?} */ scrollContainer = this.overlayDir.overlayRef.overlayElement.querySelector('.mat-select-panel'); /** @type {?} */
+        ((scrollContainer)).scrollTop = this._scrollTop;
     }
     /**
      * Sets the selected option based on a value. If no option can be
      * found with the designated value, the select trigger is cleared.
      * @param {?} value
+     * @param {?=} isUserInput
      * @return {?}
      */
-    _setSelectionByValue(value) {
+    _setSelectionByValue(value, isUserInput = false) {
         const /** @type {?} */ isArray = Array.isArray(value);
         if (this.multiple && value && !isArray) {
-            throw new MdSelectNonArrayValueError();
+            throw getMdSelectNonArrayValueError();
         }
+        this._clearSelection();
         if (isArray) {
-            this._clearSelection();
-            value.forEach((currentValue) => this._selectValue(currentValue));
+            value.forEach((currentValue) => this._selectValue(currentValue, isUserInput));
             this._sortValues();
         }
-        else if (!this._selectValue(value)) {
-            this._clearSelection();
+        else {
+            this._selectValue(value, isUserInput);
         }
         this._setValueWidth();
         if (this._selectionModel.isEmpty()) {
@@ -7834,13 +7592,16 @@ class MdSelect {
     /**
      * Finds and selects and option based on its value.
      * @param {?} value
+     * @param {?=} isUserInput
      * @return {?} Option that has the corresponding value.
      */
-    _selectValue(value) {
+    _selectValue(value, isUserInput = false) {
         let /** @type {?} */ optionsArray = this.options.toArray();
-        let /** @type {?} */ correspondingOption = optionsArray.find(option => option.value === value);
+        let /** @type {?} */ correspondingOption = optionsArray.find(option => {
+            return option.value != null && option.value === value;
+        });
         if (correspondingOption) {
-            correspondingOption.select();
+            isUserInput ? correspondingOption._selectViaInteraction() : correspondingOption.select();
             this._selectionModel.select(correspondingOption);
             this._keyManager.setActiveItem(optionsArray.indexOf(correspondingOption));
         }
@@ -7870,7 +7631,7 @@ class MdSelect {
      * @return {?}
      */
     _initKeyManager() {
-        this._keyManager = new FocusKeyManager(this.options);
+        this._keyManager = new FocusKeyManager(this.options).withTypeAhead();
         this._tabSubscription = this._keyManager.tabOut.subscribe(() => this.close());
     }
     /**
@@ -7882,15 +7643,14 @@ class MdSelect {
         this._listenToOptions();
         this._setOptionIds();
         this._setOptionMultiple();
+        this._setOptionDisableRipple();
     }
     /**
      * Listens to user-generated selection events on each option.
      * @return {?}
      */
     _listenToOptions() {
-        this._optionSubscription = this.optionSelectionChanges
-            .filter(event => event.isUserInput)
-            .subscribe(event => {
+        this._optionSubscription = filter.call(this.optionSelectionChanges, event => event.isUserInput).subscribe(event => {
             this._onSelect(event.source);
             this._setValueWidth();
             if (!this.multiple) {
@@ -7905,14 +7665,20 @@ class MdSelect {
      */
     _onSelect(option) {
         const /** @type {?} */ wasSelected = this._selectionModel.isSelected(option);
+        // TODO(crisbeto): handle blank/null options inside multi-select.
         if (this.multiple) {
             this._selectionModel.toggle(option);
             wasSelected ? option.deselect() : option.select();
             this._sortValues();
         }
         else {
-            this._clearSelection(option);
-            this._selectionModel.select(option);
+            this._clearSelection(option.value == null ? undefined : option);
+            if (option.value == null) {
+                this._propagateChanges(option.value);
+            }
+            else {
+                this._selectionModel.select(option);
+            }
         }
         if (wasSelected !== this._selectionModel.isSelected(option)) {
             this._propagateChanges();
@@ -7945,14 +7711,21 @@ class MdSelect {
     }
     /**
      * Emits change event to set the model value.
+     * @param {?=} fallbackValue
      * @return {?}
      */
-    _propagateChanges() {
-        let /** @type {?} */ valueToEmit = Array.isArray(this.selected) ?
-            this.selected.map(option => option.value) :
-            this.selected.value;
+    _propagateChanges(fallbackValue) {
+        let /** @type {?} */ valueToEmit = null;
+        if (Array.isArray(this.selected)) {
+            valueToEmit = this.selected.map(option => option.value);
+        }
+        else {
+            valueToEmit = this.selected ? this.selected.value : fallbackValue;
+        }
+        this._value = valueToEmit;
         this._onChange(valueToEmit);
         this.change.emit(new MdSelectChange(this, valueToEmit));
+        this.valueChange.emit(valueToEmit);
     }
     /**
      * Records option IDs to pass to the aria-owns property.
@@ -7974,6 +7747,15 @@ class MdSelect {
         }
     }
     /**
+     * Sets the `disableRipple` property on each option.
+     * @return {?}
+     */
+    _setOptionDisableRipple() {
+        if (this.options) {
+            this.options.forEach(option => option.disableRipple = this.disableRipple);
+        }
+    }
+    /**
      * Must set the width of the selected option's value programmatically
      * because it is absolutely positioned and otherwise will not clip
      * overflow. The selection arrow is 9px wide, add 4px of padding = 13
@@ -7981,6 +7763,7 @@ class MdSelect {
      */
     _setValueWidth() {
         this._selectedValueWidth = this._triggerWidth - 13;
+        this._changeDetectorRef.markForCheck();
     }
     /**
      * Focuses the selected item. If no option is selected, it will focus
@@ -7992,15 +7775,15 @@ class MdSelect {
             this._keyManager.setFirstItemActive();
         }
         else {
-            this._keyManager.setActiveItem(this._getOptionIndex(this._selectionModel.selected[0]));
+            this._keyManager.setActiveItem(/** @type {?} */ ((this._getOptionIndex(this._selectionModel.selected[0]))));
         }
     }
     /**
-     * Focuses the host element when the panel closes.
+     * Focuses the select element.
      * @return {?}
      */
-    _focusHost() {
-        this._element.nativeElement.focus();
+    focus() {
+        this._elementRef.nativeElement.focus();
     }
     /**
      * Gets the index of the provided option in the option list.
@@ -8017,24 +7800,27 @@ class MdSelect {
      * @return {?}
      */
     _calculateOverlayPosition() {
-        const /** @type {?} */ panelHeight = Math.min(this.options.length * SELECT_OPTION_HEIGHT, SELECT_PANEL_MAX_HEIGHT);
-        const /** @type {?} */ scrollContainerHeight = this.options.length * SELECT_OPTION_HEIGHT;
+        const /** @type {?} */ items = this._getItemCount();
+        const /** @type {?} */ panelHeight = Math.min(items * SELECT_ITEM_HEIGHT, SELECT_PANEL_MAX_HEIGHT);
+        const /** @type {?} */ scrollContainerHeight = items * SELECT_ITEM_HEIGHT;
         // The farthest the panel can be scrolled before it hits the bottom
         const /** @type {?} */ maxScroll = scrollContainerHeight - panelHeight;
-        if (this._selectionModel.hasValue()) {
-            const /** @type {?} */ selectedIndex = this._getOptionIndex(this._selectionModel.selected[0]);
+        if (this._hasValue()) {
+            let /** @type {?} */ selectedOptionOffset = ((this._getOptionIndex(this._selectionModel.selected[0])));
+            selectedOptionOffset += this._getLabelCountBeforeOption(selectedOptionOffset);
             // We must maintain a scroll buffer so the selected option will be scrolled to the
             // center of the overlay panel rather than the top.
             const /** @type {?} */ scrollBuffer = panelHeight / 2;
-            this._scrollTop = this._calculateOverlayScroll(selectedIndex, scrollBuffer, maxScroll);
-            this._offsetY = this._calculateOverlayOffsetY(selectedIndex, scrollBuffer, maxScroll);
+            this._scrollTop = this._calculateOverlayScroll(selectedOptionOffset, scrollBuffer, maxScroll);
+            this._offsetY = this._calculateOverlayOffsetY(selectedOptionOffset, scrollBuffer, maxScroll);
         }
         else {
             // If no option is selected, the panel centers on the first option. In this case,
             // we must only adjust for the height difference between the option element
             // and the trigger element, then multiply it by -1 to ensure the panel moves
             // in the correct direction up the page.
-            this._offsetY = (SELECT_OPTION_HEIGHT - SELECT_TRIGGER_HEIGHT) / 2 * -1;
+            this._offsetY = (SELECT_ITEM_HEIGHT - SELECT_TRIGGER_HEIGHT) / 2 * -1 -
+                (this._getLabelCountBeforeOption(0) * SELECT_ITEM_HEIGHT);
         }
         this._checkOverlayWithinViewport(maxScroll);
     }
@@ -8050,8 +7836,8 @@ class MdSelect {
      * @return {?}
      */
     _calculateOverlayScroll(selectedIndex, scrollBuffer, maxScroll) {
-        const /** @type {?} */ optionOffsetFromScrollTop = SELECT_OPTION_HEIGHT * selectedIndex;
-        const /** @type {?} */ halfOptionHeight = SELECT_OPTION_HEIGHT / 2;
+        const /** @type {?} */ optionOffsetFromScrollTop = SELECT_ITEM_HEIGHT * selectedIndex;
+        const /** @type {?} */ halfOptionHeight = SELECT_ITEM_HEIGHT / 2;
         // Starts at the optionOffsetFromScrollTop, which scrolls the option to the top of the
         // scroll container, then subtracts the scroll buffer to scroll the option down to
         // the center of the overlay panel. Half the option height must be re-added to the
@@ -8073,12 +7859,11 @@ class MdSelect {
         return this._placeholderState;
     }
     /**
-     * Determines the CSS `visibility` of the placeholder element.
+     * Determines the CSS `opacity` of the placeholder element.
      * @return {?}
      */
-    _getPlaceholderVisibility() {
-        return (this.floatPlaceholder !== 'never' || this._selectionModel.isEmpty()) ?
-            'visible' : 'hidden';
+    _getPlaceholderOpacity() {
+        return (this.floatPlaceholder !== 'never' || this._selectionModel.isEmpty()) ? '1' : '0';
     }
     /**
      * Returns the aria-label of the select component.
@@ -8101,14 +7886,26 @@ class MdSelect {
         const /** @type {?} */ overlayRect = this.overlayDir.overlayRef.overlayElement.getBoundingClientRect();
         const /** @type {?} */ viewportRect = this._viewportRuler.getViewportRect();
         const /** @type {?} */ isRtl = this._isRtl();
-        let /** @type {?} */ offsetX = this.multiple ? SELECT_MULTIPLE_PANEL_PADDING_X : SELECT_PANEL_PADDING_X;
+        const /** @type {?} */ paddingWidth = this.multiple ? SELECT_MULTIPLE_PANEL_PADDING_X + SELECT_PANEL_PADDING_X :
+            SELECT_PANEL_PADDING_X * 2;
+        let /** @type {?} */ offsetX;
+        // Adjust the offset, depending on the option padding.
+        if (this.multiple) {
+            offsetX = SELECT_MULTIPLE_PANEL_PADDING_X;
+        }
+        else {
+            let /** @type {?} */ selected = this._selectionModel.selected[0] || this.options.first;
+            offsetX = selected && selected.group ? SELECT_PANEL_INDENT_PADDING_X : SELECT_PANEL_PADDING_X;
+        }
+        // Invert the offset in LTR.
         if (!isRtl) {
             offsetX *= -1;
         }
-        const /** @type {?} */ leftOverflow = 0 - (overlayRect.left + offsetX
-            - (isRtl ? SELECT_PANEL_PADDING_X * 2 : 0));
+        // Determine how much the select overflows on each side.
+        const /** @type {?} */ leftOverflow = 0 - (overlayRect.left + offsetX - (isRtl ? paddingWidth : 0));
         const /** @type {?} */ rightOverflow = overlayRect.right + offsetX - viewportRect.width
-            + (isRtl ? 0 : SELECT_PANEL_PADDING_X * 2);
+            + (isRtl ? 0 : paddingWidth);
+        // If the element overflows on either side, reduce the offset to allow it to fit.
         if (leftOverflow > 0) {
             offsetX += leftOverflow + SELECT_PANEL_VIEWPORT_PADDING;
         }
@@ -8132,23 +7929,23 @@ class MdSelect {
     _calculateOverlayOffsetY(selectedIndex, scrollBuffer, maxScroll) {
         let /** @type {?} */ optionOffsetFromPanelTop;
         if (this._scrollTop === 0) {
-            optionOffsetFromPanelTop = selectedIndex * SELECT_OPTION_HEIGHT;
+            optionOffsetFromPanelTop = selectedIndex * SELECT_ITEM_HEIGHT;
         }
         else if (this._scrollTop === maxScroll) {
-            const /** @type {?} */ firstDisplayedIndex = this.options.length - SELECT_MAX_OPTIONS_DISPLAYED;
+            const /** @type {?} */ firstDisplayedIndex = this._getItemCount() - SELECT_MAX_OPTIONS_DISPLAYED;
             const /** @type {?} */ selectedDisplayIndex = selectedIndex - firstDisplayedIndex;
             // Because the panel height is longer than the height of the options alone,
             // there is always extra padding at the top or bottom of the panel. When
             // scrolled to the very bottom, this padding is at the top of the panel and
             // must be added to the offset.
             optionOffsetFromPanelTop =
-                selectedDisplayIndex * SELECT_OPTION_HEIGHT + SELECT_PANEL_PADDING_Y;
+                selectedDisplayIndex * SELECT_ITEM_HEIGHT + SELECT_PANEL_PADDING_Y;
         }
         else {
             // If the option was scrolled to the middle of the panel using a scroll buffer,
             // its offset will be the scroll buffer minus the half height that was added to
             // center it.
-            optionOffsetFromPanelTop = scrollBuffer - SELECT_OPTION_HEIGHT / 2;
+            optionOffsetFromPanelTop = scrollBuffer - SELECT_ITEM_HEIGHT / 2;
         }
         // The final offset is the option's offset from the top, adjusted for the height
         // difference, multiplied by -1 to ensure that the overlay moves in the correct
@@ -8169,7 +7966,7 @@ class MdSelect {
         const /** @type {?} */ topSpaceAvailable = triggerRect.top - SELECT_PANEL_VIEWPORT_PADDING;
         const /** @type {?} */ bottomSpaceAvailable = viewportRect.height - triggerRect.bottom - SELECT_PANEL_VIEWPORT_PADDING;
         const /** @type {?} */ panelHeightTop = Math.abs(this._offsetY);
-        const /** @type {?} */ totalPanelHeight = Math.min(this.options.length * SELECT_OPTION_HEIGHT, SELECT_PANEL_MAX_HEIGHT);
+        const /** @type {?} */ totalPanelHeight = Math.min(this._getItemCount() * SELECT_ITEM_HEIGHT, SELECT_PANEL_MAX_HEIGHT);
         const /** @type {?} */ panelHeightBottom = totalPanelHeight - panelHeightTop - triggerRect.height;
         if (panelHeightBottom > bottomSpaceAvailable) {
             this._adjustPanelUp(panelHeightBottom, bottomSpaceAvailable);
@@ -8232,7 +8029,7 @@ class MdSelect {
      * @return {?}
      */
     _getOriginBasedOnOption() {
-        const /** @type {?} */ originY = Math.abs(this._offsetY) - SELECT_OPTION_HEIGHT_ADJUSTMENT + SELECT_OPTION_HEIGHT / 2;
+        const /** @type {?} */ originY = Math.abs(this._offsetY) - SELECT_OPTION_HEIGHT_ADJUSTMENT + SELECT_ITEM_HEIGHT / 2;
         return `50% ${originY}px 0px`;
     }
     /**
@@ -8242,12 +8039,67 @@ class MdSelect {
     _floatPlaceholderState() {
         return this._isRtl() ? 'floating-rtl' : 'floating-ltr';
     }
+    /**
+     * Handles the user pressing the arrow keys on a closed select.
+     * @param {?} event
+     * @return {?}
+     */
+    _handleArrowKey(event) {
+        if (this._multiple) {
+            event.preventDefault();
+            this.open();
+        }
+        else {
+            const /** @type {?} */ prevActiveItem = this._keyManager.activeItem;
+            // Cycle though the select options even when the select is closed,
+            // matching the behavior of the native select element.
+            // TODO(crisbeto): native selects also cycle through the options with left/right arrows,
+            // however the key manager only supports up/down at the moment.
+            this._keyManager.onKeydown(event);
+            const /** @type {?} */ currentActiveItem = (this._keyManager.activeItem);
+            if (currentActiveItem !== prevActiveItem) {
+                this._clearSelection();
+                this._setSelectionByValue(currentActiveItem.value, true);
+                this._propagateChanges();
+            }
+        }
+    }
+    /**
+     * Calculates the amount of items in the select. This includes options and group labels.
+     * @return {?}
+     */
+    _getItemCount() {
+        return this.options.length + this.optionGroups.length;
+    }
+    /**
+     * Calculates the amount of option group labels that precede the specified option.
+     * Useful when positioning the panel, because the labels will offset the index of the
+     * currently-selected option.
+     * @param {?} optionIndex
+     * @return {?}
+     */
+    _getLabelCountBeforeOption(optionIndex) {
+        if (this.optionGroups.length) {
+            let /** @type {?} */ options = this.options.toArray();
+            let /** @type {?} */ groups = this.optionGroups.toArray();
+            let /** @type {?} */ groupCounter = 0;
+            for (let /** @type {?} */ i = 0; i < optionIndex + 1; i++) {
+                if (options[i].group && options[i].group === groups[groupCounter]) {
+                    groupCounter++;
+                }
+            }
+            return groupCounter;
+        }
+        return 0;
+    }
 }
 MdSelect.decorators = [
     { type: Component, args: [{selector: 'md-select, mat-select',
-                template: "<div class=\"mat-select-trigger\" cdk-overlay-origin (click)=\"toggle()\" #origin=\"cdkOverlayOrigin\" #trigger> <span class=\"mat-select-placeholder\" [class.mat-floating-placeholder]=\"_selectionModel.hasValue()\" [@transformPlaceholder]=\"_getPlaceholderAnimationState()\" [style.visibility]=\"_getPlaceholderVisibility()\" [style.width.px]=\"_selectedValueWidth\"> {{ placeholder }} </span> <span class=\"mat-select-value\" *ngIf=\"_selectionModel.hasValue()\"> <span class=\"mat-select-value-text\">{{ triggerValue }}</span> </span> <span class=\"mat-select-arrow\"></span> <span class=\"mat-select-underline\"></span> </div> <ng-template cdk-connected-overlay [origin]=\"origin\" [open]=\"panelOpen\" hasBackdrop (backdropClick)=\"close()\" backdropClass=\"cdk-overlay-transparent-backdrop\" [positions]=\"_positions\" [minWidth]=\"_triggerWidth\" [offsetY]=\"_offsetY\" (attach)=\"_onAttached()\" (detach)=\"close()\"> <div class=\"mat-select-panel\" [@transformPanel]=\"'showing'\" (@transformPanel.done)=\"_onPanelDone()\" (keydown)=\"_keyManager.onKeydown($event)\" [style.transformOrigin]=\"_transformOrigin\" [class.mat-select-panel-done-animating]=\"_panelDoneAnimating\" [ngClass]=\"'mat-' + color\"> <div class=\"mat-select-content\" [@fadeInContent]=\"'showing'\" (@fadeInContent.done)=\"_onFadeInDone()\"> <ng-content></ng-content> </div> </div> </ng-template> ",
-                styles: [".mat-select{display:inline-block;outline:0;font-family:Roboto,\"Helvetica Neue\",sans-serif}.mat-select-trigger{display:flex;align-items:center;height:30px;min-width:112px;cursor:pointer;position:relative;box-sizing:border-box;font-size:16px}[aria-disabled=true] .mat-select-trigger{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;cursor:default}.mat-select-underline{position:absolute;bottom:0;left:0;right:0;height:1px}[aria-disabled=true] .mat-select-underline{background-image:linear-gradient(to right,rgba(0,0,0,.26) 0,rgba(0,0,0,.26) 33%,transparent 0);background-size:4px 1px;background-repeat:repeat-x;background-color:transparent;background-position:0 bottom}.mat-select-placeholder{position:relative;padding:0 2px;transform-origin:left top;flex-grow:1}.mat-select-placeholder.mat-floating-placeholder{top:-22px;left:-2px;text-align:left;transform:scale(.75)}[dir=rtl] .mat-select-placeholder{transform-origin:right top}[dir=rtl] .mat-select-placeholder.mat-floating-placeholder{left:2px;text-align:right}[aria-required=true] .mat-select-placeholder::after{content:'*'}.mat-select-value{position:absolute;max-width:calc(100% - 18px);flex-grow:1;top:0;left:0;bottom:0;display:flex;align-items:center}[dir=rtl] .mat-select-value{left:auto;right:0}.mat-select-value-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:30px}.mat-select-arrow{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid;margin:0 4px}.mat-select-panel{box-shadow:0 5px 5px -3px rgba(0,0,0,.2),0 8px 10px 1px rgba(0,0,0,.14),0 3px 14px 2px rgba(0,0,0,.12);min-width:112px;max-width:280px;overflow:auto;-webkit-overflow-scrolling:touch;padding-top:0;padding-bottom:0;max-height:256px;min-width:100%}@media screen and (-ms-high-contrast:active){.mat-select-panel{outline:solid 1px}} /*# sourceMappingURL=select.css.map */ "],
+                template: "<div cdk-overlay-origin class=\"mat-select-trigger\" aria-hidden=\"true\" (click)=\"toggle()\" #origin=\"cdkOverlayOrigin\" #trigger><span class=\"mat-select-placeholder\" [class.mat-floating-placeholder]=\"_hasValue()\" [@transformPlaceholder]=\"_getPlaceholderAnimationState()\" [style.opacity]=\"_getPlaceholderOpacity()\" [style.width.px]=\"_selectedValueWidth\">{{ placeholder }} </span><span class=\"mat-select-value\" *ngIf=\"_hasValue()\"><span class=\"mat-select-value-text\" [ngSwitch]=\"!!customTrigger\"><span *ngSwitchDefault>{{ triggerValue }}</span><ng-content select=\"md-select-trigger, mat-select-trigger\" *ngSwitchCase=\"true\"></ng-content></span></span><span class=\"mat-select-arrow\"></span> <span class=\"mat-select-underline\"></span></div><ng-template cdk-connected-overlay hasBackdrop backdropClass=\"cdk-overlay-transparent-backdrop\" [scrollStrategy]=\"_scrollStrategy\" [origin]=\"origin\" [open]=\"panelOpen\" [positions]=\"_positions\" [minWidth]=\"_triggerWidth\" [offsetY]=\"_offsetY\" (backdropClick)=\"close()\" (attach)=\"_onAttached()\" (detach)=\"close()\"><div class=\"mat-select-panel {{ 'mat-' + color }}\" [ngClass]=\"panelClass\" [@transformPanel]=\"multiple ? 'showing-multiple' : 'showing'\" (@transformPanel.done)=\"_onPanelDone()\" (keydown)=\"_handlePanelKeydown($event)\" [style.transformOrigin]=\"_transformOrigin\" [class.mat-select-panel-done-animating]=\"_panelDoneAnimating\"><div class=\"mat-select-content\" [@fadeInContent]=\"'showing'\" (@fadeInContent.done)=\"_onFadeInDone()\"><ng-content></ng-content></div></div></ng-template>",
+                styles: [".mat-select{display:inline-block;outline:0}.mat-select-trigger{display:flex;align-items:center;height:30px;min-width:112px;cursor:pointer;position:relative;box-sizing:border-box}.mat-select-disabled .mat-select-trigger{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;cursor:default}.mat-select-underline{position:absolute;bottom:0;left:0;right:0;height:1px}.mat-select:focus .mat-select-underline{height:2px}.mat-select-disabled .mat-select-underline{background-color:transparent;background-position:0 bottom}.mat-select-placeholder{position:relative;padding:0 2px;transform-origin:left top;flex-grow:1}.mat-select-placeholder.mat-floating-placeholder{top:-22px;left:-2px;text-align:left;transform:scale(.75)}[dir=rtl] .mat-select-placeholder{transform-origin:right top}[dir=rtl] .mat-select-placeholder.mat-floating-placeholder{left:2px;text-align:right}.mat-select-required .mat-select-placeholder::after{content:'*'}.mat-select-value{position:absolute;max-width:calc(100% - 18px);flex-grow:1;top:0;left:0;bottom:0;display:flex;align-items:center}[dir=rtl] .mat-select-value{left:auto;right:0}.mat-select-value-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:30px}.mat-select-arrow{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid;margin:0 4px}.mat-select-panel{min-width:112px;max-width:280px;overflow:auto;-webkit-overflow-scrolling:touch;padding-top:0;padding-bottom:0;max-height:256px;min-width:100%}.mat-select-panel:not([class*=mat-elevation-z]){box-shadow:0 5px 5px -3px rgba(0,0,0,.2),0 8px 10px 1px rgba(0,0,0,.14),0 3px 14px 2px rgba(0,0,0,.12)}@media screen and (-ms-high-contrast:active){.mat-select-panel{outline:solid 1px}}"],
+                inputs: ['color', 'disabled'],
                 encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
                 host: {
                     'role': 'listbox',
                     '[attr.tabindex]': 'tabIndex',
@@ -8255,11 +8107,14 @@ MdSelect.decorators = [
                     '[attr.aria-labelledby]': 'ariaLabelledby',
                     '[attr.aria-required]': 'required.toString()',
                     '[attr.aria-disabled]': 'disabled.toString()',
-                    '[attr.aria-invalid]': '_control?.invalid || "false"',
+                    '[attr.aria-invalid]': '_isErrorState()',
                     '[attr.aria-owns]': '_optionIds',
+                    '[attr.aria-multiselectable]': 'multiple',
                     '[class.mat-select-disabled]': 'disabled',
-                    '[class.mat-select]': 'true',
-                    '(keydown)': '_handleKeydown($event)',
+                    '[class.mat-select-invalid]': '_isErrorState()',
+                    '[class.mat-select-required]': 'required',
+                    'class': 'mat-select',
+                    '(keydown)': '_handleClosedKeydown($event)',
                     '(blur)': '_onBlur()',
                 },
                 animations: [
@@ -8274,31 +8129,40 @@ MdSelect.decorators = [
  * @nocollapse
  */
 MdSelect.ctorParameters = () => [
-    { type: ElementRef, },
-    { type: Renderer2, },
     { type: ViewportRuler, },
     { type: ChangeDetectorRef, },
-    { type: ScrollDispatcher, },
-    { type: Dir, decorators: [{ type: Optional },] },
+    { type: Overlay, },
+    { type: Platform, },
+    { type: Renderer2, },
+    { type: ElementRef, },
+    { type: Directionality, decorators: [{ type: Optional },] },
+    { type: NgForm, decorators: [{ type: Optional },] },
+    { type: FormGroupDirective, decorators: [{ type: Optional },] },
     { type: NgControl, decorators: [{ type: Self }, { type: Optional },] },
     { type: undefined, decorators: [{ type: Attribute, args: ['tabindex',] },] },
+    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [MD_PLACEHOLDER_GLOBAL_OPTIONS,] },] },
+    { type: undefined, decorators: [{ type: Inject, args: [MD_SELECT_SCROLL_STRATEGY,] },] },
 ];
 MdSelect.propDecorators = {
     'trigger': [{ type: ViewChild, args: ['trigger',] },],
     'overlayDir': [{ type: ViewChild, args: [ConnectedOverlayDirective,] },],
-    'options': [{ type: ContentChildren, args: [MdOption,] },],
+    'options': [{ type: ContentChildren, args: [MdOption, { descendants: true },] },],
+    'optionGroups': [{ type: ContentChildren, args: [MdOptgroup,] },],
+    'panelClass': [{ type: Input },],
+    'customTrigger': [{ type: ContentChild, args: [MdSelectTrigger,] },],
     'placeholder': [{ type: Input },],
-    'disabled': [{ type: Input },],
     'required': [{ type: Input },],
     'multiple': [{ type: Input },],
     'floatPlaceholder': [{ type: Input },],
     'tabIndex': [{ type: Input },],
+    'value': [{ type: Input },],
+    'disableRipple': [{ type: Input },],
     'ariaLabel': [{ type: Input, args: ['aria-label',] },],
     'ariaLabelledby': [{ type: Input, args: ['aria-labelledby',] },],
-    'color': [{ type: Input },],
     'onOpen': [{ type: Output },],
     'onClose': [{ type: Output },],
     'change': [{ type: Output },],
+    'valueChange': [{ type: Output },],
 };
 /**
  * Clamps a value n between min and max values.
@@ -8312,16 +8176,6 @@ function clampValue(min, n, max) {
 }
 
 class MdSelectModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdSelectModule,
-            providers: []
-        };
-    }
 }
 MdSelectModule.decorators = [
     { type: NgModule, args: [{
@@ -8329,10 +8183,11 @@ MdSelectModule.decorators = [
                     CommonModule,
                     OverlayModule,
                     MdOptionModule,
-                    CompatibilityModule,
+                    MdCommonModule,
                 ],
-                exports: [MdSelect, MdOptionModule, CompatibilityModule],
-                declarations: [MdSelect],
+                exports: [MdSelect, MdSelectTrigger, MdOptionModule, MdCommonModule],
+                declarations: [MdSelect, MdSelectTrigger],
+                providers: [MD_SELECT_SCROLL_STRATEGY_PROVIDER]
             },] },
 ];
 /**
@@ -8340,36 +8195,53 @@ MdSelectModule.decorators = [
  */
 MdSelectModule.ctorParameters = () => [];
 
+// Increasing integer for generating unique ids for slide-toggle components.
+let nextUniqueId$3 = 0;
 const MD_SLIDE_TOGGLE_VALUE_ACCESSOR = {
     provide: NG_VALUE_ACCESSOR,
     useExisting: forwardRef(() => MdSlideToggle),
     multi: true
 };
+/**
+ * Change event object emitted by a MdSlideToggle.
+ */
 class MdSlideToggleChange {
 }
-// Increasing integer for generating unique ids for slide-toggle components.
-let nextId$1 = 0;
 /**
- * Two-state control, which can be also called `switch`.
+ * \@docs-private
  */
-class MdSlideToggle {
+class MdSlideToggleBase {
     /**
-     * @param {?} _elementRef
      * @param {?} _renderer
-     * @param {?} _focusOriginMonitor
+     * @param {?} _elementRef
      */
-    constructor(_elementRef, _renderer, _focusOriginMonitor) {
-        this._elementRef = _elementRef;
+    constructor(_renderer, _elementRef) {
         this._renderer = _renderer;
+        this._elementRef = _elementRef;
+    }
+}
+const _MdSlideToggleMixinBase = mixinColor(mixinDisableRipple(mixinDisabled(MdSlideToggleBase)), 'accent');
+/**
+ * Represents a slidable "switch" toggle that can be moved between on and off.
+ */
+class MdSlideToggle extends _MdSlideToggleMixinBase {
+    /**
+     * @param {?} elementRef
+     * @param {?} renderer
+     * @param {?} _platform
+     * @param {?} _focusOriginMonitor
+     * @param {?} _changeDetectorRef
+     */
+    constructor(elementRef, renderer, _platform, _focusOriginMonitor, _changeDetectorRef) {
+        super(renderer, elementRef);
+        this._platform = _platform;
         this._focusOriginMonitor = _focusOriginMonitor;
+        this._changeDetectorRef = _changeDetectorRef;
         this.onChange = (_) => { };
         this.onTouched = () => { };
-        this._uniqueId = `md-slide-toggle-${++nextId$1}`;
-        this._checked = false;
-        this._slideRenderer = null;
-        this._disabled = false;
+        this._uniqueId = `md-slide-toggle-${++nextUniqueId$3}`;
         this._required = false;
-        this._disableRipple = false;
+        this._checked = false;
         /**
          * Name value will be applied to the input element if present
          */
@@ -8400,16 +8272,6 @@ class MdSlideToggle {
         this.change = new EventEmitter();
     }
     /**
-     * Whether the slide-toggle is disabled.
-     * @return {?}
-     */
-    get disabled() { return this._disabled; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set disabled(value) { this._disabled = coerceBooleanProperty(value); }
-    /**
      * Whether the slide-toggle is required.
      * @return {?}
      */
@@ -8420,15 +8282,18 @@ class MdSlideToggle {
      */
     set required(value) { this._required = coerceBooleanProperty(value); }
     /**
-     * Whether the ripple effect for this slide-toggle is disabled.
+     * Whether the slide-toggle element is checked or not
      * @return {?}
      */
-    get disableRipple() { return this._disableRipple; }
+    get checked() { return this._checked; }
     /**
      * @param {?} value
      * @return {?}
      */
-    set disableRipple(value) { this._disableRipple = coerceBooleanProperty(value); }
+    set checked(value) {
+        this._checked = !!value;
+        this._changeDetectorRef.markForCheck();
+    }
     /**
      * Returns the unique id for the visual hidden input.
      * @return {?}
@@ -8438,7 +8303,7 @@ class MdSlideToggle {
      * @return {?}
      */
     ngAfterContentInit() {
-        this._slideRenderer = new SlideToggleRenderer(this._elementRef);
+        this._slideRenderer = new SlideToggleRenderer(this._elementRef, this._platform);
         this._focusOriginMonitor
             .monitor(this._inputElement.nativeElement, this._renderer, false)
             .subscribe(focusOrigin => this._onInputFocusChange(focusOrigin));
@@ -8450,9 +8315,7 @@ class MdSlideToggle {
         this._focusOriginMonitor.stopMonitoring(this._inputElement.nativeElement);
     }
     /**
-     * The onChangeEvent method will be also called on click.
-     * This is because everything for the slide-toggle is wrapped inside of a label,
-     * which triggers a onChange event on click.
+     * This function will called if the underlying input changed its value through user interaction.
      * @param {?} event
      * @return {?}
      */
@@ -8461,21 +8324,24 @@ class MdSlideToggle {
         // Otherwise the change event, from the input element, will bubble up and
         // emit its event object to the component's `change` output.
         event.stopPropagation();
-        // Once a drag is currently in progress, we do not want to toggle the slide-toggle on a click.
-        if (!this.disabled && !this._slideRenderer.dragging) {
-            this.toggle();
-            // Emit our custom change event if the native input emitted one.
-            // It is important to only emit it, if the native input triggered one, because
-            // we don't want to trigger a change event, when the `checked` variable changes for example.
-            this._emitChangeEvent();
-        }
+        // Sync the value from the underlying input element with the slide-toggle component.
+        this.checked = this._inputElement.nativeElement.checked;
+        // Emit our custom change event if the native input emitted one.
+        // It is important to only emit it, if the native input triggered one, because we don't want
+        // to trigger a change event, when the `checked` variable changes programmatically.
+        this._emitChangeEvent();
     }
     /**
      * @param {?} event
      * @return {?}
      */
     _onInputClick(event) {
-        this.onTouched();
+        // In some situations the user will release the mouse on the label element. The label element
+        // redirects the click to the underlying input element and will result in a value change.
+        // Prevent the default behavior if dragging, because the value will be set after drag.
+        if (this._slideRenderer.dragging) {
+            event.preventDefault();
+        }
         // We have to stop propagation for click events on the visual hidden input element.
         // By default, when a user clicks on a label element, a generated click event will be
         // dispatched on the associated input element. Since we are using a label element as our
@@ -8491,7 +8357,7 @@ class MdSlideToggle {
      * @return {?}
      */
     writeValue(value) {
-        this.checked = value;
+        this.checked = !!value;
     }
     /**
      * Implemented as part of ControlValueAccessor.
@@ -8516,40 +8382,14 @@ class MdSlideToggle {
      */
     setDisabledState(isDisabled) {
         this.disabled = isDisabled;
+        this._changeDetectorRef.markForCheck();
     }
     /**
      * Focuses the slide-toggle.
      * @return {?}
      */
     focus() {
-        this._focusOriginMonitor.focusVia(this._inputElement.nativeElement, this._renderer, 'keyboard');
-    }
-    /**
-     * Whether the slide-toggle is checked.
-     * @return {?}
-     */
-    get checked() { return !!this._checked; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set checked(value) {
-        if (this.checked !== !!value) {
-            this._checked = value;
-            this.onChange(this._checked);
-        }
-    }
-    /**
-     * The color of the slide-toggle. Can be primary, accent, or warn.
-     * @return {?}
-     */
-    get color() { return this._color; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set color(value) {
-        this._updateColor(value);
+        this._focusOriginMonitor.focusVia(this._inputElement.nativeElement, 'keyboard');
     }
     /**
      * Toggles the checked state of the slide-toggle.
@@ -8578,26 +8418,7 @@ class MdSlideToggle {
         }
     }
     /**
-     * @param {?} newColor
-     * @return {?}
-     */
-    _updateColor(newColor) {
-        this._setElementColor(this._color, false);
-        this._setElementColor(newColor, true);
-        this._color = newColor;
-    }
-    /**
-     * @param {?} color
-     * @param {?} isAdd
-     * @return {?}
-     */
-    _setElementColor(color, isAdd) {
-        if (color != null && color != '') {
-            this._renderer.setElementClass(this._elementRef.nativeElement, `mat-${color}`, isAdd);
-        }
-    }
-    /**
-     * Emits the change event to the `change` output EventEmitter
+     * Emits a change event on the `change` output. Also notifies the FormControl about the change.
      * @return {?}
      */
     _emitChangeEvent() {
@@ -8605,6 +8426,7 @@ class MdSlideToggle {
         event.source = this;
         event.checked = this.checked;
         this.change.emit(event);
+        this.onChange(this.checked);
     }
     /**
      * @return {?}
@@ -8642,14 +8464,16 @@ class MdSlideToggle {
 MdSlideToggle.decorators = [
     { type: Component, args: [{selector: 'md-slide-toggle, mat-slide-toggle',
                 host: {
-                    '[class.mat-slide-toggle]': 'true',
+                    'class': 'mat-slide-toggle',
+                    '[id]': 'id',
                     '[class.mat-checked]': 'checked',
                     '[class.mat-disabled]': 'disabled',
                     '[class.mat-slide-toggle-label-before]': 'labelPosition == "before"',
                 },
-                template: "<label class=\"mat-slide-toggle-label\" #label> <div class=\"mat-slide-toggle-bar\"> <input #input class=\"mat-slide-toggle-input cdk-visually-hidden\" type=\"checkbox\" [id]=\"inputId\" [required]=\"required\" [tabIndex]=\"tabIndex\" [checked]=\"checked\" [disabled]=\"disabled\" [attr.name]=\"name\" [attr.aria-label]=\"ariaLabel\" [attr.aria-labelledby]=\"ariaLabelledby\" (change)=\"_onChangeEvent($event)\" (click)=\"_onInputClick($event)\"> <div class=\"mat-slide-toggle-thumb-container\" (slidestart)=\"_onDragStart()\" (slide)=\"_onDrag($event)\" (slideend)=\"_onDragEnd()\"> <div class=\"mat-slide-toggle-thumb\"></div> <div class=\"mat-slide-toggle-ripple\" md-ripple [mdRippleTrigger]=\"label\" [mdRippleCentered]=\"true\" [mdRippleDisabled]=\"disableRipple || disabled\"> </div> </div> </div> <span class=\"mat-slide-toggle-content\"> <ng-content></ng-content> </span> </label> ",
-                styles: [".mat-slide-toggle{display:inline-block;height:24px;line-height:24px;white-space:nowrap;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;outline:0}.mat-slide-toggle.mat-checked .mat-slide-toggle-thumb-container{transform:translate3d(16px,0,0)}.mat-slide-toggle.mat-disabled .mat-slide-toggle-label,.mat-slide-toggle.mat-disabled .mat-slide-toggle-thumb-container{cursor:default}.mat-slide-toggle-content{font-size:14px;font-family:Roboto,\"Helvetica Neue\",sans-serif;font-weight:500}.mat-slide-toggle-label{display:flex;flex:1;flex-direction:row;align-items:center;cursor:pointer}.mat-slide-toggle-label-before .mat-slide-toggle-label{order:1}.mat-slide-toggle-label-before .mat-slide-toggle-bar{order:2}.mat-slide-toggle-bar,[dir=rtl] .mat-slide-toggle-label-before .mat-slide-toggle-bar{margin-right:8px;margin-left:0}.mat-slide-toggle-label-before .mat-slide-toggle-bar,[dir=rtl] .mat-slide-toggle-bar{margin-left:8px;margin-right:0}.mat-slide-toggle-thumb-container{position:absolute;z-index:1;width:20px;height:20px;top:-3px;left:0;transform:translate3d(0,0,0);transition:all 80ms linear;transition-property:transform;cursor:-webkit-grab;cursor:grab}.mat-slide-toggle-thumb-container.mat-dragging,.mat-slide-toggle-thumb-container:active{cursor:-webkit-grabbing;cursor:grabbing;transition-duration:0s}.mat-slide-toggle-thumb{height:20px;width:20px;border-radius:50%;box-shadow:0 2px 1px -1px rgba(0,0,0,.2),0 1px 1px 0 rgba(0,0,0,.14),0 1px 3px 0 rgba(0,0,0,.12)}@media screen and (-ms-high-contrast:active){.mat-slide-toggle-thumb{background:#fff;border:solid 1px #000}}.mat-slide-toggle-bar{position:relative;width:36px;height:14px;border-radius:8px}@media screen and (-ms-high-contrast:active){.mat-slide-toggle-bar{background:#fff}}.mat-slide-toggle-input{bottom:0;left:10px}.mat-slide-toggle-bar,.mat-slide-toggle-thumb{transition:all 80ms linear;transition-property:background-color;transition-delay:50ms}.mat-slide-toggle-ripple{position:absolute;top:-13px;left:-13px;height:46px;width:46px;border-radius:50%;z-index:1;pointer-events:none} /*# sourceMappingURL=slide-toggle.css.map */ "],
+                template: "<label class=\"mat-slide-toggle-label\" #label><div class=\"mat-slide-toggle-bar\"><input #input class=\"mat-slide-toggle-input cdk-visually-hidden\" type=\"checkbox\" [id]=\"inputId\" [required]=\"required\" [tabIndex]=\"tabIndex\" [checked]=\"checked\" [disabled]=\"disabled\" [attr.name]=\"name\" [attr.aria-label]=\"ariaLabel\" [attr.aria-labelledby]=\"ariaLabelledby\" (change)=\"_onChangeEvent($event)\" (click)=\"_onInputClick($event)\"><div class=\"mat-slide-toggle-thumb-container\" (slidestart)=\"_onDragStart()\" (slide)=\"_onDrag($event)\" (slideend)=\"_onDragEnd()\"><div class=\"mat-slide-toggle-thumb\"></div><div class=\"mat-slide-toggle-ripple\" md-ripple [mdRippleTrigger]=\"label\" [mdRippleCentered]=\"true\" [mdRippleDisabled]=\"disableRipple || disabled\"></div></div></div><span class=\"mat-slide-toggle-content\"><ng-content></ng-content></span></label>",
+                styles: [".mat-slide-toggle{display:inline-block;height:24px;line-height:24px;white-space:nowrap;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;outline:0}.mat-slide-toggle.mat-checked .mat-slide-toggle-thumb-container{transform:translate3d(16px,0,0)}.mat-slide-toggle.mat-disabled .mat-slide-toggle-label,.mat-slide-toggle.mat-disabled .mat-slide-toggle-thumb-container{cursor:default}.mat-slide-toggle-label{display:flex;flex:1;flex-direction:row;align-items:center;cursor:pointer}.mat-slide-toggle-label-before .mat-slide-toggle-label{order:1}.mat-slide-toggle-label-before .mat-slide-toggle-bar{order:2}.mat-slide-toggle-bar,[dir=rtl] .mat-slide-toggle-label-before .mat-slide-toggle-bar{margin-right:8px;margin-left:0}.mat-slide-toggle-label-before .mat-slide-toggle-bar,[dir=rtl] .mat-slide-toggle-bar{margin-left:8px;margin-right:0}.mat-slide-toggle-thumb-container{position:absolute;z-index:1;width:20px;height:20px;top:-3px;left:0;transform:translate3d(0,0,0);transition:all 80ms linear;transition-property:transform;cursor:-webkit-grab;cursor:grab}.mat-slide-toggle-thumb-container.mat-dragging,.mat-slide-toggle-thumb-container:active{cursor:-webkit-grabbing;cursor:grabbing;transition-duration:0s}.mat-slide-toggle-thumb{height:20px;width:20px;border-radius:50%;box-shadow:0 2px 1px -1px rgba(0,0,0,.2),0 1px 1px 0 rgba(0,0,0,.14),0 1px 3px 0 rgba(0,0,0,.12)}@media screen and (-ms-high-contrast:active){.mat-slide-toggle-thumb{background:#fff;border:solid 1px #000}}.mat-slide-toggle-bar{position:relative;width:36px;height:14px;border-radius:8px}@media screen and (-ms-high-contrast:active){.mat-slide-toggle-bar{background:#fff}}.mat-slide-toggle-input{bottom:0;left:10px}.mat-slide-toggle-bar,.mat-slide-toggle-thumb{transition:all 80ms linear;transition-property:background-color;transition-delay:50ms}.mat-slide-toggle-ripple{position:absolute;top:-13px;left:-13px;height:46px;width:46px;border-radius:50%;z-index:1;pointer-events:none}"],
                 providers: [MD_SLIDE_TOGGLE_VALUE_ACCESSOR],
+                inputs: ['disabled', 'disableRipple', 'color'],
                 encapsulation: ViewEncapsulation.None,
                 changeDetection: ChangeDetectionStrategy.OnPush
             },] },
@@ -8659,8 +8483,10 @@ MdSlideToggle.decorators = [
  */
 MdSlideToggle.ctorParameters = () => [
     { type: ElementRef, },
-    { type: Renderer, },
+    { type: Renderer2, },
+    { type: Platform, },
     { type: FocusOriginMonitor, },
+    { type: ChangeDetectorRef, },
 ];
 MdSlideToggle.propDecorators = {
     'name': [{ type: Input },],
@@ -8669,14 +8495,11 @@ MdSlideToggle.propDecorators = {
     'labelPosition': [{ type: Input },],
     'ariaLabel': [{ type: Input, args: ['aria-label',] },],
     'ariaLabelledby': [{ type: Input, args: ['aria-labelledby',] },],
-    'disabled': [{ type: Input },],
     'required': [{ type: Input },],
-    'disableRipple': [{ type: Input },],
+    'checked': [{ type: Input },],
     'change': [{ type: Output },],
     '_inputElement': [{ type: ViewChild, args: ['input',] },],
     '_ripple': [{ type: ViewChild, args: [MdRipple,] },],
-    'checked': [{ type: Input },],
-    'color': [{ type: Input },],
 };
 /**
  * Renderer for the Slide Toggle component, which separates DOM modification in its own class
@@ -8684,15 +8507,20 @@ MdSlideToggle.propDecorators = {
 class SlideToggleRenderer {
     /**
      * @param {?} _elementRef
+     * @param {?} platform
      */
-    constructor(_elementRef) {
+    constructor(_elementRef, platform) {
         this._elementRef = _elementRef;
         /**
          * Whether the thumb is currently being dragged.
          */
         this.dragging = false;
-        this._thumbEl = _elementRef.nativeElement.querySelector('.mat-slide-toggle-thumb-container');
-        this._thumbBarEl = _elementRef.nativeElement.querySelector('.mat-slide-toggle-bar');
+        // We only need to interact with these elements when we're on the browser, so only grab
+        // the reference in that case.
+        if (platform.isBrowser) {
+            this._thumbEl = _elementRef.nativeElement.querySelector('.mat-slide-toggle-thumb-container');
+            this._thumbBarEl = _elementRef.nativeElement.querySelector('.mat-slide-toggle-bar');
+        }
     }
     /**
      * Initializes the drag of the slide-toggle.
@@ -8714,7 +8542,7 @@ class SlideToggleRenderer {
      */
     stopThumbDrag() {
         if (!this.dragging) {
-            return;
+            return false;
         }
         this.dragging = false;
         this._thumbEl.classList.remove('mat-dragging');
@@ -8749,21 +8577,11 @@ class SlideToggleRenderer {
 }
 
 class MdSlideToggleModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdSlideToggleModule,
-            providers: []
-        };
-    }
 }
 MdSlideToggleModule.decorators = [
     { type: NgModule, args: [{
-                imports: [FormsModule, MdRippleModule, CompatibilityModule],
-                exports: [MdSlideToggle, CompatibilityModule],
+                imports: [MdRippleModule, MdCommonModule, PlatformModule],
+                exports: [MdSlideToggle, MdCommonModule],
                 declarations: [MdSlideToggle],
                 providers: [
                     FOCUS_ORIGIN_MONITOR_PROVIDER,
@@ -8808,21 +8626,29 @@ const MD_SLIDER_VALUE_ACCESSOR = {
 class MdSliderChange {
 }
 /**
+ * \@docs-private
+ */
+class MdSliderBase {
+}
+const _MdSliderMixinBase = mixinDisabled(MdSliderBase);
+/**
  * Allows users to select from a range of values by moving the slider thumb. It is similar in
  * behavior to the native `<input type="range">` element.
  */
-class MdSlider {
+class MdSlider extends _MdSliderMixinBase {
     /**
      * @param {?} renderer
      * @param {?} _elementRef
      * @param {?} _focusOriginMonitor
+     * @param {?} _changeDetectorRef
      * @param {?} _dir
      */
-    constructor(renderer, _elementRef, _focusOriginMonitor, _dir) {
+    constructor(renderer, _elementRef, _focusOriginMonitor, _changeDetectorRef, _dir) {
+        super();
         this._elementRef = _elementRef;
         this._focusOriginMonitor = _focusOriginMonitor;
+        this._changeDetectorRef = _changeDetectorRef;
         this._dir = _dir;
-        this._disabled = false;
         this._invert = false;
         this._max = 100;
         this._min = 0;
@@ -8860,36 +8686,14 @@ class MdSlider {
          */
         this._tickIntervalPercent = 0;
         /**
-         * A renderer to handle updating the slider's thumb and fill track.
-         */
-        this._renderer = null;
-        /**
          * The dimensions of the slider.
          */
         this._sliderDimensions = null;
         this._controlValueAccessorChangeFn = () => { };
-        /**
-         * The last value for which a change event was emitted.
-         */
-        this._lastChangeValue = null;
-        /**
-         * The last value for which an input event was emitted.
-         */
-        this._lastInputValue = null;
-        this._focusOriginMonitor.monitor(this._elementRef.nativeElement, renderer, true)
+        this._focusOriginMonitor
+            .monitor(this._elementRef.nativeElement, renderer, true)
             .subscribe((origin) => this._isActive = !!origin && origin !== 'keyboard');
-        this._renderer = new SliderRenderer(this._elementRef);
     }
-    /**
-     * Whether or not the slider is disabled.
-     * @return {?}
-     */
-    get disabled() { return this._disabled; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set disabled(value) { this._disabled = coerceBooleanProperty(value); }
     /**
      * Whether the slider is inverted.
      * @return {?}
@@ -8899,14 +8703,14 @@ class MdSlider {
      * @param {?} value
      * @return {?}
      */
-    set invert(value) { this._invert = coerceBooleanProperty(value); }
+    set invert(value) {
+        this._invert = coerceBooleanProperty(value);
+    }
     /**
      * The maximum value that the slider can have.
      * @return {?}
      */
-    get max() {
-        return this._max;
-    }
+    get max() { return this._max; }
     /**
      * @param {?} v
      * @return {?}
@@ -8914,14 +8718,14 @@ class MdSlider {
     set max(v) {
         this._max = coerceNumberProperty(v, this._max);
         this._percent = this._calculatePercentage(this._value);
+        // Since this also modifies the percentage, we need to let the change detection know.
+        this._changeDetectorRef.markForCheck();
     }
     /**
      * The minimum value that the slider can have.
      * @return {?}
      */
-    get min() {
-        return this._min;
-    }
+    get min() { return this._min; }
     /**
      * @param {?} v
      * @return {?}
@@ -8933,6 +8737,8 @@ class MdSlider {
             this.value = this._min;
         }
         this._percent = this._calculatePercentage(this._value);
+        // Since this also modifies the percentage, we need to let the change detection know.
+        this._changeDetectorRef.markForCheck();
     }
     /**
      * The values at which the thumb will snap.
@@ -8946,8 +8752,10 @@ class MdSlider {
     set step(v) {
         this._step = coerceNumberProperty(v, this._step);
         if (this._step % 1 !== 0) {
-            this._roundLabelTo = this._step.toString().split('.').pop().length;
+            this._roundLabelTo = ((this._step.toString().split('.').pop())).length;
         }
+        // Since this could modify the label, we need to notify the change detection.
+        this._changeDetectorRef.markForCheck();
     }
     /**
      * Whether or not to show the thumb label.
@@ -9016,8 +8824,12 @@ class MdSlider {
      * @return {?}
      */
     set value(v) {
-        this._value = coerceNumberProperty(v, this._value);
-        this._percent = this._calculatePercentage(this._value);
+        if (v !== this._value) {
+            this._value = coerceNumberProperty(v, this._value || 0);
+            this._percent = this._calculatePercentage(this._value);
+            // Since this also modifies the percentage, we need to let the change detection know.
+            this._changeDetectorRef.markForCheck();
+        }
     }
     /**
      * Whether the slider is vertical.
@@ -9028,7 +8840,9 @@ class MdSlider {
      * @param {?} value
      * @return {?}
      */
-    set vertical(value) { this._vertical = coerceBooleanProperty(value); }
+    set vertical(value) {
+        this._vertical = coerceBooleanProperty(value);
+    }
     /**
      * The value to be used for display purposes.
      * @return {?}
@@ -9037,10 +8851,10 @@ class MdSlider {
         // Note that this could be improved further by rounding something like 0.999 to 1 or
         // 0.899 to 0.9, however it is very performance sensitive, because it gets called on
         // every change detection cycle.
-        if (this._roundLabelTo && this.value % 1 !== 0) {
+        if (this._roundLabelTo && this.value && this.value % 1 !== 0) {
             return this.value.toFixed(this._roundLabelTo);
         }
-        return this.value;
+        return this.value || 0;
     }
     /**
      * The percentage of the slider that coincides with the value.
@@ -9183,7 +8997,7 @@ class MdSlider {
         }
         // We save the dimensions of the slider here so we can use them to update the spacing of the
         // ticks and determine where on the slider click and slide events happen.
-        this._sliderDimensions = this._renderer.getSliderDimensions();
+        this._sliderDimensions = this._getSliderDimensions();
         this._updateTickIntervalPercent();
     }
     /**
@@ -9194,12 +9008,15 @@ class MdSlider {
         if (this.disabled) {
             return;
         }
+        let /** @type {?} */ oldValue = this.value;
         this._isSliding = false;
-        this._renderer.addFocus();
+        this._focusHostElement();
         this._updateValueFromPosition({ x: event.clientX, y: event.clientY });
-        /* Emits a change and input event if the value changed. */
-        this._emitInputEvent();
-        this._emitValueIfChanged();
+        /* Emit a change and input event if the value changed. */
+        if (oldValue != this.value) {
+            this._emitInputEvent();
+            this._emitChangeEvent();
+        }
     }
     /**
      * @param {?} event
@@ -9209,11 +9026,19 @@ class MdSlider {
         if (this.disabled) {
             return;
         }
+        // The slide start event sometimes fails to fire on iOS, so if we're not already in the sliding
+        // state, call the slide start handler manually.
+        if (!this._isSliding) {
+            this._onSlideStart(null);
+        }
         // Prevent the slide from selecting anything else.
         event.preventDefault();
+        let /** @type {?} */ oldValue = this.value;
         this._updateValueFromPosition({ x: event.center.x, y: event.center.y });
         // Native range elements always emit `input` events when the value changed while sliding.
-        this._emitInputEvent();
+        if (oldValue != this.value) {
+            this._emitInputEvent();
+        }
     }
     /**
      * @param {?} event
@@ -9225,17 +9050,23 @@ class MdSlider {
         }
         // Simulate mouseenter in case this is a mobile device.
         this._onMouseenter();
-        event.preventDefault();
         this._isSliding = true;
-        this._renderer.addFocus();
-        this._updateValueFromPosition({ x: event.center.x, y: event.center.y });
+        this._focusHostElement();
+        this._valueOnSlideStart = this.value;
+        if (event) {
+            this._updateValueFromPosition({ x: event.center.x, y: event.center.y });
+            event.preventDefault();
+        }
     }
     /**
      * @return {?}
      */
     _onSlideEnd() {
         this._isSliding = false;
-        this._emitValueIfChanged();
+        if (this._valueOnSlideStart != this.value) {
+            this._emitChangeEvent();
+        }
+        this._valueOnSlideStart = null;
     }
     /**
      * @return {?}
@@ -9243,7 +9074,7 @@ class MdSlider {
     _onFocus() {
         // We save the dimensions of the slider here so we can use them to update the spacing of the
         // ticks and determine where on the slider click and slide events happen.
-        this._sliderDimensions = this._renderer.getSliderDimensions();
+        this._sliderDimensions = this._getSliderDimensions();
         this._updateTickIntervalPercent();
     }
     /**
@@ -9260,6 +9091,7 @@ class MdSlider {
         if (this.disabled) {
             return;
         }
+        let /** @type {?} */ oldValue = this.value;
         switch (event.keyCode) {
             case PAGE_UP:
                 this._increment(10);
@@ -9298,6 +9130,10 @@ class MdSlider {
                 // it.
                 return;
         }
+        if (oldValue != this.value) {
+            this._emitInputEvent();
+            this._emitChangeEvent();
+        }
         this._isSliding = true;
         event.preventDefault();
     }
@@ -9313,9 +9149,7 @@ class MdSlider {
      * @return {?}
      */
     _increment(numSteps) {
-        this.value = this._clamp(this.value + this.step * numSteps, this.min, this.max);
-        this._emitInputEvent();
-        this._emitValueIfChanged();
+        this.value = this._clamp((this.value || 0) + this.step * numSteps, this.min, this.max);
     }
     /**
      * Calculate the new value from the new physical location. The value will always be snapped.
@@ -9345,31 +9179,23 @@ class MdSlider {
      * Emits a change event if the current value is different from the last emitted value.
      * @return {?}
      */
-    _emitValueIfChanged() {
-        if (this.value != this._lastChangeValue) {
-            let /** @type {?} */ event = this._createChangeEvent();
-            this._lastChangeValue = this.value;
-            this._controlValueAccessorChangeFn(this.value);
-            this.change.emit(event);
-        }
+    _emitChangeEvent() {
+        this._controlValueAccessorChangeFn(this.value);
+        this.change.emit(this._createChangeEvent());
     }
     /**
      * Emits an input event when the current value is different from the last emitted value.
      * @return {?}
      */
     _emitInputEvent() {
-        if (this.value != this._lastInputValue) {
-            let /** @type {?} */ event = this._createChangeEvent();
-            this._lastInputValue = this.value;
-            this.input.emit(event);
-        }
+        this.input.emit(this._createChangeEvent());
     }
     /**
      * Updates the amount of space between ticks as a percentage of the width of the slider.
      * @return {?}
      */
     _updateTickIntervalPercent() {
-        if (!this.tickInterval) {
+        if (!this.tickInterval || !this._sliderDimensions) {
             return;
         }
         if (this.tickInterval == 'auto') {
@@ -9400,7 +9226,7 @@ class MdSlider {
      * @return {?}
      */
     _calculatePercentage(value) {
-        return (value - this.min) / (this.max - this.min);
+        return ((value || 0) - this.min) / (this.max - this.min);
     }
     /**
      * Calculates the value a percentage of the slider corresponds to.
@@ -9419,6 +9245,23 @@ class MdSlider {
      */
     _clamp(value, min = 0, max = 1) {
         return Math.max(min, Math.min(value, max));
+    }
+    /**
+     * Get the bounding client rect of the slider track element.
+     * The track is used rather than the native element to ignore the extra space that the thumb can
+     * take up.
+     * @return {?}
+     */
+    _getSliderDimensions() {
+        return this._sliderWrapper ? this._sliderWrapper.nativeElement.getBoundingClientRect() : null;
+    }
+    /**
+     * Focuses the native element.
+     * Currently only used to allow a blur event to fire but will be used with keyboard input later.
+     * @return {?}
+     */
+    _focusHostElement() {
+        this._elementRef.nativeElement.focus();
     }
     /**
      * Sets the model value. Implemented as part of ControlValueAccessor.
@@ -9460,7 +9303,6 @@ MdSlider.decorators = [
     { type: Component, args: [{selector: 'md-slider, mat-slider',
                 providers: [MD_SLIDER_VALUE_ACCESSOR],
                 host: {
-                    '[class.mat-slider]': 'true',
                     '(focus)': '_onFocus()',
                     '(blur)': '_onBlur()',
                     '(click)': '_onClick($event)',
@@ -9470,12 +9312,14 @@ MdSlider.decorators = [
                     '(slide)': '_onSlide($event)',
                     '(slideend)': '_onSlideEnd()',
                     '(slidestart)': '_onSlideStart($event)',
+                    'class': 'mat-slider',
                     'role': 'slider',
                     'tabindex': '0',
                     '[attr.aria-disabled]': 'disabled',
                     '[attr.aria-valuemax]': 'max',
                     '[attr.aria-valuemin]': 'min',
                     '[attr.aria-valuenow]': 'value',
+                    '[attr.aria-orientation]': 'vertical ? "vertical" : "horizontal"',
                     '[class.mat-primary]': 'color == "primary"',
                     '[class.mat-accent]': 'color != "primary" && color != "warn"',
                     '[class.mat-warn]': 'color == "warn"',
@@ -9489,22 +9333,24 @@ MdSlider.decorators = [
                     '[class.mat-slider-min-value]': '_isMinValue',
                     '[class.mat-slider-hide-last-tick]': 'disabled || _isMinValue && _thumbGap && _invertAxis',
                 },
-                template: "<div class=\"mat-slider-wrapper\"> <div class=\"mat-slider-track-wrapper\"> <div class=\"mat-slider-track-background\" [ngStyle]=\"_trackBackgroundStyles\"></div> <div class=\"mat-slider-track-fill\" [ngStyle]=\"_trackFillStyles\"></div> </div> <div class=\"mat-slider-ticks-container\" [ngStyle]=\"_ticksContainerStyles\"> <div class=\"mat-slider-ticks\" [ngStyle]=\"_ticksStyles\"></div> </div> <div class=\"mat-slider-thumb-container\" [ngStyle]=\"_thumbContainerStyles\"> <div class=\"mat-slider-focus-ring\"></div> <div class=\"mat-slider-thumb\"></div> <div class=\"mat-slider-thumb-label\"> <span class=\"mat-slider-thumb-label-text\">{{displayValue}}</span> </div> </div> </div> ",
-                styles: [".mat-slider{display:inline-block;position:relative;box-sizing:border-box;padding:8px;outline:0;vertical-align:middle}.mat-slider-wrapper{position:absolute}.mat-slider-track-wrapper{position:absolute;top:0;left:0;overflow:hidden}.mat-slider-track-fill{position:absolute;transform-origin:0 0;transition:transform .4s cubic-bezier(.25,.8,.25,1),background-color .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-track-background{position:absolute;transform-origin:100% 100%;transition:transform .4s cubic-bezier(.25,.8,.25,1),background-color .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-ticks-container{position:absolute;left:0;top:0;overflow:hidden}.mat-slider-ticks{box-sizing:border-box;opacity:0;transition:opacity .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-thumb-container{position:absolute;z-index:1;transition:transform .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-focus-ring{position:absolute;width:30px;height:30px;border-radius:50%;transform:scale(0);opacity:0;transition:transform .4s cubic-bezier(.25,.8,.25,1),background-color .4s cubic-bezier(.25,.8,.25,1),opacity .4s cubic-bezier(.25,.8,.25,1)}.cdk-keyboard-focused .mat-slider-focus-ring{transform:scale(1);opacity:1}.mat-slider:not(.mat-slider-disabled) .mat-slider-thumb,.mat-slider:not(.mat-slider-disabled) .mat-slider-thumb-label{cursor:-webkit-grab;cursor:grab}.mat-slider-sliding:not(.mat-slider-disabled) .mat-slider-thumb,.mat-slider-sliding:not(.mat-slider-disabled) .mat-slider-thumb-label,.mat-slider:not(.mat-slider-disabled) .mat-slider-thumb-label:active,.mat-slider:not(.mat-slider-disabled) .mat-slider-thumb:active{cursor:-webkit-grabbing;cursor:grabbing}.mat-slider-thumb{position:absolute;right:-10px;bottom:-10px;box-sizing:border-box;width:20px;height:20px;border:3px solid transparent;border-radius:50%;transform:scale(.7);transition:transform .4s cubic-bezier(.25,.8,.25,1),background-color .4s cubic-bezier(.25,.8,.25,1),border-color .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-thumb-label{display:none;align-items:center;justify-content:center;position:absolute;width:28px;height:28px;border-radius:50%;transition:transform .4s cubic-bezier(.25,.8,.25,1),border-radius .4s cubic-bezier(.25,.8,.25,1),background-color .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-thumb-label-text{z-index:1;font-size:12px;font-weight:700;opacity:0;transition:opacity .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-sliding .mat-slider-thumb-container,.mat-slider-sliding .mat-slider-track-background,.mat-slider-sliding .mat-slider-track-fill{transition-duration:0s}.mat-slider-has-ticks .mat-slider-wrapper::after{content:'';position:absolute;border:0 solid rgba(0,0,0,.6);opacity:0;transition:opacity .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-has-ticks.cdk-focused:not(.mat-slider-hide-last-tick) .mat-slider-wrapper::after,.mat-slider-has-ticks:hover:not(.mat-slider-hide-last-tick) .mat-slider-wrapper::after{opacity:1}.mat-slider-has-ticks.cdk-focused:not(.mat-slider-disabled) .mat-slider-ticks,.mat-slider-has-ticks:hover:not(.mat-slider-disabled) .mat-slider-ticks{opacity:1}.mat-slider-thumb-label-showing .mat-slider-focus-ring{transform:scale(0);opacity:0}.mat-slider-thumb-label-showing .mat-slider-thumb-label{display:flex}.mat-slider-axis-inverted .mat-slider-track-fill{transform-origin:100% 100%}.mat-slider-axis-inverted .mat-slider-track-background{transform-origin:0 0}.cdk-focused.mat-slider-thumb-label-showing .mat-slider-thumb{transform:scale(0)}.cdk-focused .mat-slider-thumb-label{border-radius:50% 50% 0}.cdk-focused .mat-slider-thumb-label-text{opacity:1}.cdk-mouse-focused .mat-slider-thumb,.cdk-program-focused .mat-slider-thumb,.cdk-touch-focused .mat-slider-thumb{border-width:2px;transform:scale(1)}.mat-slider-disabled .mat-slider-focus-ring{transform:scale(0);opacity:0}.mat-slider-disabled .mat-slider-thumb{border-width:4px;transform:scale(.5)}.mat-slider-disabled .mat-slider-thumb-label{display:none}.mat-slider-horizontal{height:48px;min-width:128px}.mat-slider-horizontal .mat-slider-wrapper{height:2px;top:23px;left:8px;right:8px}.mat-slider-horizontal .mat-slider-wrapper::after{height:2px;border-left-width:2px;right:0;top:0}.mat-slider-horizontal .mat-slider-track-wrapper{height:2px;width:100%}.mat-slider-horizontal .mat-slider-track-fill{height:2px;width:100%;transform:scaleX(0)}.mat-slider-horizontal .mat-slider-track-background{height:2px;width:100%;transform:scaleX(1)}.mat-slider-horizontal .mat-slider-ticks-container{height:2px;width:100%}.mat-slider-horizontal .mat-slider-ticks{background:repeating-linear-gradient(to right,rgba(0,0,0,.6),rgba(0,0,0,.6) 2px,transparent 0,transparent) repeat;background:-moz-repeating-linear-gradient(.0001deg,rgba(0,0,0,.6),rgba(0,0,0,.6) 2px,transparent 0,transparent) repeat;background-clip:content-box;height:2px;width:100%}.mat-slider-horizontal .mat-slider-thumb-container{width:100%;height:0;top:50%}.mat-slider-horizontal .mat-slider-focus-ring{top:-15px;right:-15px}.mat-slider-horizontal .mat-slider-thumb-label{right:-14px;top:-40px;transform:translateY(26px) scale(.01) rotate(45deg)}.mat-slider-horizontal .mat-slider-thumb-label-text{transform:rotate(-45deg)}.mat-slider-horizontal.cdk-focused .mat-slider-thumb-label{transform:rotate(45deg)}.mat-slider-vertical{width:48px;min-height:128px}.mat-slider-vertical .mat-slider-wrapper{width:2px;top:8px;bottom:8px;left:23px}.mat-slider-vertical .mat-slider-wrapper::after{width:2px;border-top-width:2px;bottom:0;left:0}.mat-slider-vertical .mat-slider-track-wrapper{height:100%;width:2px}.mat-slider-vertical .mat-slider-track-fill{height:100%;width:2px;transform:scaleY(0)}.mat-slider-vertical .mat-slider-track-background{height:100%;width:2px;transform:scaleY(1)}.mat-slider-vertical .mat-slider-ticks-container{width:2px;height:100%}.mat-slider-vertical .mat-slider-focus-ring{bottom:-15px;left:-15px}.mat-slider-vertical .mat-slider-ticks{background:repeating-linear-gradient(to bottom,rgba(0,0,0,.6),rgba(0,0,0,.6) 2px,transparent 0,transparent) repeat;background-clip:content-box;width:2px;height:100%}.mat-slider-vertical .mat-slider-thumb-container{height:100%;width:0;left:50%}.mat-slider-vertical .mat-slider-thumb-label{bottom:-14px;left:-40px;transform:translateX(26px) scale(.01) rotate(-45deg)}.mat-slider-vertical .mat-slider-thumb-label-text{transform:rotate(45deg)}.mat-slider-vertical.cdk-focused .mat-slider-thumb-label{transform:rotate(-45deg)}[dir=rtl] .mat-slider-wrapper::after{left:0;right:auto}[dir=rtl] .mat-slider-horizontal .mat-slider-track-fill{transform-origin:100% 100%}[dir=rtl] .mat-slider-horizontal .mat-slider-track-background{transform-origin:0 0}[dir=rtl] .mat-slider-horizontal.mat-slider-axis-inverted .mat-slider-track-fill{transform-origin:0 0}[dir=rtl] .mat-slider-horizontal.mat-slider-axis-inverted .mat-slider-track-background{transform-origin:100% 100%} /*# sourceMappingURL=slider.css.map */ "],
+                template: "<div class=\"mat-slider-wrapper\" #sliderWrapper><div class=\"mat-slider-track-wrapper\"><div class=\"mat-slider-track-background\" [ngStyle]=\"_trackBackgroundStyles\"></div><div class=\"mat-slider-track-fill\" [ngStyle]=\"_trackFillStyles\"></div></div><div class=\"mat-slider-ticks-container\" [ngStyle]=\"_ticksContainerStyles\"><div class=\"mat-slider-ticks\" [ngStyle]=\"_ticksStyles\"></div></div><div class=\"mat-slider-thumb-container\" [ngStyle]=\"_thumbContainerStyles\"><div class=\"mat-slider-focus-ring\"></div><div class=\"mat-slider-thumb\"></div><div class=\"mat-slider-thumb-label\"><span class=\"mat-slider-thumb-label-text\">{{displayValue}}</span></div></div></div>",
+                styles: [".mat-slider{display:inline-block;position:relative;box-sizing:border-box;padding:8px;outline:0;vertical-align:middle}.mat-slider-wrapper{position:absolute}.mat-slider-track-wrapper{position:absolute;top:0;left:0;overflow:hidden}.mat-slider-track-fill{position:absolute;transform-origin:0 0;transition:transform .4s cubic-bezier(.25,.8,.25,1),background-color .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-track-background{position:absolute;transform-origin:100% 100%;transition:transform .4s cubic-bezier(.25,.8,.25,1),background-color .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-ticks-container{position:absolute;left:0;top:0;overflow:hidden}.mat-slider-ticks{background-repeat:repeat;background-clip:content-box;box-sizing:border-box;opacity:0;transition:opacity .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-thumb-container{position:absolute;z-index:1;transition:transform .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-focus-ring{position:absolute;width:30px;height:30px;border-radius:50%;transform:scale(0);opacity:0;transition:transform .4s cubic-bezier(.25,.8,.25,1),background-color .4s cubic-bezier(.25,.8,.25,1),opacity .4s cubic-bezier(.25,.8,.25,1)}.cdk-keyboard-focused .mat-slider-focus-ring{transform:scale(1);opacity:1}.mat-slider:not(.mat-slider-disabled) .mat-slider-thumb,.mat-slider:not(.mat-slider-disabled) .mat-slider-thumb-label{cursor:-webkit-grab;cursor:grab}.mat-slider-sliding:not(.mat-slider-disabled) .mat-slider-thumb,.mat-slider-sliding:not(.mat-slider-disabled) .mat-slider-thumb-label,.mat-slider:not(.mat-slider-disabled) .mat-slider-thumb-label:active,.mat-slider:not(.mat-slider-disabled) .mat-slider-thumb:active{cursor:-webkit-grabbing;cursor:grabbing}.mat-slider-thumb{position:absolute;right:-10px;bottom:-10px;box-sizing:border-box;width:20px;height:20px;border:3px solid transparent;border-radius:50%;transform:scale(.7);transition:transform .4s cubic-bezier(.25,.8,.25,1),background-color .4s cubic-bezier(.25,.8,.25,1),border-color .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-thumb-label{display:none;align-items:center;justify-content:center;position:absolute;width:28px;height:28px;border-radius:50%;transition:transform .4s cubic-bezier(.25,.8,.25,1),border-radius .4s cubic-bezier(.25,.8,.25,1),background-color .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-thumb-label-text{z-index:1;opacity:0;transition:opacity .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-sliding .mat-slider-thumb-container,.mat-slider-sliding .mat-slider-track-background,.mat-slider-sliding .mat-slider-track-fill{transition-duration:0s}.mat-slider-has-ticks .mat-slider-wrapper::after{content:'';position:absolute;border-width:0;border-style:solid;opacity:0;transition:opacity .4s cubic-bezier(.25,.8,.25,1)}.mat-slider-has-ticks.cdk-focused:not(.mat-slider-hide-last-tick) .mat-slider-wrapper::after,.mat-slider-has-ticks:hover:not(.mat-slider-hide-last-tick) .mat-slider-wrapper::after{opacity:1}.mat-slider-has-ticks.cdk-focused:not(.mat-slider-disabled) .mat-slider-ticks,.mat-slider-has-ticks:hover:not(.mat-slider-disabled) .mat-slider-ticks{opacity:1}.mat-slider-thumb-label-showing .mat-slider-focus-ring{transform:scale(0);opacity:0}.mat-slider-thumb-label-showing .mat-slider-thumb-label{display:flex}.mat-slider-axis-inverted .mat-slider-track-fill{transform-origin:100% 100%}.mat-slider-axis-inverted .mat-slider-track-background{transform-origin:0 0}.cdk-focused.mat-slider-thumb-label-showing .mat-slider-thumb{transform:scale(0)}.cdk-focused .mat-slider-thumb-label{border-radius:50% 50% 0}.cdk-focused .mat-slider-thumb-label-text{opacity:1}.cdk-mouse-focused .mat-slider-thumb,.cdk-program-focused .mat-slider-thumb,.cdk-touch-focused .mat-slider-thumb{border-width:2px;transform:scale(1)}.mat-slider-disabled .mat-slider-focus-ring{transform:scale(0);opacity:0}.mat-slider-disabled .mat-slider-thumb{border-width:4px;transform:scale(.5)}.mat-slider-disabled .mat-slider-thumb-label{display:none}.mat-slider-horizontal{height:48px;min-width:128px}.mat-slider-horizontal .mat-slider-wrapper{height:2px;top:23px;left:8px;right:8px}.mat-slider-horizontal .mat-slider-wrapper::after{height:2px;border-left-width:2px;right:0;top:0}.mat-slider-horizontal .mat-slider-track-wrapper{height:2px;width:100%}.mat-slider-horizontal .mat-slider-track-fill{height:2px;width:100%;transform:scaleX(0)}.mat-slider-horizontal .mat-slider-track-background{height:2px;width:100%;transform:scaleX(1)}.mat-slider-horizontal .mat-slider-ticks-container{height:2px;width:100%}.mat-slider-horizontal .mat-slider-ticks{height:2px;width:100%}.mat-slider-horizontal .mat-slider-thumb-container{width:100%;height:0;top:50%}.mat-slider-horizontal .mat-slider-focus-ring{top:-15px;right:-15px}.mat-slider-horizontal .mat-slider-thumb-label{right:-14px;top:-40px;transform:translateY(26px) scale(.01) rotate(45deg)}.mat-slider-horizontal .mat-slider-thumb-label-text{transform:rotate(-45deg)}.mat-slider-horizontal.cdk-focused .mat-slider-thumb-label{transform:rotate(45deg)}.mat-slider-vertical{width:48px;min-height:128px}.mat-slider-vertical .mat-slider-wrapper{width:2px;top:8px;bottom:8px;left:23px}.mat-slider-vertical .mat-slider-wrapper::after{width:2px;border-top-width:2px;bottom:0;left:0}.mat-slider-vertical .mat-slider-track-wrapper{height:100%;width:2px}.mat-slider-vertical .mat-slider-track-fill{height:100%;width:2px;transform:scaleY(0)}.mat-slider-vertical .mat-slider-track-background{height:100%;width:2px;transform:scaleY(1)}.mat-slider-vertical .mat-slider-ticks-container{width:2px;height:100%}.mat-slider-vertical .mat-slider-focus-ring{bottom:-15px;left:-15px}.mat-slider-vertical .mat-slider-ticks{width:2px;height:100%}.mat-slider-vertical .mat-slider-thumb-container{height:100%;width:0;left:50%}.mat-slider-vertical .mat-slider-thumb-label{bottom:-14px;left:-40px;transform:translateX(26px) scale(.01) rotate(-45deg)}.mat-slider-vertical .mat-slider-thumb-label-text{transform:rotate(45deg)}.mat-slider-vertical.cdk-focused .mat-slider-thumb-label{transform:rotate(-45deg)}[dir=rtl] .mat-slider-wrapper::after{left:0;right:auto}[dir=rtl] .mat-slider-horizontal .mat-slider-track-fill{transform-origin:100% 100%}[dir=rtl] .mat-slider-horizontal .mat-slider-track-background{transform-origin:0 0}[dir=rtl] .mat-slider-horizontal.mat-slider-axis-inverted .mat-slider-track-fill{transform-origin:0 0}[dir=rtl] .mat-slider-horizontal.mat-slider-axis-inverted .mat-slider-track-background{transform-origin:100% 100%}"],
+                inputs: ['disabled'],
                 encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
             },] },
 ];
 /**
  * @nocollapse
  */
 MdSlider.ctorParameters = () => [
-    { type: Renderer, },
+    { type: Renderer2, },
     { type: ElementRef, },
     { type: FocusOriginMonitor, },
-    { type: Dir, decorators: [{ type: Optional },] },
+    { type: ChangeDetectorRef, },
+    { type: Directionality, decorators: [{ type: Optional },] },
 ];
 MdSlider.propDecorators = {
-    'disabled': [{ type: Input },],
     'invert': [{ type: Input },],
     'max': [{ type: Input },],
     'min': [{ type: Input },],
@@ -9518,54 +9364,15 @@ MdSlider.propDecorators = {
     'color': [{ type: Input },],
     'change': [{ type: Output },],
     'input': [{ type: Output },],
+    '_sliderWrapper': [{ type: ViewChild, args: ['sliderWrapper',] },],
 };
-/**
- * Renderer class in order to keep all dom manipulation in one place and outside of the main class.
- * \@docs-private
- */
-class SliderRenderer {
-    /**
-     * @param {?} elementRef
-     */
-    constructor(elementRef) {
-        this._sliderElement = elementRef.nativeElement;
-    }
-    /**
-     * Get the bounding client rect of the slider track element.
-     * The track is used rather than the native element to ignore the extra space that the thumb can
-     * take up.
-     * @return {?}
-     */
-    getSliderDimensions() {
-        let /** @type {?} */ wrapperElement = this._sliderElement.querySelector('.mat-slider-wrapper');
-        return wrapperElement.getBoundingClientRect();
-    }
-    /**
-     * Focuses the native element.
-     * Currently only used to allow a blur event to fire but will be used with keyboard input later.
-     * @return {?}
-     */
-    addFocus() {
-        this._sliderElement.focus();
-    }
-}
 
 class MdSliderModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdSliderModule,
-            providers: []
-        };
-    }
 }
 MdSliderModule.decorators = [
     { type: NgModule, args: [{
-                imports: [CommonModule, FormsModule, CompatibilityModule, StyleModule, RtlModule],
-                exports: [MdSlider, CompatibilityModule],
+                imports: [CommonModule, MdCommonModule, StyleModule, BidiModule],
+                exports: [MdSlider, MdCommonModule],
                 declarations: [MdSlider],
                 providers: [{ provide: HAMMER_GESTURE_CONFIG, useClass: GestureConfig }]
             },] },
@@ -9576,18 +9383,16 @@ MdSliderModule.decorators = [
 MdSliderModule.ctorParameters = () => [];
 
 /**
- * Exception thrown when two MdSidenav are matching the same side.
+ * Throws an exception when two MdSidenav are matching the same side.
+ * @param {?} align
+ * @return {?}
  */
-class MdDuplicatedSidenavError extends MdError {
-    /**
-     * @param {?} align
-     */
-    constructor(align) {
-        super(`A sidenav was already declared for 'align="${align}"'`);
-    }
+function throwMdDuplicatedSidenavError(align) {
+    throw Error(`A sidenav was already declared for 'align="${align}"'`);
 }
 /**
  * Sidenav toggle promise result.
+ * @deprecated
  */
 class MdSidenavToggleResult {
     /**
@@ -9608,15 +9413,19 @@ class MdSidenavToggleResult {
  */
 class MdSidenav {
     /**
-     * @param {?} _elementRef The DOM element reference. Used for transition and width calculation.
-     *     If not available we do not hook on transitions.
-     * @param {?} _renderer
+     * @param {?} _elementRef
      * @param {?} _focusTrapFactory
+     * @param {?} _doc
      */
-    constructor(_elementRef, _renderer, _focusTrapFactory) {
+    constructor(_elementRef, _focusTrapFactory, _doc) {
         this._elementRef = _elementRef;
-        this._renderer = _renderer;
         this._focusTrapFactory = _focusTrapFactory;
+        this._doc = _doc;
+        this._elementFocusedBeforeSidenavWasOpened = null;
+        /**
+         * Whether the sidenav is initialized. Used for disabling the initial animation.
+         */
+        this._enableAnimations = false;
         /**
          * Alignment of the sidenav (direction neutral); whether 'start' or 'end'.
          */
@@ -9631,17 +9440,17 @@ class MdSidenav {
          */
         this._opened = false;
         /**
-         * Event emitted when the sidenav is being opened. Use this to synchronize animations.
+         * Emits whenever the sidenav has started animating.
          */
-        this.onOpenStart = new EventEmitter();
+        this._animationStarted = new EventEmitter();
+        /**
+         * Whether the sidenav is animating. Used to prevent overlapping animations.
+         */
+        this._isAnimating = false;
         /**
          * Event emitted when the sidenav is fully opened.
          */
         this.onOpen = new EventEmitter();
-        /**
-         * Event emitted when the sidenav is being closed. Use this to synchronize animations.
-         */
-        this.onCloseStart = new EventEmitter();
         /**
          * Event emitted when the sidenav is fully closed.
          */
@@ -9650,31 +9459,15 @@ class MdSidenav {
          * Event emitted when the sidenav alignment changes.
          */
         this.onAlignChanged = new EventEmitter();
-        /**
-         * The current toggle animation promise. `null` if no animation is in progress.
-         */
-        this._toggleAnimationPromise = null;
-        /**
-         * The current toggle animation promise resolution function.
-         * `null` if no animation is in progress.
-         */
-        this._resolveToggleAnimationPromise = null;
-        this._elementFocusedBeforeSidenavWasOpened = null;
         this.onOpen.subscribe(() => {
-            this._elementFocusedBeforeSidenavWasOpened = document.activeElement;
+            if (this._doc) {
+                this._elementFocusedBeforeSidenavWasOpened = this._doc.activeElement;
+            }
             if (this.isFocusTrapEnabled && this._focusTrap) {
-                this._focusTrap.focusFirstTabbableElementWhenReady();
+                this._focusTrap.focusInitialElementWhenReady();
             }
         });
-        this.onClose.subscribe(() => {
-            if (this._elementFocusedBeforeSidenavWasOpened instanceof HTMLElement) {
-                this._renderer.invokeElementMethod(this._elementFocusedBeforeSidenavWasOpened, 'focus');
-            }
-            else {
-                this._renderer.invokeElementMethod(this._elementRef.nativeElement, 'blur');
-            }
-            this._elementFocusedBeforeSidenavWasOpened = null;
-        });
+        this.onClose.subscribe(() => this._restoreFocus());
     }
     /**
      * Direction which the sidenav is aligned in.
@@ -9687,7 +9480,7 @@ class MdSidenav {
      */
     set align(value) {
         // Make sure we have a valid value.
-        value = (value == 'end') ? 'end' : 'start';
+        value = value === 'end' ? 'end' : 'start';
         if (value != this._align) {
             this._align = value;
             this.onAlignChanged.emit();
@@ -9711,17 +9504,29 @@ class MdSidenav {
         return this.opened && this.mode !== 'side';
     }
     /**
+     * If focus is currently inside the sidenav, restores it to where it was before the sidenav
+     * opened.
+     * @return {?}
+     */
+    _restoreFocus() {
+        let /** @type {?} */ activeEl = this._doc && this._doc.activeElement;
+        if (activeEl && this._elementRef.nativeElement.contains(activeEl)) {
+            if (this._elementFocusedBeforeSidenavWasOpened instanceof HTMLElement) {
+                this._elementFocusedBeforeSidenavWasOpened.focus();
+            }
+            else {
+                this._elementRef.nativeElement.blur();
+            }
+        }
+        this._elementFocusedBeforeSidenavWasOpened = null;
+    }
+    /**
      * @return {?}
      */
     ngAfterContentInit() {
         this._focusTrap = this._focusTrapFactory.create(this._elementRef.nativeElement);
         this._focusTrap.enabled = this.isFocusTrapEnabled;
-        // This can happen when the sidenav is set to opened in
-        // the template and the transition hasn't ended.
-        if (this._toggleAnimationPromise) {
-            this._resolveToggleAnimationPromise(true);
-            this._toggleAnimationPromise = this._resolveToggleAnimationPromise = null;
-        }
+        Promise.resolve().then(() => this._enableAnimations = true);
     }
     /**
      * @return {?}
@@ -9745,50 +9550,37 @@ class MdSidenav {
         this.toggle(coerceBooleanProperty(v));
     }
     /**
-     * Open this sidenav, and return a Promise that will resolve when it's fully opened (or get
-     * rejected if it didn't).
+     * Open the sidenav.
      * @return {?}
      */
     open() {
         return this.toggle(true);
     }
     /**
-     * Close this sidenav, and return a Promise that will resolve when it's fully closed (or get
-     * rejected if it didn't).
+     * Close the sidenav.
      * @return {?}
      */
     close() {
         return this.toggle(false);
     }
     /**
-     * Toggle this sidenav. This is equivalent to calling open() when it's already opened, or
-     * close() when it's closed.
+     * Toggle this sidenav.
      * @param {?=} isOpen Whether the sidenav should be open.
-     * @return {?} Resolves with the result of whether the sidenav was opened or closed.
+     * @return {?}
      */
     toggle(isOpen = !this.opened) {
-        // Shortcut it if we're already opened.
-        if (isOpen === this.opened) {
-            return this._toggleAnimationPromise ||
-                Promise.resolve(new MdSidenavToggleResult(isOpen ? 'open' : 'close', true));
+        if (!this._isAnimating) {
+            this._opened = isOpen;
+            this._currentTogglePromise = new Promise(resolve => {
+                first.call(isOpen ? this.onOpen : this.onClose).subscribe(resolve);
+            });
+            if (this._focusTrap) {
+                this._focusTrap.enabled = this.isFocusTrapEnabled;
+            }
         }
-        this._opened = isOpen;
-        if (this._focusTrap) {
-            this._focusTrap.enabled = this.isFocusTrapEnabled;
-        }
-        if (isOpen) {
-            this.onOpenStart.emit();
-        }
-        else {
-            this.onCloseStart.emit();
-        }
-        if (this._toggleAnimationPromise) {
-            this._resolveToggleAnimationPromise(false);
-        }
-        this._toggleAnimationPromise = new Promise(resolve => {
-            this._resolveToggleAnimationPromise = animationFinished => resolve(new MdSidenavToggleResult(isOpen ? 'open' : 'close', animationFinished));
-        });
-        return this._toggleAnimationPromise;
+        // TODO(crisbeto): This promise is here backwards-compatibility.
+        // It should be removed next time we do breaking changes in the sidenav.
+        return ((this._currentTogglePromise));
     }
     /**
      * Handles the keyboard events.
@@ -9803,107 +9595,76 @@ class MdSidenav {
         }
     }
     /**
-     * When transition has finished, set the internal state for classes and emit the proper event.
-     * The event passed is actually of type TransitionEvent, but that type is not available in
-     * Android so we use any.
-     * @param {?} transitionEvent
+     * Figures out the state of the sidenav animation.
      * @return {?}
      */
-    _onTransitionEnd(transitionEvent) {
-        if (transitionEvent.target == this._elementRef.nativeElement
-            && transitionEvent.propertyName.endsWith('transform')) {
-            if (this._opened) {
-                this.onOpen.emit();
-            }
-            else {
-                this.onClose.emit();
-            }
-            if (this._toggleAnimationPromise) {
-                this._resolveToggleAnimationPromise(true);
-                this._toggleAnimationPromise = this._resolveToggleAnimationPromise = null;
-            }
+    _getAnimationState() {
+        if (this.opened) {
+            return this._enableAnimations ? 'open' : 'open-instant';
         }
+        return 'void';
     }
     /**
      * @return {?}
      */
-    get _isClosing() {
-        return !this._opened && !!this._toggleAnimationPromise;
+    _onAnimationStart() {
+        this._isAnimating = true;
+        this._animationStarted.emit();
     }
     /**
+     * @param {?} event
      * @return {?}
      */
-    get _isOpening() {
-        return this._opened && !!this._toggleAnimationPromise;
-    }
-    /**
-     * @return {?}
-     */
-    get _isClosed() {
-        return !this._opened && !this._toggleAnimationPromise;
-    }
-    /**
-     * @return {?}
-     */
-    get _isOpened() {
-        return this._opened && !this._toggleAnimationPromise;
-    }
-    /**
-     * @return {?}
-     */
-    get _isEnd() {
-        return this.align == 'end';
-    }
-    /**
-     * @return {?}
-     */
-    get _modeSide() {
-        return this.mode == 'side';
-    }
-    /**
-     * @return {?}
-     */
-    get _modeOver() {
-        return this.mode == 'over';
-    }
-    /**
-     * @return {?}
-     */
-    get _modePush() {
-        return this.mode == 'push';
+    _onAnimationEnd(event) {
+        const { fromState, toState } = event;
+        if (toState === 'open' && fromState === 'void') {
+            this.onOpen.emit(new MdSidenavToggleResult('open', true));
+        }
+        else if (toState === 'void' && fromState === 'open') {
+            this.onClose.emit(new MdSidenavToggleResult('close', true));
+        }
+        this._isAnimating = false;
+        this._currentTogglePromise = null;
     }
     /**
      * @return {?}
      */
     get _width() {
-        if (this._elementRef.nativeElement) {
-            return this._elementRef.nativeElement.offsetWidth;
-        }
-        return 0;
+        return this._elementRef.nativeElement ? (this._elementRef.nativeElement.offsetWidth || 0) : 0;
     }
 }
 MdSidenav.decorators = [
     { type: Component, args: [{selector: 'md-sidenav, mat-sidenav',
-                // TODO(mmalerba): move template to separate file.
-                template: "<ng-content></ng-content> ",
+                template: "<ng-content></ng-content>",
+                changeDetection: ChangeDetectionStrategy.OnPush,
+                encapsulation: ViewEncapsulation.None,
+                animations: [
+                    trigger('transform', [
+                        state('open, open-instant', style({
+                            transform: 'translate3d(0, 0, 0)',
+                            visibility: 'visible',
+                        })),
+                        state('void', style({
+                            visibility: 'hidden',
+                        })),
+                        transition('void => open-instant', animate('0ms')),
+                        transition('void <=> open', animate('400ms cubic-bezier(0.25, 0.8, 0.25, 1)'))
+                    ])
+                ],
                 host: {
-                    '[class.mat-sidenav]': 'true',
-                    '(transitionend)': '_onTransitionEnd($event)',
+                    'class': 'mat-sidenav',
+                    '[@transform]': '_getAnimationState()',
+                    '(@transform.start)': '_onAnimationStart()',
+                    '(@transform.done)': '_onAnimationEnd($event)',
                     '(keydown)': 'handleKeydown($event)',
                     // must prevent the browser from aligning text based on value
                     '[attr.align]': 'null',
-                    '[class.mat-sidenav-closed]': '_isClosed',
-                    '[class.mat-sidenav-closing]': '_isClosing',
-                    '[class.mat-sidenav-end]': '_isEnd',
-                    '[class.mat-sidenav-opened]': '_isOpened',
-                    '[class.mat-sidenav-opening]': '_isOpening',
-                    '[class.mat-sidenav-over]': '_modeOver',
-                    '[class.mat-sidenav-push]': '_modePush',
-                    '[class.mat-sidenav-side]': '_modeSide',
+                    '[class.mat-sidenav-end]': 'align === "end"',
+                    '[class.mat-sidenav-over]': 'mode === "over"',
+                    '[class.mat-sidenav-push]': 'mode === "push"',
+                    '[class.mat-sidenav-side]': 'mode === "side"',
                     'tabIndex': '-1'
                 },
-                changeDetection: ChangeDetectionStrategy.OnPush,
-                encapsulation: ViewEncapsulation.None,
             },] },
 ];
 /**
@@ -9911,16 +9672,14 @@ MdSidenav.decorators = [
  */
 MdSidenav.ctorParameters = () => [
     { type: ElementRef, },
-    { type: Renderer, },
     { type: FocusTrapFactory, },
+    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [DOCUMENT,] },] },
 ];
 MdSidenav.propDecorators = {
     'align': [{ type: Input },],
     'mode': [{ type: Input },],
     'disableClose': [{ type: Input },],
-    'onOpenStart': [{ type: Output, args: ['open-start',] },],
     'onOpen': [{ type: Output, args: ['open',] },],
-    'onCloseStart': [{ type: Output, args: ['close-start',] },],
     'onClose': [{ type: Output, args: ['close',] },],
     'onAlignChanged': [{ type: Output, args: ['align-changed',] },],
     'opened': [{ type: Input },],
@@ -9937,24 +9696,22 @@ class MdSidenavContainer {
      * @param {?} _element
      * @param {?} _renderer
      * @param {?} _ngZone
+     * @param {?} _changeDetectorRef
      */
-    constructor(_dir, _element, _renderer, _ngZone) {
+    constructor(_dir, _element, _renderer, _ngZone, _changeDetectorRef) {
         this._dir = _dir;
         this._element = _element;
         this._renderer = _renderer;
         this._ngZone = _ngZone;
+        this._changeDetectorRef = _changeDetectorRef;
         /**
          * Event emitted when the sidenav backdrop is clicked.
          */
         this.backdropClick = new EventEmitter();
-        /**
-         * Whether to enable open/close trantions.
-         */
-        this._enableTransitions = false;
         // If a `Dir` directive exists up the tree, listen direction changes and update the left/right
         // properties to point to the proper start/end.
         if (_dir != null) {
-            _dir.dirChange.subscribe(() => this._validateDrawers());
+            _dir.change.subscribe(() => this._validateDrawers());
         }
     }
     /**
@@ -9971,29 +9728,27 @@ class MdSidenavContainer {
      * @return {?}
      */
     ngAfterContentInit() {
-        // On changes, assert on consistency.
-        this._sidenavs.changes.subscribe(() => this._validateDrawers());
-        this._sidenavs.forEach((sidenav) => {
-            this._watchSidenavToggle(sidenav);
-            this._watchSidenavAlign(sidenav);
+        startWith.call(this._sidenavs.changes, null).subscribe(() => {
+            this._validateDrawers();
+            this._sidenavs.forEach((sidenav) => {
+                this._watchSidenavToggle(sidenav);
+                this._watchSidenavAlign(sidenav);
+            });
         });
-        this._validateDrawers();
-        // Give the view a chance to render the initial state, then enable transitions.
-        this._ngZone.onMicrotaskEmpty.first().subscribe(() => this._enableTransitions = true);
     }
     /**
      * Calls `open` of both start and end sidenavs
      * @return {?}
      */
     open() {
-        return Promise.all([this._start, this._end].map(sidenav => sidenav && sidenav.open()));
+        this._sidenavs.forEach(sidenav => sidenav.open());
     }
     /**
      * Calls `close` of both start and end sidenavs
      * @return {?}
      */
     close() {
-        return Promise.all([this._start, this._end].map(sidenav => sidenav && sidenav.close()));
+        this._sidenavs.forEach(sidenav => sidenav.close());
     }
     /**
      * Subscribes to sidenav events in order to set a class on the main container element when the
@@ -10003,11 +9758,16 @@ class MdSidenavContainer {
      * @return {?}
      */
     _watchSidenavToggle(sidenav) {
-        if (!sidenav || sidenav.mode === 'side') {
-            return;
+        takeUntil.call(sidenav._animationStarted, this._sidenavs.changes).subscribe(() => {
+            // Set the transition class on the container so that the animations occur. This should not
+            // be set initially because animations should only be triggered via a change in state.
+            this._renderer.addClass(this._element.nativeElement, 'mat-sidenav-transition');
+            this._updateStyles();
+            this._changeDetectorRef.markForCheck();
+        });
+        if (sidenav.mode !== 'side') {
+            takeUntil.call(merge(sidenav.onOpen, sidenav.onClose), this._sidenavs.changes).subscribe(() => this._setContainerClass(sidenav.opened));
         }
-        sidenav.onOpen.subscribe(() => this._setContainerClass(sidenav, true));
-        sidenav.onClose.subscribe(() => this._setContainerClass(sidenav, false));
     }
     /**
      * Subscribes to sidenav onAlignChanged event in order to re-validate drawers when the align
@@ -10021,16 +9781,20 @@ class MdSidenavContainer {
         }
         // NOTE: We need to wait for the microtask queue to be empty before validating,
         // since both drawers may be swapping sides at the same time.
-        sidenav.onAlignChanged.subscribe(() => this._ngZone.onMicrotaskEmpty.first().subscribe(() => this._validateDrawers()));
+        takeUntil.call(sidenav.onAlignChanged, this._sidenavs.changes).subscribe(() => first.call(this._ngZone.onMicrotaskEmpty).subscribe(() => this._validateDrawers()));
     }
     /**
      * Toggles the 'mat-sidenav-opened' class on the main 'md-sidenav-container' element.
-     * @param {?} sidenav
-     * @param {?} bool
+     * @param {?} isAdd
      * @return {?}
      */
-    _setContainerClass(sidenav, bool) {
-        this._renderer.setElementClass(this._element.nativeElement, 'mat-sidenav-opened', bool);
+    _setContainerClass(isAdd) {
+        if (isAdd) {
+            this._renderer.addClass(this._element.nativeElement, 'mat-sidenav-opened');
+        }
+        else {
+            this._renderer.removeClass(this._element.nativeElement, 'mat-sidenav-opened');
+        }
     }
     /**
      * Validate the state of the sidenav children components.
@@ -10039,22 +9803,20 @@ class MdSidenavContainer {
     _validateDrawers() {
         this._start = this._end = null;
         // Ensure that we have at most one start and one end sidenav.
-        // NOTE: We must call toArray on _sidenavs even though it's iterable
-        // (see https://github.com/Microsoft/TypeScript/issues/3164).
-        for (let /** @type {?} */ sidenav of this._sidenavs.toArray()) {
+        this._sidenavs.forEach(sidenav => {
             if (sidenav.align == 'end') {
                 if (this._end != null) {
-                    throw new MdDuplicatedSidenavError('end');
+                    throwMdDuplicatedSidenavError('end');
                 }
                 this._end = sidenav;
             }
             else {
                 if (this._start != null) {
-                    throw new MdDuplicatedSidenavError('start');
+                    throwMdDuplicatedSidenavError('start');
                 }
                 this._start = sidenav;
             }
-        }
+        });
         this._right = this._left = null;
         // Detect if we're LTR or RTL.
         if (this._dir == null || this._dir.value == 'ltr') {
@@ -10080,14 +9842,14 @@ class MdSidenavContainer {
         // Close all open sidenav's where closing is not disabled and the mode is not `side`.
         [this._start, this._end]
             .filter(sidenav => sidenav && !sidenav.disableClose && sidenav.mode !== 'side')
-            .forEach(sidenav => sidenav.close());
+            .forEach(sidenav => ((sidenav)).close());
     }
     /**
      * @return {?}
      */
     _isShowingBackdrop() {
-        return (this._isSidenavOpen(this._start) && this._start.mode != 'side')
-            || (this._isSidenavOpen(this._end) && this._end.mode != 'side');
+        return (this._isSidenavOpen(this._start) && ((this._start)).mode != 'side')
+            || (this._isSidenavOpen(this._end) && ((this._end)).mode != 'side');
     }
     /**
      * @param {?} side
@@ -10107,63 +9869,30 @@ class MdSidenavContainer {
         return (this._isSidenavOpen(sidenav) && sidenav.mode == mode) ? sidenav._width : 0;
     }
     /**
+     * Recalculates and updates the inline styles. Note that this
+     * should be used sparingly, because it causes a reflow.
      * @return {?}
      */
-    _getMarginLeft() {
-        return this._getSidenavEffectiveWidth(this._left, 'side');
-    }
-    /**
-     * @return {?}
-     */
-    _getMarginRight() {
-        return this._getSidenavEffectiveWidth(this._right, 'side');
-    }
-    /**
-     * @return {?}
-     */
-    _getPositionLeft() {
-        return this._getSidenavEffectiveWidth(this._left, 'push');
-    }
-    /**
-     * @return {?}
-     */
-    _getPositionRight() {
-        return this._getSidenavEffectiveWidth(this._right, 'push');
-    }
-    /**
-     * Returns the horizontal offset for the content area.  There should never be a value for both
-     * left and right, so by subtracting the right value from the left value, we should always get
-     * the appropriate offset.
-     * @return {?}
-     */
-    _getPositionOffset() {
-        return this._getPositionLeft() - this._getPositionRight();
-    }
-    /**
-     * This is using [ngStyle] rather than separate [style...] properties because [style.transform]
-     * doesn't seem to work right now.
-     * @return {?}
-     */
-    _getStyles() {
-        return {
-            marginLeft: `${this._getMarginLeft()}px`,
-            marginRight: `${this._getMarginRight()}px`,
-            transform: `translate3d(${this._getPositionOffset()}px, 0, 0)`
+    _updateStyles() {
+        const /** @type {?} */ marginLeft = this._left ? this._getSidenavEffectiveWidth(this._left, 'side') : 0;
+        const /** @type {?} */ marginRight = this._right ? this._getSidenavEffectiveWidth(this._right, 'side') : 0;
+        const /** @type {?} */ leftWidth = this._left ? this._getSidenavEffectiveWidth(this._left, 'push') : 0;
+        const /** @type {?} */ rightWidth = this._right ? this._getSidenavEffectiveWidth(this._right, 'push') : 0;
+        this._styles = {
+            marginLeft: `${marginLeft}px`,
+            marginRight: `${marginRight}px`,
+            transform: `translate3d(${leftWidth - rightWidth}px, 0, 0)`
         };
     }
 }
 MdSidenavContainer.decorators = [
     { type: Component, args: [{selector: 'md-sidenav-container, mat-sidenav-container',
-                // Do not use ChangeDetectionStrategy.OnPush. It does not work for this component because
-                // technically it is a sibling of MdSidenav (on the content tree) and isn't updated when MdSidenav
-                // changes its state.
-                template: "<div class=\"mat-sidenav-backdrop\" (click)=\"_onBackdropClicked()\" [class.mat-sidenav-shown]=\"_isShowingBackdrop()\"></div> <ng-content select=\"md-sidenav, mat-sidenav\"></ng-content> <div class=\"mat-sidenav-content\" [ngStyle]=\"_getStyles()\" cdk-scrollable> <ng-content></ng-content> </div> ",
-                styles: [".mat-sidenav-container{position:relative;transform:translate3d(0,0,0);box-sizing:border-box;-webkit-overflow-scrolling:touch;display:block;overflow:hidden}.mat-sidenav-container[fullscreen]{position:absolute;top:0;left:0;right:0;bottom:0}.mat-sidenav-container[fullscreen].mat-sidenav-opened{overflow:hidden}.mat-sidenav-backdrop{position:absolute;top:0;left:0;right:0;bottom:0;display:block;z-index:2;visibility:hidden}.mat-sidenav-backdrop.mat-sidenav-shown{visibility:visible}@media screen and (-ms-high-contrast:active){.mat-sidenav-backdrop{opacity:.5}}.mat-sidenav-content{position:relative;transform:translate3d(0,0,0);display:block;height:100%;overflow:auto}.mat-sidenav{position:relative;transform:translate3d(0,0,0);display:block;position:absolute;top:0;bottom:0;z-index:3;min-width:5vw;outline:0;box-sizing:border-box;height:100%;overflow-y:auto;transform:translate3d(-100%,0,0)}.mat-sidenav.mat-sidenav-closed{visibility:hidden}.mat-sidenav.mat-sidenav-opened,.mat-sidenav.mat-sidenav-opening{transform:translate3d(0,0,0)}.mat-sidenav.mat-sidenav-side{z-index:1}.mat-sidenav.mat-sidenav-end{right:0;transform:translate3d(100%,0,0)}.mat-sidenav.mat-sidenav-end.mat-sidenav-closed{visibility:hidden}.mat-sidenav.mat-sidenav-end.mat-sidenav-opened,.mat-sidenav.mat-sidenav-end.mat-sidenav-opening{transform:translate3d(0,0,0)}[dir=rtl] .mat-sidenav{transform:translate3d(100%,0,0)}[dir=rtl] .mat-sidenav.mat-sidenav-closed{visibility:hidden}[dir=rtl] .mat-sidenav.mat-sidenav-opened,[dir=rtl] .mat-sidenav.mat-sidenav-opening{transform:translate3d(0,0,0)}[dir=rtl] .mat-sidenav.mat-sidenav-end{left:0;right:auto;transform:translate3d(-100%,0,0)}[dir=rtl] .mat-sidenav.mat-sidenav-end.mat-sidenav-closed{visibility:hidden}[dir=rtl] .mat-sidenav.mat-sidenav-end.mat-sidenav-opened,[dir=rtl] .mat-sidenav.mat-sidenav-end.mat-sidenav-opening{transform:translate3d(0,0,0)}.mat-sidenav.mat-sidenav-opened:not(.mat-sidenav-side),.mat-sidenav.mat-sidenav-opening:not(.mat-sidenav-side){box-shadow:0 8px 10px -5px rgba(0,0,0,.2),0 16px 24px 2px rgba(0,0,0,.14),0 6px 30px 5px rgba(0,0,0,.12)} /*# sourceMappingURL=sidenav.css.map */ ",
-".mat-sidenav-transition .mat-sidenav{transition:transform .4s cubic-bezier(.25,.8,.25,1)}.mat-sidenav-transition .mat-sidenav-content{transition-duration:.4s;transition-timing-function:cubic-bezier(.25,.8,.25,1);transition-property:transform,margin-left,margin-right}.mat-sidenav-transition .mat-sidenav-backdrop.mat-sidenav-shown{transition:background-color .4s cubic-bezier(.25,.8,.25,1)} /*# sourceMappingURL=sidenav-transitions.css.map */ "],
+                template: "<div class=\"mat-sidenav-backdrop\" (click)=\"_onBackdropClicked()\" [class.mat-sidenav-shown]=\"_isShowingBackdrop()\"></div><ng-content select=\"md-sidenav, mat-sidenav\"></ng-content><div class=\"mat-sidenav-content\" [ngStyle]=\"_styles\" cdk-scrollable><ng-content></ng-content></div>",
+                styles: [".mat-sidenav-container{position:relative;transform:translate3d(0,0,0);box-sizing:border-box;-webkit-overflow-scrolling:touch;display:block;overflow:hidden}.mat-sidenav-container[fullscreen]{position:absolute;top:0;left:0;right:0;bottom:0}.mat-sidenav-container[fullscreen].mat-sidenav-opened{overflow:hidden}.mat-sidenav-backdrop{position:absolute;top:0;left:0;right:0;bottom:0;display:block;z-index:2;visibility:hidden}.mat-sidenav-backdrop.mat-sidenav-shown{visibility:visible}@media screen and (-ms-high-contrast:active){.mat-sidenav-backdrop{opacity:.5}}.mat-sidenav-content{position:relative;transform:translate3d(0,0,0);display:block;height:100%;overflow:auto}.mat-sidenav{position:relative;transform:translate3d(0,0,0);display:block;position:absolute;top:0;bottom:0;z-index:3;min-width:5vw;outline:0;box-sizing:border-box;height:100%;overflow-y:auto;transform:translate3d(-100%,0,0)}.mat-sidenav.mat-sidenav-side{z-index:1}.mat-sidenav.mat-sidenav-end{right:0;transform:translate3d(100%,0,0)}[dir=rtl] .mat-sidenav{transform:translate3d(100%,0,0)}[dir=rtl] .mat-sidenav.mat-sidenav-end{left:0;right:auto;transform:translate3d(-100%,0,0)}.mat-sidenav.mat-sidenav-opened:not(.mat-sidenav-side),.mat-sidenav.mat-sidenav-opening:not(.mat-sidenav-side){box-shadow:0 8px 10px -5px rgba(0,0,0,.2),0 16px 24px 2px rgba(0,0,0,.14),0 6px 30px 5px rgba(0,0,0,.12)} .mat-sidenav-transition .mat-sidenav-content{transition-duration:.4s;transition-timing-function:cubic-bezier(.25,.8,.25,1);transition-property:transform,margin-left,margin-right}.mat-sidenav-transition .mat-sidenav-backdrop.mat-sidenav-shown{transition:background-color .4s cubic-bezier(.25,.8,.25,1)}"],
                 host: {
-                    '[class.mat-sidenav-container]': 'true',
-                    '[class.mat-sidenav-transition]': '_enableTransitions',
+                    'class': 'mat-sidenav-container',
                 },
+                changeDetection: ChangeDetectionStrategy.OnPush,
                 encapsulation: ViewEncapsulation.None,
             },] },
 ];
@@ -10171,10 +9900,11 @@ MdSidenavContainer.decorators = [
  * @nocollapse
  */
 MdSidenavContainer.ctorParameters = () => [
-    { type: Dir, decorators: [{ type: Optional },] },
+    { type: Directionality, decorators: [{ type: Optional },] },
     { type: ElementRef, },
-    { type: Renderer, },
+    { type: Renderer2, },
     { type: NgZone, },
+    { type: ChangeDetectorRef, },
 ];
 MdSidenavContainer.propDecorators = {
     '_sidenavs': [{ type: ContentChildren, args: [MdSidenav,] },],
@@ -10182,21 +9912,11 @@ MdSidenavContainer.propDecorators = {
 };
 
 class MdSidenavModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdSidenavModule,
-            providers: []
-        };
-    }
 }
 MdSidenavModule.decorators = [
     { type: NgModule, args: [{
-                imports: [CommonModule, CompatibilityModule, A11yModule, OverlayModule],
-                exports: [MdSidenavContainer, MdSidenav, CompatibilityModule],
+                imports: [CommonModule, MdCommonModule, A11yModule, OverlayModule],
+                exports: [MdSidenavContainer, MdSidenav, MdCommonModule],
                 declarations: [MdSidenavContainer, MdSidenav],
             },] },
 ];
@@ -10205,50 +9925,49 @@ MdSidenavModule.decorators = [
  */
 MdSidenavModule.ctorParameters = () => [];
 
+/**
+ * \@docs-private
+ */
+class MdListBase {
+}
+const _MdListMixinBase = mixinDisableRipple(MdListBase);
+/**
+ * \@docs-private
+ */
+class MdListItemBase {
+}
+const _MdListItemMixinBase = mixinDisableRipple(MdListItemBase);
 class MdListDivider {
 }
 MdListDivider.decorators = [
     { type: Directive, args: [{
-                selector: 'md-divider, mat-divider'
+                selector: 'md-divider, mat-divider',
+                host: {
+                    'role': 'separator',
+                    'aria-orientation': 'horizontal'
+                }
             },] },
 ];
 /**
  * @nocollapse
  */
 MdListDivider.ctorParameters = () => [];
-class MdList {
-    constructor() {
-        this._disableRipple = false;
-    }
-    /**
-     * Whether the ripple effect should be disabled on the list-items or not.
-     * This flag only has an effect for `md-nav-list` components.
-     * @return {?}
-     */
-    get disableRipple() { return this._disableRipple; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set disableRipple(value) { this._disableRipple = coerceBooleanProperty(value); }
+class MdList extends _MdListMixinBase {
 }
 MdList.decorators = [
     { type: Component, args: [{selector: 'md-list, mat-list, md-nav-list, mat-nav-list',
-                host: {
-                    'role': 'list'
-                },
+                host: { 'role': 'list' },
                 template: '<ng-content></ng-content>',
-                styles: [".mat-list,.mat-nav-list{padding-top:8px;display:block}.mat-list .mat-subheader,.mat-nav-list .mat-subheader{display:block;box-sizing:border-box;height:48px;padding:16px;margin:0;font-family:Roboto,\"Helvetica Neue\",sans-serif;font-size:14px;font-weight:500}.mat-list .mat-subheader:first-child,.mat-nav-list .mat-subheader:first-child{margin-top:-8px}.mat-list .mat-list-item,.mat-nav-list .mat-list-item{display:block}.mat-list .mat-list-item .mat-list-item-content,.mat-nav-list .mat-list-item .mat-list-item-content{display:flex;flex-direction:row;align-items:center;font-family:Roboto,\"Helvetica Neue\",sans-serif;box-sizing:border-box;font-size:16px;height:48px;padding:0 16px;position:relative}.mat-list .mat-list-item.mat-list-item-avatar .mat-list-item-content,.mat-nav-list .mat-list-item.mat-list-item-avatar .mat-list-item-content{height:56px}.mat-list .mat-list-item.mat-2-line .mat-list-item-content,.mat-nav-list .mat-list-item.mat-2-line .mat-list-item-content{height:72px}.mat-list .mat-list-item.mat-3-line .mat-list-item-content,.mat-nav-list .mat-list-item.mat-3-line .mat-list-item-content{height:88px}.mat-list .mat-list-item.mat-multi-line .mat-list-item-content,.mat-nav-list .mat-list-item.mat-multi-line .mat-list-item-content{height:100%;padding:8px 16px}.mat-list .mat-list-item .mat-list-text,.mat-nav-list .mat-list-item .mat-list-text{display:flex;flex-direction:column;width:100%;box-sizing:border-box;overflow:hidden;padding:0 16px}.mat-list .mat-list-item .mat-list-text>*,.mat-nav-list .mat-list-item .mat-list-text>*{margin:0;padding:0;font-weight:400;font-size:inherit}.mat-list .mat-list-item .mat-list-text:empty,.mat-nav-list .mat-list-item .mat-list-text:empty{display:none}.mat-list .mat-list-item .mat-list-text:first-child,.mat-nav-list .mat-list-item .mat-list-text:first-child{padding:0}.mat-list .mat-list-item .mat-list-avatar,.mat-nav-list .mat-list-item .mat-list-avatar{flex-shrink:0;width:40px;height:40px;border-radius:50%}.mat-list .mat-list-item .mat-list-icon,.mat-nav-list .mat-list-item .mat-list-icon{width:24px;height:24px;font-size:24px;box-sizing:content-box;border-radius:50%;padding:4px}.mat-list .mat-list-item .mat-line,.mat-nav-list .mat-list-item .mat-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;box-sizing:border-box}.mat-list .mat-list-item .mat-line:nth-child(n+2),.mat-nav-list .mat-list-item .mat-line:nth-child(n+2){font-size:14px}.mat-list[dense],.mat-nav-list[dense]{padding-top:4px;display:block}.mat-list[dense] .mat-subheader,.mat-nav-list[dense] .mat-subheader{display:block;box-sizing:border-box;height:40px;padding:16px;margin:0;font-family:Roboto,\"Helvetica Neue\",sans-serif;font-size:13px;font-weight:500}.mat-list[dense] .mat-subheader:first-child,.mat-nav-list[dense] .mat-subheader:first-child{margin-top:-4px}.mat-list[dense] .mat-list-item,.mat-nav-list[dense] .mat-list-item{display:block}.mat-list[dense] .mat-list-item .mat-list-item-content,.mat-nav-list[dense] .mat-list-item .mat-list-item-content{display:flex;flex-direction:row;align-items:center;font-family:Roboto,\"Helvetica Neue\",sans-serif;box-sizing:border-box;font-size:13px;height:40px;padding:0 16px;position:relative}.mat-list[dense] .mat-list-item.mat-list-item-avatar .mat-list-item-content,.mat-nav-list[dense] .mat-list-item.mat-list-item-avatar .mat-list-item-content{height:48px}.mat-list[dense] .mat-list-item.mat-2-line .mat-list-item-content,.mat-nav-list[dense] .mat-list-item.mat-2-line .mat-list-item-content{height:60px}.mat-list[dense] .mat-list-item.mat-3-line .mat-list-item-content,.mat-nav-list[dense] .mat-list-item.mat-3-line .mat-list-item-content{height:76px}.mat-list[dense] .mat-list-item.mat-multi-line .mat-list-item-content,.mat-nav-list[dense] .mat-list-item.mat-multi-line .mat-list-item-content{height:100%;padding:8px 16px}.mat-list[dense] .mat-list-item .mat-list-text,.mat-nav-list[dense] .mat-list-item .mat-list-text{display:flex;flex-direction:column;width:100%;box-sizing:border-box;overflow:hidden;padding:0 16px}.mat-list[dense] .mat-list-item .mat-list-text>*,.mat-nav-list[dense] .mat-list-item .mat-list-text>*{margin:0;padding:0;font-weight:400;font-size:inherit}.mat-list[dense] .mat-list-item .mat-list-text:empty,.mat-nav-list[dense] .mat-list-item .mat-list-text:empty{display:none}.mat-list[dense] .mat-list-item .mat-list-text:first-child,.mat-nav-list[dense] .mat-list-item .mat-list-text:first-child{padding:0}.mat-list[dense] .mat-list-item .mat-list-avatar,.mat-nav-list[dense] .mat-list-item .mat-list-avatar{flex-shrink:0;width:40px;height:40px;border-radius:50%}.mat-list[dense] .mat-list-item .mat-list-icon,.mat-nav-list[dense] .mat-list-item .mat-list-icon{width:20px;height:20px;font-size:20px;box-sizing:content-box;border-radius:50%;padding:4px}.mat-list[dense] .mat-list-item .mat-line,.mat-nav-list[dense] .mat-list-item .mat-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;box-sizing:border-box}.mat-list[dense] .mat-list-item .mat-line:nth-child(n+2),.mat-nav-list[dense] .mat-list-item .mat-line:nth-child(n+2){font-size:13px}.mat-divider{display:block;border-top-style:solid;border-top-width:1px;margin:0}.mat-nav-list a{text-decoration:none;color:inherit}.mat-nav-list .mat-list-item-content{cursor:pointer}.mat-nav-list .mat-list-item-content.mat-list-item-focus,.mat-nav-list .mat-list-item-content:hover{outline:0} /*# sourceMappingURL=list.css.map */ "],
-                encapsulation: ViewEncapsulation.None
+                styles: [".mat-subheader{display:block;box-sizing:border-box;padding:16px}.mat-list .mat-subheader{margin:0}.mat-list,.mat-nav-list{padding-top:8px;display:block}.mat-list .mat-subheader,.mat-nav-list .mat-subheader{height:48px;line-height:16px}.mat-list .mat-subheader:first-child,.mat-nav-list .mat-subheader:first-child{margin-top:-8px}.mat-list .mat-list-item,.mat-nav-list .mat-list-item{display:block}.mat-list .mat-list-item .mat-list-item-content,.mat-nav-list .mat-list-item .mat-list-item-content{display:flex;flex-direction:row;align-items:center;box-sizing:border-box;height:48px;padding:0 16px;position:relative}.mat-list .mat-list-item .mat-list-item-ripple,.mat-nav-list .mat-list-item .mat-list-item-ripple{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none}.mat-list .mat-list-item.mat-list-item-avatar .mat-list-item-content,.mat-nav-list .mat-list-item.mat-list-item-avatar .mat-list-item-content{height:56px}.mat-list .mat-list-item.mat-2-line .mat-list-item-content,.mat-nav-list .mat-list-item.mat-2-line .mat-list-item-content{height:72px}.mat-list .mat-list-item.mat-3-line .mat-list-item-content,.mat-nav-list .mat-list-item.mat-3-line .mat-list-item-content{height:88px}.mat-list .mat-list-item.mat-multi-line .mat-list-item-content,.mat-nav-list .mat-list-item.mat-multi-line .mat-list-item-content{height:100%;padding:8px 16px}.mat-list .mat-list-item .mat-list-text,.mat-nav-list .mat-list-item .mat-list-text{display:flex;flex-direction:column;width:100%;box-sizing:border-box;overflow:hidden;padding:0 16px}.mat-list .mat-list-item .mat-list-text>*,.mat-nav-list .mat-list-item .mat-list-text>*{margin:0;padding:0;font-weight:400;font-size:inherit}.mat-list .mat-list-item .mat-list-text:empty,.mat-nav-list .mat-list-item .mat-list-text:empty{display:none}.mat-list .mat-list-item .mat-list-text:nth-child(2),.mat-nav-list .mat-list-item .mat-list-text:nth-child(2){padding:0}.mat-list .mat-list-item .mat-list-avatar,.mat-nav-list .mat-list-item .mat-list-avatar{flex-shrink:0;width:40px;height:40px;border-radius:50%}.mat-list .mat-list-item .mat-list-icon,.mat-nav-list .mat-list-item .mat-list-icon{width:24px;height:24px;font-size:24px;box-sizing:content-box;border-radius:50%;padding:4px}.mat-list[dense],.mat-nav-list[dense]{padding-top:4px;display:block}.mat-list[dense] .mat-subheader,.mat-nav-list[dense] .mat-subheader{height:40px;line-height:8px}.mat-list[dense] .mat-subheader:first-child,.mat-nav-list[dense] .mat-subheader:first-child{margin-top:-4px}.mat-list[dense] .mat-list-item,.mat-nav-list[dense] .mat-list-item{display:block}.mat-list[dense] .mat-list-item .mat-list-item-content,.mat-nav-list[dense] .mat-list-item .mat-list-item-content{display:flex;flex-direction:row;align-items:center;box-sizing:border-box;height:40px;padding:0 16px;position:relative}.mat-list[dense] .mat-list-item .mat-list-item-ripple,.mat-nav-list[dense] .mat-list-item .mat-list-item-ripple{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none}.mat-list[dense] .mat-list-item.mat-list-item-avatar .mat-list-item-content,.mat-nav-list[dense] .mat-list-item.mat-list-item-avatar .mat-list-item-content{height:48px}.mat-list[dense] .mat-list-item.mat-2-line .mat-list-item-content,.mat-nav-list[dense] .mat-list-item.mat-2-line .mat-list-item-content{height:60px}.mat-list[dense] .mat-list-item.mat-3-line .mat-list-item-content,.mat-nav-list[dense] .mat-list-item.mat-3-line .mat-list-item-content{height:76px}.mat-list[dense] .mat-list-item.mat-multi-line .mat-list-item-content,.mat-nav-list[dense] .mat-list-item.mat-multi-line .mat-list-item-content{height:100%;padding:8px 16px}.mat-list[dense] .mat-list-item .mat-list-text,.mat-nav-list[dense] .mat-list-item .mat-list-text{display:flex;flex-direction:column;width:100%;box-sizing:border-box;overflow:hidden;padding:0 16px}.mat-list[dense] .mat-list-item .mat-list-text>*,.mat-nav-list[dense] .mat-list-item .mat-list-text>*{margin:0;padding:0;font-weight:400;font-size:inherit}.mat-list[dense] .mat-list-item .mat-list-text:empty,.mat-nav-list[dense] .mat-list-item .mat-list-text:empty{display:none}.mat-list[dense] .mat-list-item .mat-list-text:nth-child(2),.mat-nav-list[dense] .mat-list-item .mat-list-text:nth-child(2){padding:0}.mat-list[dense] .mat-list-item .mat-list-avatar,.mat-nav-list[dense] .mat-list-item .mat-list-avatar{flex-shrink:0;width:40px;height:40px;border-radius:50%}.mat-list[dense] .mat-list-item .mat-list-icon,.mat-nav-list[dense] .mat-list-item .mat-list-icon{width:20px;height:20px;font-size:20px;box-sizing:content-box;border-radius:50%;padding:4px}.mat-divider{display:block;border-top-style:solid;border-top-width:1px;margin:0}.mat-nav-list a{text-decoration:none;color:inherit}.mat-nav-list .mat-list-item-content{cursor:pointer}.mat-nav-list .mat-list-item-content.mat-list-item-focus,.mat-nav-list .mat-list-item-content:hover{outline:0}"],
+                inputs: ['disableRipple'],
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
             },] },
 ];
 /**
  * @nocollapse
  */
 MdList.ctorParameters = () => [];
-MdList.propDecorators = {
-    'disableRipple': [{ type: Input },],
-};
 /**
  * Directive whose purpose is to add the mat- CSS styling to this selector.
  * \@docs-private
@@ -10258,9 +9977,7 @@ class MdListCssMatStyler {
 MdListCssMatStyler.decorators = [
     { type: Directive, args: [{
                 selector: 'md-list, mat-list',
-                host: {
-                    '[class.mat-list]': 'true'
-                }
+                host: { 'class': 'mat-list' }
             },] },
 ];
 /**
@@ -10276,9 +9993,7 @@ class MdNavListCssMatStyler {
 MdNavListCssMatStyler.decorators = [
     { type: Directive, args: [{
                 selector: 'md-nav-list, mat-nav-list',
-                host: {
-                    '[class.mat-nav-list]': 'true'
-                }
+                host: { 'class': 'mat-nav-list' }
             },] },
 ];
 /**
@@ -10294,9 +10009,7 @@ class MdDividerCssMatStyler {
 MdDividerCssMatStyler.decorators = [
     { type: Directive, args: [{
                 selector: 'md-divider, mat-divider',
-                host: {
-                    '[class.mat-divider]': 'true'
-                }
+                host: { 'class': 'mat-divider' }
             },] },
 ];
 /**
@@ -10311,10 +10024,8 @@ class MdListAvatarCssMatStyler {
 }
 MdListAvatarCssMatStyler.decorators = [
     { type: Directive, args: [{
-                selector: '[md-list-avatar], [mat-list-avatar]',
-                host: {
-                    '[class.mat-list-avatar]': 'true'
-                }
+                selector: '[md-list-avatar], [mat-list-avatar], [mdListAvatar], [matListAvatar]',
+                host: { 'class': 'mat-list-avatar' }
             },] },
 ];
 /**
@@ -10329,10 +10040,8 @@ class MdListIconCssMatStyler {
 }
 MdListIconCssMatStyler.decorators = [
     { type: Directive, args: [{
-                selector: '[md-list-icon], [mat-list-icon]',
-                host: {
-                    '[class.mat-list-icon]': 'true'
-                }
+                selector: '[md-list-icon], [mat-list-icon], [mdListIcon], [matListIcon]',
+                host: { 'class': 'mat-list-icon' }
             },] },
 ];
 /**
@@ -10347,17 +10056,15 @@ class MdListSubheaderCssMatStyler {
 }
 MdListSubheaderCssMatStyler.decorators = [
     { type: Directive, args: [{
-                selector: '[md-subheader], [mat-subheader]',
-                host: {
-                    '[class.mat-subheader]': 'true'
-                }
+                selector: '[md-subheader], [mat-subheader], [mdSubheader], [matSubheader]',
+                host: { 'class': 'mat-subheader' }
             },] },
 ];
 /**
  * @nocollapse
  */
 MdListSubheaderCssMatStyler.ctorParameters = () => [];
-class MdListItem {
+class MdListItem extends _MdListItemMixinBase {
     /**
      * @param {?} _renderer
      * @param {?} _element
@@ -10365,31 +10072,24 @@ class MdListItem {
      * @param {?} navList
      */
     constructor(_renderer, _element, _list, navList) {
+        super();
         this._renderer = _renderer;
         this._element = _element;
         this._list = _list;
-        this._disableRipple = false;
         this._isNavList = false;
-        this._hasFocus = false;
         this._isNavList = !!navList;
     }
-    /**
-     * Whether the ripple effect on click should be disabled. This applies only to list items that are
-     * part of a nav list. The value of `disableRipple` on the `md-nav-list` overrides this flag.
-     * @return {?}
-     */
-    get disableRipple() { return this._disableRipple; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set disableRipple(value) { this._disableRipple = coerceBooleanProperty(value); }
     /**
      * @param {?} avatar
      * @return {?}
      */
     set _hasAvatar(avatar) {
-        this._renderer.setElementClass(this._element.nativeElement, 'mat-list-item-avatar', avatar != null);
+        if (avatar != null) {
+            this._renderer.addClass(this._element.nativeElement, 'mat-list-item-avatar');
+        }
+        else {
+            this._renderer.removeClass(this._element.nativeElement, 'mat-list-item-avatar');
+        }
     }
     /**
      * @return {?}
@@ -10408,64 +10108,62 @@ class MdListItem {
      * @return {?}
      */
     _handleFocus() {
-        this._hasFocus = true;
+        this._renderer.addClass(this._element.nativeElement, 'mat-list-item-focus');
     }
     /**
      * @return {?}
      */
     _handleBlur() {
-        this._hasFocus = false;
+        this._renderer.removeClass(this._element.nativeElement, 'mat-list-item-focus');
+    }
+    /**
+     * Retrieves the DOM element of the component host.
+     * @return {?}
+     */
+    _getHostElement() {
+        return this._element.nativeElement;
     }
 }
 MdListItem.decorators = [
     { type: Component, args: [{selector: 'md-list-item, mat-list-item, a[md-list-item], a[mat-list-item]',
                 host: {
                     'role': 'listitem',
+                    'class': 'mat-list-item',
                     '(focus)': '_handleFocus()',
                     '(blur)': '_handleBlur()',
-                    '[class.mat-list-item]': 'true',
                 },
-                template: "<div class=\"mat-list-item-content\" [class.mat-list-item-focus]=\"_hasFocus\" md-ripple [mdRippleDisabled]=\"!isRippleEnabled()\"> <ng-content select=\"[md-list-avatar],[md-list-icon], [mat-list-avatar], [mat-list-icon]\"></ng-content> <div class=\"mat-list-text\"><ng-content select=\"[md-line], [mat-line]\"></ng-content></div> <ng-content></ng-content> </div> ",
-                encapsulation: ViewEncapsulation.None
+                inputs: ['disableRipple'],
+                template: "<div class=\"mat-list-item-content\"><div class=\"mat-list-item-ripple\" md-ripple [mdRippleTrigger]=\"_getHostElement()\" [mdRippleDisabled]=\"!isRippleEnabled()\"></div><ng-content select=\"[md-list-avatar], [md-list-icon], [mat-list-avatar], [mat-list-icon], [mdListAvatar], [mdListIcon], [matListAvatar], [matListIcon]\"></ng-content><div class=\"mat-list-text\"><ng-content select=\"[md-line], [mat-line], [mdLine], [matLine]\"></ng-content></div><ng-content></ng-content></div>",
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
             },] },
 ];
 /**
  * @nocollapse
  */
 MdListItem.ctorParameters = () => [
-    { type: Renderer, },
+    { type: Renderer2, },
     { type: ElementRef, },
     { type: MdList, decorators: [{ type: Optional },] },
     { type: MdNavListCssMatStyler, decorators: [{ type: Optional },] },
 ];
 MdListItem.propDecorators = {
-    'disableRipple': [{ type: Input },],
     '_lines': [{ type: ContentChildren, args: [MdLine,] },],
     '_hasAvatar': [{ type: ContentChild, args: [MdListAvatarCssMatStyler,] },],
 };
 
 class MdListModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdListModule,
-            providers: []
-        };
-    }
 }
 MdListModule.decorators = [
     { type: NgModule, args: [{
-                imports: [MdLineModule, MdRippleModule, CompatibilityModule],
+                imports: [MdLineModule, MdRippleModule, MdCommonModule],
                 exports: [
                     MdList,
                     MdListItem,
                     MdListDivider,
                     MdListAvatarCssMatStyler,
                     MdLineModule,
-                    CompatibilityModule,
+                    MdCommonModule,
                     MdListIconCssMatStyler,
                     MdListCssMatStyler,
                     MdNavListCssMatStyler,
@@ -10548,25 +10246,25 @@ class MdGridTile {
      * @return {?}
      */
     _setStyle(property, value) {
-        this._renderer.setElementStyle(this._element.nativeElement, property, value);
+        this._renderer.setStyle(this._element.nativeElement, property, value);
     }
 }
 MdGridTile.decorators = [
     { type: Component, args: [{selector: 'md-grid-tile, mat-grid-tile',
                 host: {
-                    'role': 'listitem',
-                    '[class.mat-grid-tile]': 'true',
+                    'class': 'mat-grid-tile',
                 },
-                template: "<!-- TODO(kara): Revisit why this is a figure.--> <figure class=\"mat-figure\"> <ng-content></ng-content> </figure>",
-                styles: [".mat-grid-list{display:block;position:relative}.mat-grid-tile{display:block;position:absolute;overflow:hidden}.mat-grid-tile .mat-figure{display:flex;position:absolute;align-items:center;justify-content:center;height:100%;top:0;right:0;bottom:0;left:0;padding:0;margin:0}.mat-grid-tile .mat-grid-tile-footer,.mat-grid-tile .mat-grid-tile-header{display:flex;align-items:center;height:48px;color:#fff;background:rgba(0,0,0,.38);overflow:hidden;padding:0 16px;font-size:16px;position:absolute;left:0;right:0}.mat-grid-tile .mat-grid-tile-footer .mat-line,.mat-grid-tile .mat-grid-tile-header .mat-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;box-sizing:border-box}.mat-grid-tile .mat-grid-tile-footer .mat-line:nth-child(n+2),.mat-grid-tile .mat-grid-tile-header .mat-line:nth-child(n+2){font-size:12px}.mat-grid-tile .mat-grid-tile-footer>*,.mat-grid-tile .mat-grid-tile-header>*{margin:0;padding:0;font-weight:400;font-size:inherit}.mat-grid-tile .mat-grid-tile-footer.mat-2-line,.mat-grid-tile .mat-grid-tile-header.mat-2-line{height:68px}.mat-grid-tile .mat-grid-list-text{display:flex;flex-direction:column;width:100%;box-sizing:border-box;overflow:hidden}.mat-grid-tile .mat-grid-list-text>*{margin:0;padding:0;font-weight:400;font-size:inherit}.mat-grid-tile .mat-grid-list-text:empty{display:none}.mat-grid-tile .mat-grid-tile-header{top:0}.mat-grid-tile .mat-grid-tile-footer{bottom:0}.mat-grid-tile .mat-grid-avatar{padding-right:16px}[dir=rtl] .mat-grid-tile .mat-grid-avatar{padding-right:0;padding-left:16px}.mat-grid-tile .mat-grid-avatar:empty{display:none} /*# sourceMappingURL=grid-list.css.map */ "],
+                template: "<figure class=\"mat-figure\"><ng-content></ng-content></figure>",
+                styles: [".mat-grid-list{display:block;position:relative}.mat-grid-tile{display:block;position:absolute;overflow:hidden}.mat-grid-tile .mat-figure{display:flex;position:absolute;align-items:center;justify-content:center;height:100%;top:0;right:0;bottom:0;left:0;padding:0;margin:0}.mat-grid-tile .mat-grid-tile-footer,.mat-grid-tile .mat-grid-tile-header{display:flex;align-items:center;height:48px;color:#fff;background:rgba(0,0,0,.38);overflow:hidden;padding:0 16px;position:absolute;left:0;right:0}.mat-grid-tile .mat-grid-tile-footer>*,.mat-grid-tile .mat-grid-tile-header>*{margin:0;padding:0;font-weight:400;font-size:inherit}.mat-grid-tile .mat-grid-tile-footer.mat-2-line,.mat-grid-tile .mat-grid-tile-header.mat-2-line{height:68px}.mat-grid-tile .mat-grid-list-text{display:flex;flex-direction:column;width:100%;box-sizing:border-box;overflow:hidden}.mat-grid-tile .mat-grid-list-text>*{margin:0;padding:0;font-weight:400;font-size:inherit}.mat-grid-tile .mat-grid-list-text:empty{display:none}.mat-grid-tile .mat-grid-tile-header{top:0}.mat-grid-tile .mat-grid-tile-footer{bottom:0}.mat-grid-tile .mat-grid-avatar{padding-right:16px}[dir=rtl] .mat-grid-tile .mat-grid-avatar{padding-right:0;padding-left:16px}.mat-grid-tile .mat-grid-avatar:empty{display:none}"],
                 encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
             },] },
 ];
 /**
  * @nocollapse
  */
 MdGridTile.ctorParameters = () => [
-    { type: Renderer, },
+    { type: Renderer2, },
     { type: ElementRef, },
 ];
 MdGridTile.propDecorators = {
@@ -10591,14 +10289,15 @@ class MdGridTileText {
 }
 MdGridTileText.decorators = [
     { type: Component, args: [{selector: 'md-grid-tile-header, mat-grid-tile-header, md-grid-tile-footer, mat-grid-tile-footer',
-                template: "<ng-content select=\"[md-grid-avatar], [mat-grid-avatar]\"></ng-content> <div class=\"mat-grid-list-text\"><ng-content select=\"[md-line], [mat-line]\"></ng-content></div> <ng-content></ng-content> "
+                template: "<ng-content select=\"[md-grid-avatar], [mat-grid-avatar], [mdGridAvatar], [matGridAvatar]\"></ng-content><div class=\"mat-grid-list-text\"><ng-content select=\"[md-line], [mat-line], [mdLine], [matLine]\"></ng-content></div><ng-content></ng-content>",
+                changeDetection: ChangeDetectionStrategy.OnPush,
             },] },
 ];
 /**
  * @nocollapse
  */
 MdGridTileText.ctorParameters = () => [
-    { type: Renderer, },
+    { type: Renderer2, },
     { type: ElementRef, },
 ];
 MdGridTileText.propDecorators = {
@@ -10612,10 +10311,8 @@ class MdGridAvatarCssMatStyler {
 }
 MdGridAvatarCssMatStyler.decorators = [
     { type: Directive, args: [{
-                selector: '[md-grid-avatar], [mat-grid-avatar]',
-                host: {
-                    '[class.mat-grid-avatar]': 'true'
-                }
+                selector: '[md-grid-avatar], [mat-grid-avatar], [mdGridAvatar], [matGridAvatar]',
+                host: { 'class': 'mat-grid-avatar' }
             },] },
 ];
 /**
@@ -10631,9 +10328,7 @@ class MdGridTileHeaderCssMatStyler {
 MdGridTileHeaderCssMatStyler.decorators = [
     { type: Directive, args: [{
                 selector: 'md-grid-tile-header, mat-grid-tile-header',
-                host: {
-                    '[class.mat-grid-tile-header]': 'true'
-                }
+                host: { 'class': 'mat-grid-tile-header' }
             },] },
 ];
 /**
@@ -10649,50 +10344,13 @@ class MdGridTileFooterCssMatStyler {
 MdGridTileFooterCssMatStyler.decorators = [
     { type: Directive, args: [{
                 selector: 'md-grid-tile-footer, mat-grid-tile-footer',
-                host: {
-                    '[class.mat-grid-tile-footer]': 'true'
-                }
+                host: { 'class': 'mat-grid-tile-footer' }
             },] },
 ];
 /**
  * @nocollapse
  */
 MdGridTileFooterCssMatStyler.ctorParameters = () => [];
-
-/**
- * Exception thrown when cols property is missing from grid-list
- * \@docs-private
- */
-class MdGridListColsError extends MdError {
-    constructor() {
-        super(`md-grid-list: must pass in number of columns. Example: <md-grid-list cols="3">`);
-    }
-}
-/**
- * Exception thrown when a tile's colspan is longer than the number of cols in list
- * \@docs-private
- */
-class MdGridTileTooWideError extends MdError {
-    /**
-     * @param {?} cols
-     * @param {?} listLength
-     */
-    constructor(cols, listLength) {
-        super(`md-grid-list: tile with colspan ${cols} is wider than grid with cols="${listLength}".`);
-    }
-}
-/**
- * Exception thrown when an invalid ratio is passed in as a rowHeight
- * \@docs-private
- */
-class MdGridListBadRatioError extends MdError {
-    /**
-     * @param {?} value
-     */
-    constructor(value) {
-        super(`md-grid-list: invalid ratio given for row-height: "${value}"`);
-    }
-}
 
 /**
  * Class for determining, from a list of tiles, the (row, col) position of each of those tiles
@@ -10767,7 +10425,8 @@ class TileCoordinator {
      */
     _findMatchingGap(tileCols) {
         if (tileCols > this.tracker.length) {
-            throw new MdGridTileTooWideError(tileCols, this.tracker.length);
+            throw Error(`md-grid-list: tile with colspan ${tileCols} is wider than ` +
+                `grid with cols="${this.tracker.length}".`);
         }
         // Start index is inclusive, end index is exclusive.
         let /** @type {?} */ gapStartIndex = -1;
@@ -10851,6 +10510,7 @@ class TilePosition {
  * Sets the style properties for an individual tile, given the position calculated by the
  * Tile Coordinator.
  * \@docs-private
+ * @abstract
  */
 class TileStyler {
     constructor() {
@@ -10961,6 +10621,7 @@ class TileStyler {
      * Sets the vertical placement of the tile in the list.
      * This method will be implemented by each type of TileStyler.
      * \@docs-private
+     * @abstract
      * @param {?} tile
      * @param {?} rowIndex
      * @param {?} percentWidth
@@ -10970,7 +10631,7 @@ class TileStyler {
     setRowStyles(tile, rowIndex, percentWidth, gutterWidth) { }
     /**
      * Calculates the computed height and returns the correct style property to set.
-     * This method will be implemented by each type of TileStyler.
+     * This method can be implemented by each type of TileStyler.
      * \@docs-private
      * @return {?}
      */
@@ -11003,11 +10664,9 @@ class FixedTileStyler extends TileStyler {
     /**
      * @param {?} tile
      * @param {?} rowIndex
-     * @param {?} percentWidth
-     * @param {?} gutterWidth
      * @return {?}
      */
-    setRowStyles(tile, rowIndex, percentWidth, gutterWidth) {
+    setRowStyles(tile, rowIndex) {
         tile._setStyle('top', this.getTilePosition(this.fixedRowHeight, rowIndex));
         tile._setStyle('height', calc(this.getTileSize(this.fixedRowHeight, tile.rowspan)));
     }
@@ -11043,18 +10702,18 @@ class RatioTileStyler extends TileStyler {
     setRowStyles(tile, rowIndex, percentWidth, gutterWidth) {
         let /** @type {?} */ percentHeightPerTile = percentWidth / this.rowHeightRatio;
         this.baseTileHeight = this.getBaseTileSize(percentHeightPerTile, gutterWidth);
-        // Use paddingTop and marginTop to maintain the given aspect ratio, as
+        // Use padding-top and margin-top to maintain the given aspect ratio, as
         // a percentage-based value for these properties is applied versus the *width* of the
         // containing block. See http://www.w3.org/TR/CSS2/box.html#margin-properties
-        tile._setStyle('marginTop', this.getTilePosition(this.baseTileHeight, rowIndex));
-        tile._setStyle('paddingTop', calc(this.getTileSize(this.baseTileHeight, tile.rowspan)));
+        tile._setStyle('margin-top', this.getTilePosition(this.baseTileHeight, rowIndex));
+        tile._setStyle('padding-top', calc(this.getTileSize(this.baseTileHeight, tile.rowspan)));
     }
     /**
      * @return {?}
      */
     getComputedHeight() {
         return [
-            'paddingBottom', calc(`${this.getTileSpan(this.baseTileHeight)} + ${this.getGutterSpan()}`)
+            'padding-bottom', calc(`${this.getTileSpan(this.baseTileHeight)} + ${this.getGutterSpan()}`)
         ];
     }
     /**
@@ -11064,7 +10723,7 @@ class RatioTileStyler extends TileStyler {
     _parseRatio(value) {
         let /** @type {?} */ ratioParts = value.split(':');
         if (ratioParts.length !== 2) {
-            throw new MdGridListBadRatioError(value);
+            throw Error(`md-grid-list: invalid ratio given for row-height: "${value}"`);
         }
         this.rowHeightRatio = parseFloat(ratioParts[0]) / parseFloat(ratioParts[1]);
     }
@@ -11080,11 +10739,9 @@ class FitTileStyler extends TileStyler {
     /**
      * @param {?} tile
      * @param {?} rowIndex
-     * @param {?} percentWidth
-     * @param {?} gutterWidth
      * @return {?}
      */
-    setRowStyles(tile, rowIndex, percentWidth, gutterWidth) {
+    setRowStyles(tile, rowIndex) {
         // Percent of the available vertical space that one row takes up.
         let /** @type {?} */ percentHeightPerTile = 100 / this._rowspan;
         // Fraction of the horizontal gutter size that each column takes up.
@@ -11179,7 +10836,8 @@ class MdGridList {
      */
     _checkCols() {
         if (!this.cols) {
-            throw new MdGridListColsError();
+            throw Error(`md-grid-list: must pass in number of columns. ` +
+                `Example: <md-grid-list cols="3">`);
         }
     }
     /**
@@ -11227,18 +10885,18 @@ class MdGridList {
      */
     _setListStyle(style$$1) {
         if (style$$1) {
-            this._renderer.setElementStyle(this._element.nativeElement, style$$1[0], style$$1[1]);
+            this._renderer.setStyle(this._element.nativeElement, style$$1[0], style$$1[1]);
         }
     }
 }
 MdGridList.decorators = [
     { type: Component, args: [{selector: 'md-grid-list, mat-grid-list',
-                template: "<div> <ng-content></ng-content> </div>",
-                styles: [".mat-grid-list{display:block;position:relative}.mat-grid-tile{display:block;position:absolute;overflow:hidden}.mat-grid-tile .mat-figure{display:flex;position:absolute;align-items:center;justify-content:center;height:100%;top:0;right:0;bottom:0;left:0;padding:0;margin:0}.mat-grid-tile .mat-grid-tile-footer,.mat-grid-tile .mat-grid-tile-header{display:flex;align-items:center;height:48px;color:#fff;background:rgba(0,0,0,.38);overflow:hidden;padding:0 16px;font-size:16px;position:absolute;left:0;right:0}.mat-grid-tile .mat-grid-tile-footer .mat-line,.mat-grid-tile .mat-grid-tile-header .mat-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;box-sizing:border-box}.mat-grid-tile .mat-grid-tile-footer .mat-line:nth-child(n+2),.mat-grid-tile .mat-grid-tile-header .mat-line:nth-child(n+2){font-size:12px}.mat-grid-tile .mat-grid-tile-footer>*,.mat-grid-tile .mat-grid-tile-header>*{margin:0;padding:0;font-weight:400;font-size:inherit}.mat-grid-tile .mat-grid-tile-footer.mat-2-line,.mat-grid-tile .mat-grid-tile-header.mat-2-line{height:68px}.mat-grid-tile .mat-grid-list-text{display:flex;flex-direction:column;width:100%;box-sizing:border-box;overflow:hidden}.mat-grid-tile .mat-grid-list-text>*{margin:0;padding:0;font-weight:400;font-size:inherit}.mat-grid-tile .mat-grid-list-text:empty{display:none}.mat-grid-tile .mat-grid-tile-header{top:0}.mat-grid-tile .mat-grid-tile-footer{bottom:0}.mat-grid-tile .mat-grid-avatar{padding-right:16px}[dir=rtl] .mat-grid-tile .mat-grid-avatar{padding-right:0;padding-left:16px}.mat-grid-tile .mat-grid-avatar:empty{display:none} /*# sourceMappingURL=grid-list.css.map */ "],
+                template: "<div><ng-content></ng-content></div>",
+                styles: [".mat-grid-list{display:block;position:relative}.mat-grid-tile{display:block;position:absolute;overflow:hidden}.mat-grid-tile .mat-figure{display:flex;position:absolute;align-items:center;justify-content:center;height:100%;top:0;right:0;bottom:0;left:0;padding:0;margin:0}.mat-grid-tile .mat-grid-tile-footer,.mat-grid-tile .mat-grid-tile-header{display:flex;align-items:center;height:48px;color:#fff;background:rgba(0,0,0,.38);overflow:hidden;padding:0 16px;position:absolute;left:0;right:0}.mat-grid-tile .mat-grid-tile-footer>*,.mat-grid-tile .mat-grid-tile-header>*{margin:0;padding:0;font-weight:400;font-size:inherit}.mat-grid-tile .mat-grid-tile-footer.mat-2-line,.mat-grid-tile .mat-grid-tile-header.mat-2-line{height:68px}.mat-grid-tile .mat-grid-list-text{display:flex;flex-direction:column;width:100%;box-sizing:border-box;overflow:hidden}.mat-grid-tile .mat-grid-list-text>*{margin:0;padding:0;font-weight:400;font-size:inherit}.mat-grid-tile .mat-grid-list-text:empty{display:none}.mat-grid-tile .mat-grid-tile-header{top:0}.mat-grid-tile .mat-grid-tile-footer{bottom:0}.mat-grid-tile .mat-grid-avatar{padding-right:16px}[dir=rtl] .mat-grid-tile .mat-grid-avatar{padding-right:0;padding-left:16px}.mat-grid-tile .mat-grid-avatar:empty{display:none}"],
                 host: {
-                    'role': 'list',
-                    '[class.mat-grid-list]': 'true',
+                    'class': 'mat-grid-list',
                 },
+                changeDetection: ChangeDetectionStrategy.OnPush,
                 encapsulation: ViewEncapsulation.None,
             },] },
 ];
@@ -11246,9 +10904,9 @@ MdGridList.decorators = [
  * @nocollapse
  */
 MdGridList.ctorParameters = () => [
-    { type: Renderer, },
+    { type: Renderer2, },
     { type: ElementRef, },
-    { type: Dir, decorators: [{ type: Optional },] },
+    { type: Directionality, decorators: [{ type: Optional },] },
 ];
 MdGridList.propDecorators = {
     '_tiles': [{ type: ContentChildren, args: [MdGridTile,] },],
@@ -11258,26 +10916,16 @@ MdGridList.propDecorators = {
 };
 
 class MdGridListModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdGridListModule,
-            providers: []
-        };
-    }
 }
 MdGridListModule.decorators = [
     { type: NgModule, args: [{
-                imports: [MdLineModule, CompatibilityModule],
+                imports: [MdLineModule, MdCommonModule],
                 exports: [
                     MdGridList,
                     MdGridTile,
                     MdGridTileText,
                     MdLineModule,
-                    CompatibilityModule,
+                    MdCommonModule,
                     MdGridTileHeaderCssMatStyler,
                     MdGridTileFooterCssMatStyler,
                     MdGridAvatarCssMatStyler
@@ -11306,9 +10954,7 @@ class MdCardContent {
 MdCardContent.decorators = [
     { type: Directive, args: [{
                 selector: 'md-card-content, mat-card-content',
-                host: {
-                    '[class.mat-card-content]': 'true'
-                }
+                host: { 'class': 'mat-card-content' }
             },] },
 ];
 /**
@@ -11323,9 +10969,10 @@ class MdCardTitle {
 }
 MdCardTitle.decorators = [
     { type: Directive, args: [{
-                selector: 'md-card-title, mat-card-title, [md-card-title], [mat-card-title]',
+                selector: 'md-card-title, mat-card-title, [md-card-title], [mat-card-title],' +
+                    '[mdCardTitle], [matCardTitle]',
                 host: {
-                    '[class.mat-card-title]': 'true'
+                    'class': 'mat-card-title'
                 }
             },] },
 ];
@@ -11341,9 +10988,10 @@ class MdCardSubtitle {
 }
 MdCardSubtitle.decorators = [
     { type: Directive, args: [{
-                selector: 'md-card-subtitle, mat-card-subtitle, [md-card-subtitle], [mat-card-subtitle]',
+                selector: 'md-card-subtitle, mat-card-subtitle, [md-card-subtitle], [mat-card-subtitle],' +
+                    '[mdCardSubtitle], [matCardSubtitle]',
                 host: {
-                    '[class.mat-card-subtitle]': 'true'
+                    'class': 'mat-card-subtitle'
                 }
             },] },
 ];
@@ -11356,12 +11004,19 @@ MdCardSubtitle.ctorParameters = () => [];
  * \@docs-private
  */
 class MdCardActions {
+    constructor() {
+        /**
+         * Position of the actions inside the card.
+         */
+        this.align = 'start';
+    }
 }
 MdCardActions.decorators = [
     { type: Directive, args: [{
                 selector: 'md-card-actions, mat-card-actions',
                 host: {
-                    '[class.mat-card-actions]': 'true'
+                    'class': 'mat-card-actions',
+                    '[class.mat-card-actions-align-end]': 'align === "end"',
                 }
             },] },
 ];
@@ -11369,6 +11024,9 @@ MdCardActions.decorators = [
  * @nocollapse
  */
 MdCardActions.ctorParameters = () => [];
+MdCardActions.propDecorators = {
+    'align': [{ type: Input },],
+};
 /**
  * Footer of a card, needed as it's used as a selector in the API.
  * \@docs-private
@@ -11378,9 +11036,7 @@ class MdCardFooter {
 MdCardFooter.decorators = [
     { type: Directive, args: [{
                 selector: 'md-card-footer, mat-card-footer',
-                host: {
-                    '[class.mat-card-footer]': 'true'
-                }
+                host: { 'class': 'mat-card-footer' }
             },] },
 ];
 /**
@@ -11391,14 +11047,28 @@ MdCardFooter.ctorParameters = () => [];
  * Image used in a card, needed to add the mat- CSS styling.
  * \@docs-private
  */
+class MdCardImage {
+}
+MdCardImage.decorators = [
+    { type: Directive, args: [{
+                selector: '[md-card-image], [mat-card-image], [mdCardImage], [matCardImage]',
+                host: { 'class': 'mat-card-image' }
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdCardImage.ctorParameters = () => [];
+/**
+ * Image used in a card, needed to add the mat- CSS styling.
+ * \@docs-private
+ */
 class MdCardSmImage {
 }
 MdCardSmImage.decorators = [
     { type: Directive, args: [{
-                selector: '[md-card-sm-image], [mat-card-sm-image]',
-                host: {
-                    '[class.mat-card-sm-image]': 'true'
-                }
+                selector: '[md-card-sm-image], [mat-card-sm-image], [mdCardImageSmall], [matCardImageSmall]',
+                host: { 'class': 'mat-card-sm-image' }
             },] },
 ];
 /**
@@ -11413,10 +11083,8 @@ class MdCardMdImage {
 }
 MdCardMdImage.decorators = [
     { type: Directive, args: [{
-                selector: '[md-card-md-image], [mat-card-md-image]',
-                host: {
-                    '[class.mat-card-md-image]': 'true'
-                }
+                selector: '[md-card-md-image], [mat-card-md-image], [mdCardImageMedium], [matCardImageMedium]',
+                host: { 'class': 'mat-card-md-image' }
             },] },
 ];
 /**
@@ -11431,34 +11099,14 @@ class MdCardLgImage {
 }
 MdCardLgImage.decorators = [
     { type: Directive, args: [{
-                selector: '[md-card-lg-image], [mat-card-lg-image]',
-                host: {
-                    'class.mat-card-lg-image': 'true'
-                }
+                selector: '[md-card-lg-image], [mat-card-lg-image], [mdCardImageLarge], [matCardImageLarge]',
+                host: { 'class': 'mat-card-lg-image' }
             },] },
 ];
 /**
  * @nocollapse
  */
 MdCardLgImage.ctorParameters = () => [];
-/**
- * Image used in a card, needed to add the mat- CSS styling.
- * \@docs-private
- */
-class MdCardImage {
-}
-MdCardImage.decorators = [
-    { type: Directive, args: [{
-                selector: '[md-card-image], [mat-card-image]',
-                host: {
-                    '[class.mat-card-image]': 'true'
-                }
-            },] },
-];
-/**
- * @nocollapse
- */
-MdCardImage.ctorParameters = () => [];
 /**
  * Large image used in a card, needed to add the mat- CSS styling.
  * \@docs-private
@@ -11467,10 +11115,8 @@ class MdCardXlImage {
 }
 MdCardXlImage.decorators = [
     { type: Directive, args: [{
-                selector: '[md-card-xl-image], [mat-card-xl-image]',
-                host: {
-                    '[class.mat-card-xl-image]': 'true'
-                }
+                selector: '[md-card-xl-image], [mat-card-xl-image], [mdCardImageXLarge], [matCardImageXLarge]',
+                host: { 'class': 'mat-card-xl-image' }
             },] },
 ];
 /**
@@ -11485,10 +11131,8 @@ class MdCardAvatar {
 }
 MdCardAvatar.decorators = [
     { type: Directive, args: [{
-                selector: '[md-card-avatar], [mat-card-avatar]',
-                host: {
-                    '[class.mat-card-avatar]': 'true'
-                }
+                selector: '[md-card-avatar], [mat-card-avatar], [mdCardAvatar], [matCardAvatar]',
+                host: { 'class': 'mat-card-avatar' }
             },] },
 ];
 /**
@@ -11510,13 +11154,11 @@ class MdCard {
 }
 MdCard.decorators = [
     { type: Component, args: [{selector: 'md-card, mat-card',
-                template: "<ng-content></ng-content> ",
-                styles: [".mat-card{transition:box-shadow 280ms cubic-bezier(.4,0,.2,1);will-change:box-shadow;display:block;position:relative;padding:24px;border-radius:2px;font-family:Roboto,\"Helvetica Neue\",sans-serif}.mat-card:not([class*=mat-elevation-z]){box-shadow:0 3px 1px -2px rgba(0,0,0,.2),0 2px 2px 0 rgba(0,0,0,.14),0 1px 5px 0 rgba(0,0,0,.12)}@media screen and (-ms-high-contrast:active){.mat-card{outline:solid 1px}}.mat-card-flat{box-shadow:none}.mat-card-actions,.mat-card-content,.mat-card-subtitle,.mat-card-title{display:block;margin-bottom:16px}.mat-card-title{font-size:24px;font-weight:400}.mat-card-subtitle{font-size:14px}.mat-card-content{font-size:14px}.mat-card-actions{margin-left:-16px;margin-right:-16px;padding:8px 0}.mat-card-actions[align=end]{display:flex;justify-content:flex-end}.mat-card-image{width:calc(100% + 48px);margin:0 -24px 16px -24px}.mat-card-xl-image{width:240px;height:240px;margin:-8px}.mat-card-footer{position:absolute;width:100%;min-height:5px;bottom:0;left:0}.mat-card-actions .mat-button,.mat-card-actions .mat-raised-button{margin:0 4px}.mat-card-header{display:flex;flex-direction:row}.mat-card-header-text{margin:0 8px}.mat-card-avatar{height:40px;width:40px;border-radius:50%;flex-shrink:0}.mat-card-header .mat-card-title{font-size:14px}.mat-card-lg-image,.mat-card-md-image,.mat-card-sm-image{margin:-8px 0}.mat-card-title-group{display:flex;justify-content:space-between;margin:0 -8px}.mat-card-sm-image{width:80px;height:80px}.mat-card-md-image{width:112px;height:112px}.mat-card-lg-image{width:152px;height:152px}@media (max-width:600px){.mat-card{padding:24px 16px}.mat-card-actions{margin-left:-8px;margin-right:-8px}.mat-card-image{width:calc(100% + 32px);margin:16px -16px}.mat-card-title-group{margin:0}.mat-card-xl-image{margin-left:0;margin-right:0}.mat-card-header{margin:-8px 0 0 0}}.mat-card-content>:first-child,.mat-card>:first-child{margin-top:0}.mat-card-content>:last-child,.mat-card>:last-child{margin-bottom:0}.mat-card-image:first-child{margin-top:-24px}.mat-card>.mat-card-actions:last-child{margin-bottom:-16px;padding-bottom:0}.mat-card-actions .mat-button:first-child,.mat-card-actions .mat-raised-button:first-child{margin-left:0;margin-right:0}.mat-card-subtitle:not(:first-child),.mat-card-title:not(:first-child){margin-top:-4px}.mat-card-header .mat-card-subtitle:not(:first-child){margin-top:-8px}.mat-card>.mat-card-xl-image:first-child{margin-top:-8px}.mat-card>.mat-card-xl-image:last-child{margin-bottom:-8px} /*# sourceMappingURL=card.css.map */ "],
+                template: "<ng-content></ng-content><ng-content select=\"md-card-footer, mat-card-footer\"></ng-content>",
+                styles: [".mat-card{transition:box-shadow 280ms cubic-bezier(.4,0,.2,1);display:block;position:relative;padding:24px;border-radius:2px}.mat-card:not([class*=mat-elevation-z]){box-shadow:0 3px 1px -2px rgba(0,0,0,.2),0 2px 2px 0 rgba(0,0,0,.14),0 1px 5px 0 rgba(0,0,0,.12)}@media screen and (-ms-high-contrast:active){.mat-card{outline:solid 1px}}.mat-card-flat{box-shadow:none}.mat-card-actions,.mat-card-content,.mat-card-subtitle,.mat-card-title{display:block;margin-bottom:16px}.mat-card-actions{margin-left:-16px;margin-right:-16px;padding:8px 0}.mat-card-actions-align-end{display:flex;justify-content:flex-end}.mat-card-image{width:calc(100% + 48px);margin:0 -24px 16px -24px}.mat-card-xl-image{width:240px;height:240px;margin:-8px}.mat-card-footer{display:block;margin:0 -24px -24px -24px}.mat-card-actions .mat-button,.mat-card-actions .mat-raised-button{margin:0 4px}.mat-card-header{display:flex;flex-direction:row}.mat-card-header-text{margin:0 8px}.mat-card-avatar{height:40px;width:40px;border-radius:50%;flex-shrink:0}.mat-card-lg-image,.mat-card-md-image,.mat-card-sm-image{margin:-8px 0}.mat-card-title-group{display:flex;justify-content:space-between;margin:0 -8px}.mat-card-sm-image{width:80px;height:80px}.mat-card-md-image{width:112px;height:112px}.mat-card-lg-image{width:152px;height:152px}@media (max-width:600px){.mat-card{padding:24px 16px}.mat-card-actions{margin-left:-8px;margin-right:-8px}.mat-card-image{width:calc(100% + 32px);margin:16px -16px}.mat-card-title-group{margin:0}.mat-card-xl-image{margin-left:0;margin-right:0}.mat-card-header{margin:-8px 0 0 0}.mat-card-footer{margin-left:-16px;margin-right:-16px}}.mat-card-content>:first-child,.mat-card>:first-child{margin-top:0}.mat-card-content>:last-child:not(.mat-card-footer),.mat-card>:last-child:not(.mat-card-footer){margin-bottom:0}.mat-card-image:first-child{margin-top:-24px}.mat-card>.mat-card-actions:last-child{margin-bottom:-16px;padding-bottom:0}.mat-card-actions .mat-button:first-child,.mat-card-actions .mat-raised-button:first-child{margin-left:0;margin-right:0}.mat-card-subtitle:not(:first-child),.mat-card-title:not(:first-child){margin-top:-4px}.mat-card-header .mat-card-subtitle:not(:first-child){margin-top:-8px}.mat-card>.mat-card-xl-image:first-child{margin-top:-8px}.mat-card>.mat-card-xl-image:last-child{margin-bottom:-8px}"],
                 encapsulation: ViewEncapsulation.None,
                 changeDetection: ChangeDetectionStrategy.OnPush,
-                host: {
-                    '[class.mat-card]': 'true'
-                }
+                host: { 'class': 'mat-card' }
             },] },
 ];
 /**
@@ -11532,12 +11174,10 @@ class MdCardHeader {
 }
 MdCardHeader.decorators = [
     { type: Component, args: [{selector: 'md-card-header, mat-card-header',
-                template: "<ng-content select=\"[md-card-avatar], [mat-card-avatar]\"></ng-content> <div class=\"mat-card-header-text\"> <ng-content select=\"md-card-title, mat-card-title, md-card-subtitle, mat-card-subtitle, [md-card-title], [mat-card-title], [md-card-subtitle], [mat-card-subtitle]\"></ng-content> </div> <ng-content></ng-content> ",
+                template: "<ng-content select=\"[md-card-avatar], [mat-card-avatar], [mdCardAvatar], [matCardAvatar]\"></ng-content><div class=\"mat-card-header-text\"><ng-content select=\"md-card-title, mat-card-title, md-card-subtitle, mat-card-subtitle, [md-card-title], [mat-card-title], [md-card-subtitle], [mat-card-subtitle]\"></ng-content></div><ng-content></ng-content>",
                 encapsulation: ViewEncapsulation.None,
                 changeDetection: ChangeDetectionStrategy.OnPush,
-                host: {
-                    '[class.mat-card-header]': 'true'
-                }
+                host: { 'class': 'mat-card-header' }
             },] },
 ];
 /**
@@ -11553,12 +11193,10 @@ class MdCardTitleGroup {
 }
 MdCardTitleGroup.decorators = [
     { type: Component, args: [{selector: 'md-card-title-group, mat-card-title-group',
-                template: "<div> <ng-content select=\"md-card-title, mat-card-title, md-card-subtitle, mat-card-subtitle, [md-card-title], [mat-card-title], [md-card-subtitle], [mat-card-subtitle]\"></ng-content> </div> <ng-content select=\"img\"></ng-content> <ng-content></ng-content> ",
+                template: "<div><ng-content select=\"md-card-title, mat-card-title, md-card-subtitle, mat-card-subtitle, [md-card-title], [mat-card-title], [md-card-subtitle], [mat-card-subtitle]\"></ng-content></div><ng-content select=\"img\"></ng-content><ng-content></ng-content>",
                 encapsulation: ViewEncapsulation.None,
                 changeDetection: ChangeDetectionStrategy.OnPush,
-                host: {
-                    '[class.mat-card-title-group]': 'true'
-                }
+                host: { 'class': 'mat-card-title-group' }
             },] },
 ];
 /**
@@ -11567,20 +11205,10 @@ MdCardTitleGroup.decorators = [
 MdCardTitleGroup.ctorParameters = () => [];
 
 class MdCardModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdCardModule,
-            providers: []
-        };
-    }
 }
 MdCardModule.decorators = [
     { type: NgModule, args: [{
-                imports: [CompatibilityModule],
+                imports: [MdCommonModule],
                 exports: [
                     MdCard,
                     MdCardHeader,
@@ -11596,7 +11224,7 @@ MdCardModule.decorators = [
                     MdCardImage,
                     MdCardXlImage,
                     MdCardAvatar,
-                    CompatibilityModule,
+                    MdCommonModule,
                 ],
                 declarations: [
                     MdCard, MdCardHeader, MdCardTitleGroup, MdCardContent, MdCardTitle, MdCardSubtitle,
@@ -11611,9 +11239,9 @@ MdCardModule.decorators = [
 MdCardModule.ctorParameters = () => [];
 
 /**
- * Material design styled Chip component. Used inside the MdChipList component.
+ * \@docs-private
  */
-class MdChip {
+class MdChipBase {
     /**
      * @param {?} _renderer
      * @param {?} _elementRef
@@ -11621,35 +11249,42 @@ class MdChip {
     constructor(_renderer, _elementRef) {
         this._renderer = _renderer;
         this._elementRef = _elementRef;
-        /**
-         * Whether or not the chip is disabled. Disabled chips cannot be focused.
-         */
-        this._disabled = null;
-        /**
-         * Whether or not the chip is selectable.
-         */
+    }
+}
+const _MdChipMixinBase = mixinColor(mixinDisabled(MdChipBase), 'primary');
+/**
+ * Dummy directive to add CSS class to basic chips.
+ * \@docs-private
+ */
+class MdBasicChip {
+}
+MdBasicChip.decorators = [
+    { type: Directive, args: [{
+                selector: `md-basic-chip, [md-basic-chip], mat-basic-chip, [mat-basic-chip]`,
+                host: { 'class': 'mat-basic-chip' }
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdBasicChip.ctorParameters = () => [];
+/**
+ * Material design styled Chip component. Used inside the MdChipList component.
+ */
+class MdChip extends _MdChipMixinBase {
+    /**
+     * @param {?} renderer
+     * @param {?} elementRef
+     */
+    constructor(renderer, elementRef) {
+        super(renderer, elementRef);
+        this._selected = false;
         this._selectable = true;
-        /**
-         * Whether or not the chip is removable.
-         */
         this._removable = true;
         /**
-         * Whether or not the chip is selected.
+         * Whether the chip has focus.
          */
-        this._selected = false;
-        /**
-         * The palette color of selected chips.
-         */
-        this._color = 'primary';
-        /**
-         * Whether or not the chip is displaying the remove icon.
-         */
-        this._hasRemoveIcon = false;
-        /**
-         * Emitted when the removable property changes.
-         */
-        this._onRemovableChange = new EventEmitter();
-        this.onRemovableChange$ = this._onRemovableChange.asObservable();
+        this._hasFocus = false;
         /**
          * Emitted when the chip is focused.
          */
@@ -11672,39 +11307,17 @@ class MdChip {
         this.onRemove = new EventEmitter();
     }
     /**
+     * Whether the chip is selected.
      * @return {?}
      */
-    ngOnInit() {
-        this._addDefaultCSSClass();
-        this._updateColor(this._color);
-    }
+    get selected() { return this._selected; }
     /**
-     * @return {?}
-     */
-    ngOnDestroy() {
-        this.destroy.emit({ chip: this });
-    }
-    /**
-     * Whether or not the chip is disabled.
-     * @return {?}
-     */
-    get disabled() {
-        return this._disabled;
-    }
-    /**
-     * Sets the disabled state of the chip.
      * @param {?} value
      * @return {?}
      */
-    set disabled(value) {
-        this._disabled = coerceBooleanProperty(value) ? true : null;
-    }
-    /**
-     * A String representation of the current disabled state.
-     * @return {?}
-     */
-    get _isAriaDisabled() {
-        return String(coerceBooleanProperty(this.disabled));
+    set selected(value) {
+        this._selected = coerceBooleanProperty(value);
+        (this.selected ? this.select : this.deselect).emit({ chip: this });
     }
     /**
      * Whether or not the chips are selectable. When a chip is not selectable,
@@ -11734,27 +11347,18 @@ class MdChip {
      */
     set removable(value) {
         this._removable = coerceBooleanProperty(value);
-        this._onRemovableChange.emit(this._removable);
     }
     /**
-     * Whether or not this chip is selected.
      * @return {?}
      */
-    get selected() {
-        return this._selected;
+    get ariaSelected() {
+        return this.selectable ? this.selected.toString() : '';
     }
     /**
-     * @param {?} value
      * @return {?}
      */
-    set selected(value) {
-        this._selected = coerceBooleanProperty(value);
-        if (this._selected) {
-            this.select.emit({ chip: this });
-        }
-        else {
-            this.deselect.emit({ chip: this });
-        }
+    ngOnDestroy() {
+        this.destroy.emit({ chip: this });
     }
     /**
      * Toggles the current selected state of this chip.
@@ -11765,33 +11369,18 @@ class MdChip {
         return this.selected;
     }
     /**
-     * The color of the chip. Can be `primary`, `accent`, or `warn`.
-     * @return {?}
-     */
-    get color() {
-        return this._color;
-    }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set color(value) {
-        this._updateColor(value);
-    }
-    /**
      * Allows for programmatic focusing of the chip.
      * @return {?}
      */
     focus() {
-        this._renderer.invokeElementMethod(this._elementRef.nativeElement, 'focus');
+        this._elementRef.nativeElement.focus();
         this.onFocus.emit({ chip: this });
     }
     /**
      * Allows for programmatic removal of the chip. Called by the MdChipList when the DELETE or
      * BACKSPACE keys are pressed.
      *
-     * Note: This only informs any listeners of the removal request, it does **not** actually remove
-     * the chip from the DOM.
+     * Informs any listeners of the removal request. Does not remove the chip from the DOM.
      * @return {?}
      */
     remove() {
@@ -11806,7 +11395,7 @@ class MdChip {
      */
     _handleClick(event) {
         // Check disabled
-        if (this._checkDisabled(event)) {
+        if (this.disabled) {
             return;
         }
         event.preventDefault();
@@ -11819,16 +11408,14 @@ class MdChip {
      * @return {?}
      */
     _handleKeydown(event) {
-        if (this._checkDisabled(event)) {
+        if (this.disabled) {
             return;
         }
         switch (event.keyCode) {
             case DELETE:
             case BACKSPACE:
                 // If we are removable, remove the focused chip
-                if (this.removable) {
-                    this.onRemove.emit();
-                }
+                this.remove();
                 // Always prevent so page navigation does not occur
                 event.preventDefault();
                 break;
@@ -11842,75 +11429,25 @@ class MdChip {
                 break;
         }
     }
-    /**
-     * Sets whether or not this chip is displaying a remove icon. Adds/removes the
-     * `md-chip-has-remove-icon` class.
-     * @param {?} value
-     * @return {?}
-     */
-    _setHasRemoveIcon(value) {
-        this._hasRemoveIcon = value;
-    }
-    /**
-     * @param {?} event
-     * @return {?}
-     */
-    _checkDisabled(event) {
-        if (this.disabled) {
-            event.preventDefault();
-            event.stopPropagation();
-        }
-        return this.disabled;
-    }
-    /**
-     * Initializes the appropriate CSS classes based on the chip type (basic or standard).
-     * @return {?}
-     */
-    _addDefaultCSSClass() {
-        let /** @type {?} */ el = this._elementRef.nativeElement;
-        // If we are a basic chip, also add the `mat-basic-chip` class for :not() targeting
-        if (el.nodeName.toLowerCase() == 'mat-basic-chip' || el.hasAttribute('mat-basic-chip') ||
-            el.nodeName.toLowerCase() == 'md-basic-chip' || el.hasAttribute('md-basic-chip')) {
-            el.classList.add('mat-basic-chip');
-        }
-    }
-    /**
-     * Updates the private _color variable and the native element.
-     * @param {?} newColor
-     * @return {?}
-     */
-    _updateColor(newColor) {
-        this._setElementColor(this._color, false);
-        this._setElementColor(newColor, true);
-        this._color = newColor;
-    }
-    /**
-     * Sets the mat-color on the native element.
-     * @param {?} color
-     * @param {?} isAdd
-     * @return {?}
-     */
-    _setElementColor(color, isAdd) {
-        if (color != null && color != '') {
-            this._renderer.setElementClass(this._elementRef.nativeElement, `mat-${color}`, isAdd);
-        }
-    }
 }
 MdChip.decorators = [
-    { type: Component, args: [{
+    { type: Directive, args: [{
                 selector: `md-basic-chip, [md-basic-chip], md-chip, [md-chip],
              mat-basic-chip, [mat-basic-chip], mat-chip, [mat-chip]`,
-                template: `<ng-content></ng-content><div class="md-chip-focus-border"></div>`,
+                inputs: ['color', 'disabled'],
+                exportAs: 'mdChip',
                 host: {
-                    '[class.mat-chip]': 'true',
+                    'class': 'mat-chip',
                     'tabindex': '-1',
                     'role': 'option',
                     '[class.mat-chip-selected]': 'selected',
-                    '[class.mat-chip-has-remove-icon]': '_hasRemoveIcon',
-                    '[attr.disabled]': 'disabled',
-                    '[attr.aria-disabled]': '_isAriaDisabled',
+                    '[attr.disabled]': 'disabled || null',
+                    '[attr.aria-disabled]': 'disabled.toString()',
+                    '[attr.aria-selected]': 'ariaSelected',
                     '(click)': '_handleClick($event)',
-                    '(keydown)': '_handleKeydown($event)'
+                    '(keydown)': '_handleKeydown($event)',
+                    '(focus)': '_hasFocus = true',
+                    '(blur)': '_hasFocus = false',
                 }
             },] },
 ];
@@ -11918,20 +11455,64 @@ MdChip.decorators = [
  * @nocollapse
  */
 MdChip.ctorParameters = () => [
-    { type: Renderer, },
+    { type: Renderer2, },
     { type: ElementRef, },
 ];
 MdChip.propDecorators = {
+    '_chipRemove': [{ type: ContentChild, args: [forwardRef(() => MdChipRemove),] },],
+    'selected': [{ type: Input },],
+    'selectable': [{ type: Input },],
+    'removable': [{ type: Input },],
     'select': [{ type: Output },],
     'deselect': [{ type: Output },],
     'destroy': [{ type: Output },],
     'onRemove': [{ type: Output, args: ['remove',] },],
-    'disabled': [{ type: Input },],
-    'selectable': [{ type: Input },],
-    'removable': [{ type: Input },],
-    'selected': [{ type: Input },],
-    'color': [{ type: Input },],
 };
+/**
+ * Applies proper (click) support and adds styling for use with the Material Design "cancel" icon
+ * available at https://material.io/icons/#ic_cancel.
+ *
+ * Example:
+ *
+ *     <md-chip>
+ *       <md-icon mdChipRemove>cancel</md-icon>
+ *     </md-chip>
+ *
+ * You *may* use a custom icon, but you may need to override the `md-chip-remove` positioning styles
+ * to properly center the icon within the chip.
+ */
+class MdChipRemove {
+    /**
+     * @param {?} _parentChip
+     */
+    constructor(_parentChip) {
+        this._parentChip = _parentChip;
+    }
+    /**
+     * Calls the parent chip's public `remove()` method if applicable.
+     * @return {?}
+     */
+    _handleClick() {
+        if (this._parentChip.removable) {
+            this._parentChip.remove();
+        }
+    }
+}
+MdChipRemove.decorators = [
+    { type: Directive, args: [{
+                selector: '[mdChipRemove], [matChipRemove]',
+                host: {
+                    'class': 'mat-chip-remove',
+                    '(click)': '_handleClick($event)'
+                }
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdChipRemove.ctorParameters = () => [
+    { type: MdChip, },
+];
 
 /**
  * A material design chips component (named ChipList for it's similarity to the List component).
@@ -11956,68 +11537,98 @@ class MdChipList {
         /**
          * When a chip is destroyed, we track the index so we can focus the appropriate next chip.
          */
-        this._destroyedIndex = null;
+        this._lastDestroyedIndex = null;
         /**
          * Track which chips we're listening to for focus/destruction.
          */
-        this._subscribed = new WeakMap();
+        this._chipSet = new WeakMap();
         /**
-         * Whether or not the chip list is currently focusable via keyboard interaction.
+         * Whether or not the chip is selectable.
          */
-        this._tabIndex = -1;
+        this._selectable = true;
+        /**
+         * Tab index for the chip list.
+         */
+        this._tabIndex = 0;
     }
     /**
      * @return {?}
      */
     ngAfterContentInit() {
         this._keyManager = new FocusKeyManager(this.chips).withWrap();
+        // Prevents the chip list from capturing focus and redirecting
+        // it back to the first chip when the user tabs out.
+        this._tabOutSubscription = this._keyManager.tabOut.subscribe(() => {
+            this._tabIndex = -1;
+            setTimeout(() => this._tabIndex = 0);
+        });
         // Go ahead and subscribe all of the initial chips
         this._subscribeChips(this.chips);
         // Make sure we set our tab index at the start
-        this._checkTabIndex();
+        this._updateTabIndex();
         // When the list changes, re-subscribe
         this.chips.changes.subscribe((chips) => {
             this._subscribeChips(chips);
             // If we have 0 chips, attempt to focus an input (if available)
-            if (chips.length == 0) {
-                this.focusInput();
+            if (chips.length === 0) {
+                this._focusInput();
             }
             // Check to see if we need to update our tab index
-            this._checkTabIndex();
+            this._updateTabIndex();
             // Check to see if we have a destroyed chip and need to refocus
-            this._checkDestroyedFocus();
+            this._updateFocusForDestroyedChips();
         });
     }
     /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        if (this._tabOutSubscription) {
+            this._tabOutSubscription.unsubscribe();
+        }
+    }
+    /**
+     * Whether or not this chip is selectable. When a chip is not selectable,
+     * it's selected state is always ignored.
+     * @return {?}
+     */
+    get selectable() {
+        return this._selectable;
+    }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set selectable(value) {
+        this._selectable = coerceBooleanProperty(value);
+    }
+    /**
      * Associates an HTML input element with this chip list.
-     *
-     * @param {?} inputElement The input to associate.
+     * @param {?} inputElement
      * @return {?}
      */
     registerInput(inputElement) {
         this._inputElement = inputElement;
     }
     /**
-     * Programmatically focus the chip list. This in turn focuses the first non-disabled chip in this
-     * chip list, or the input if available and there are 0 chips.
-     *
-     * TODO: ARIA says this should focus the first `selected` chip if any are selected.
-     * @param {?=} event
+     * Focuses the the first non-disabled chip in this chip list, or the associated input when there
+     * are no eligible chips.
      * @return {?}
      */
-    focus(event) {
+    focus() {
+        // TODO: ARIA says this should focus the first `selected` chip if any are selected.
         if (this.chips.length > 0) {
             this._keyManager.setFirstItemActive();
         }
         else {
-            this.focusInput();
+            this._focusInput();
         }
     }
     /**
      * Attempt to focus an input if we have one.
      * @return {?}
      */
-    focusInput() {
+    _focusInput() {
         if (this._inputElement) {
             this._inputElement.focus();
         }
@@ -12030,21 +11641,14 @@ class MdChipList {
     _keydown(event) {
         let /** @type {?} */ code = event.keyCode;
         let /** @type {?} */ target = (event.target);
-        let /** @type {?} */ isInputEmpty = MdChipList._isInputEmpty(target);
-        let /** @type {?} */ isRtl = this._dir.value == 'rtl';
-        let /** @type {?} */ isPrevKey = (code == (isRtl ? RIGHT_ARROW : LEFT_ARROW));
-        let /** @type {?} */ isNextKey = (code == (isRtl ? LEFT_ARROW : RIGHT_ARROW));
-        let /** @type {?} */ isBackKey = (code == BACKSPACE || code == DELETE || code == UP_ARROW || isPrevKey);
-        let /** @type {?} */ isForwardKey = (code == DOWN_ARROW || isNextKey);
+        let /** @type {?} */ isInputEmpty = this._isInputEmpty(target);
+        let /** @type {?} */ isRtl = this._dir && this._dir.value == 'rtl';
+        let /** @type {?} */ isPrevKey = (code === (isRtl ? RIGHT_ARROW : LEFT_ARROW));
+        let /** @type {?} */ isNextKey = (code === (isRtl ? LEFT_ARROW : RIGHT_ARROW));
+        let /** @type {?} */ isBackKey = (code === BACKSPACE || code == DELETE || code == UP_ARROW || isPrevKey);
         // If they are on an empty input and hit backspace/delete/left arrow, focus the last chip
         if (isInputEmpty && isBackKey) {
             this._keyManager.setLastItemActive();
-            event.preventDefault();
-            return;
-        }
-        // If they are on an empty input and hit the right arrow, wrap focus to the first chip
-        if (isInputEmpty && isForwardKey) {
-            this._keyManager.setFirstItemActive();
             event.preventDefault();
             return;
         }
@@ -12078,9 +11682,9 @@ class MdChipList {
      * Check the tab index as you should not be allowed to focus an empty list.
      * @return {?}
      */
-    _checkTabIndex() {
+    _updateTabIndex() {
         // If we have 0 chips, we should not allow keyboard focus
-        this._tabIndex = (this.chips.length == 0 ? -1 : 0);
+        this._tabIndex = (this.chips.length === 0 ? -1 : 0);
     }
     /**
      * Add a specific chip to our subscribed list. If the chip has
@@ -12093,7 +11697,7 @@ class MdChipList {
      */
     _addChip(chip) {
         // If we've already been subscribed to a parent, do nothing
-        if (this._subscribed.has(chip)) {
+        if (this._chipSet.has(chip)) {
             return;
         }
         // Watch for focus events outside of the keyboard navigation
@@ -12106,37 +11710,44 @@ class MdChipList {
         // On destroy, remove the item from our list, and setup our destroyed focus check
         chip.destroy.subscribe(() => {
             let /** @type {?} */ chipIndex = this.chips.toArray().indexOf(chip);
-            if (this._isValidIndex(chipIndex) && this._keyManager.activeItemIndex == chipIndex) {
-                this._destroyedIndex = chipIndex;
+            if (this._isValidIndex(chipIndex)) {
+                if (chip._hasFocus) {
+                    // Check whether the chip is the last item
+                    if (chipIndex < this.chips.length - 1) {
+                        this._keyManager.setActiveItem(chipIndex);
+                    }
+                    else if (chipIndex - 1 >= 0) {
+                        this._keyManager.setActiveItem(chipIndex - 1);
+                    }
+                }
+                if (this._keyManager.activeItemIndex === chipIndex) {
+                    this._lastDestroyedIndex = chipIndex;
+                }
             }
-            this._subscribed.delete(chip);
+            this._chipSet.delete(chip);
             chip.destroy.unsubscribe();
         });
-        this._subscribed.set(chip, true);
+        this._chipSet.set(chip, true);
     }
     /**
      * Checks to see if a focus chip was recently destroyed so that we can refocus the next closest
      * one.
      * @return {?}
      */
-    _checkDestroyedFocus() {
-        let /** @type {?} */ chipsArray = this.chips.toArray();
-        let /** @type {?} */ focusChip;
-        if (this._destroyedIndex != null && chipsArray.length > 0) {
+    _updateFocusForDestroyedChips() {
+        let /** @type {?} */ chipsArray = this.chips;
+        if (this._lastDestroyedIndex != null && chipsArray.length > 0) {
             // Check whether the destroyed chip was the last item
-            if (this._destroyedIndex >= chipsArray.length) {
-                this._keyManager.setActiveItem(chipsArray.length - 1);
-            }
-            else if (this._destroyedIndex >= 0) {
-                this._keyManager.setActiveItem(this._destroyedIndex);
-            }
+            const /** @type {?} */ newFocusIndex = Math.min(this._lastDestroyedIndex, chipsArray.length - 1);
+            this._keyManager.setActiveItem(newFocusIndex);
+            let /** @type {?} */ focusChip = this._keyManager.activeItem;
             // Focus the chip
             if (focusChip) {
                 focusChip.focus();
             }
         }
         // Reset our destroyed index
-        this._destroyedIndex = null;
+        this._lastDestroyedIndex = null;
     }
     /**
      * Utility to ensure all indexes are valid.
@@ -12148,14 +11759,13 @@ class MdChipList {
         return index >= 0 && index < this.chips.length;
     }
     /**
-     * Utility to check if an input element has no value.
      * @param {?} element
      * @return {?}
      */
-    static _isInputEmpty(element) {
-        if (element && element.nodeName.toLowerCase() == 'input') {
+    _isInputEmpty(element) {
+        if (element && element.nodeName.toLowerCase() === 'input') {
             let /** @type {?} */ input = (element);
-            return input.value == '' || input.value == null;
+            return !input.value;
         }
         return false;
     }
@@ -12163,17 +11773,18 @@ class MdChipList {
 MdChipList.decorators = [
     { type: Component, args: [{selector: 'md-chip-list, mat-chip-list',
                 template: `<div class="mat-chip-list-wrapper"><ng-content></ng-content></div>`,
+                exportAs: 'mdChipList',
                 host: {
-                    'role': 'listbox',
-                    '[class.mat-chip-list]': 'true',
                     '[attr.tabindex]': '_tabIndex',
-                    '(focus)': 'focus($event)',
+                    'role': 'listbox',
+                    'class': 'mat-chip-list',
+                    '(focus)': 'focus()',
                     '(keydown)': '_keydown($event)'
                 },
                 queries: {
                     chips: new ContentChildren(MdChip)
                 },
-                styles: [".mat-chip-list-wrapper{display:flex;flex-direction:row;flex-wrap:wrap;align-items:flex-start}.mat-chip-list-wrapper .mat-chip:not(.mat-basic-chip){margin:2.5px}:not(.mat-input-wrapper) .mat-chip-list-wrapper .mat-chip:not(.mat-basic-chip):first-child{margin-left:0;margin-right:2.5px}[dir=rtl] :not(.mat-input-wrapper) .mat-chip-list-wrapper .mat-chip:not(.mat-basic-chip):first-child{margin-left:2.5px;margin-right:0}:not(.mat-input-wrapper) .mat-chip-list-wrapper .mat-chip:not(.mat-basic-chip):last-child{margin-left:2.5px;margin-right:0}[dir=rtl] :not(.mat-input-wrapper) .mat-chip-list-wrapper .mat-chip:not(.mat-basic-chip):last-child{margin-left:0;margin-right:2.5px}.mat-chip:not(.mat-basic-chip){display:inline-block;position:relative;padding:6px 10px;border:2px solid transparent;border-radius:20px;font-size:13px;line-height:16px}.mat-chip:not(.mat-basic-chip).mat-chip-has-remove-icon{padding-right:32px}.mat-chip-list-stacked .mat-chip-list-wrapper{display:block}.mat-chip-list-stacked .mat-chip-list-wrapper .mat-chip:not(.mat-basic-chip){display:block;margin:0;margin-bottom:6px}[dir=rtl] .mat-chip-list-stacked .mat-chip-list-wrapper .mat-chip:not(.mat-basic-chip){margin:0;margin-bottom:6px}.mat-chip-list-stacked .mat-chip-list-wrapper .mat-chip:not(.mat-basic-chip):last-child,[dir=rtl] .mat-chip-list-stacked .mat-chip-list-wrapper .mat-chip:not(.mat-basic-chip):last-child{margin-bottom:0}.mat-chip-remove{position:absolute;top:2px;right:4px;width:24px;height:21px;padding-top:3px;font-size:18px;text-align:center;cursor:default}.mat-chip-remove.mat-chip-remove-hidden{display:none}.mat-input-container .mat-chip-list-wrapper input{width:auto;height:38px;margin-left:8px}.mat-input-container mat-chip-list~label.mat-empty{transform:translateY(22px)} /*# sourceMappingURL=chips.css.map */ "],
+                styles: [".mat-chip-list-wrapper{display:flex;flex-direction:row;flex-wrap:wrap;align-items:flex-start}.mat-chip:not(.mat-basic-chip){transition:box-shadow 280ms cubic-bezier(.4,0,.2,1);display:inline-flex;padding:7px 12px;border-radius:24px;align-items:center;cursor:default}.mat-chip:not(.mat-basic-chip)+.mat-chip:not(.mat-basic-chip){margin:0 0 0 8px}[dir=rtl] .mat-chip:not(.mat-basic-chip)+.mat-chip:not(.mat-basic-chip){margin:0 8px 0 0}.mat-input-prefix .mat-chip:not(.mat-basic-chip):last-child{margin-right:8px}[dir=rtl] .mat-input-prefix .mat-chip:not(.mat-basic-chip):last-child{margin-left:8px}.mat-chip:not(.mat-basic-chip) .mat-chip-remove.mat-icon{width:1em;height:1em}.mat-chip:not(.mat-basic-chip):focus{box-shadow:0 3px 3px -2px rgba(0,0,0,.2),0 3px 4px 0 rgba(0,0,0,.14),0 1px 8px 0 rgba(0,0,0,.12);outline:0}@media screen and (-ms-high-contrast:active){.mat-chip:not(.mat-basic-chip){outline:solid 1px}}.mat-chip-list-stacked .mat-chip-list-wrapper{display:block}.mat-chip-list-stacked .mat-chip-list-wrapper .mat-chip:not(.mat-basic-chip){display:block;margin:0;margin-bottom:8px}[dir=rtl] .mat-chip-list-stacked .mat-chip-list-wrapper .mat-chip:not(.mat-basic-chip){margin:0;margin-bottom:8px}.mat-chip-list-stacked .mat-chip-list-wrapper .mat-chip:not(.mat-basic-chip):last-child,[dir=rtl] .mat-chip-list-stacked .mat-chip-list-wrapper .mat-chip:not(.mat-basic-chip):last-child{margin-bottom:0}.mat-input-prefix .mat-chip-list-wrapper{margin-bottom:8px}.mat-chip-remove{margin-right:-4px;margin-left:6px;cursor:pointer}[dir=rtl] .mat-chip-remove{margin-right:6px;margin-left:-4px}"],
                 encapsulation: ViewEncapsulation.None,
                 changeDetection: ChangeDetectionStrategy.OnPush
             },] },
@@ -12182,65 +11793,106 @@ MdChipList.decorators = [
  * @nocollapse
  */
 MdChipList.ctorParameters = () => [
-    { type: Renderer, },
+    { type: Renderer2, },
     { type: ElementRef, },
-    { type: Dir, },
+    { type: Directionality, decorators: [{ type: Optional },] },
 ];
+MdChipList.propDecorators = {
+    'selectable': [{ type: Input },],
+};
 
 class MdChipInput {
     /**
-     * @param {?} _renderer
      * @param {?} _elementRef
      */
-    constructor(_renderer, _elementRef) {
-        this._renderer = _renderer;
+    constructor(_elementRef) {
         this._elementRef = _elementRef;
+        this._addOnBlur = false;
         /**
-         * Whether or not the chipAdded event will be emitted when the input is blurred.
-         *
-         * Default `false`.
-         */
-        this.addOnBlur = false;
-        /**
-         * The list of key codes that will trigger a chipAdded event.
+         * The list of key codes that will trigger a chipEnd event.
          *
          * Defaults to `[ENTER]`.
          */
-        this.separatorKeys = [ENTER];
+        // TODO(tinayuangao): Support Set here
+        this.separatorKeyCodes = [ENTER];
         /**
          * Emitted when a chip is to be added.
          */
-        this.chipAdded = new EventEmitter();
+        this.chipEnd = new EventEmitter();
         this._inputElement = this._elementRef.nativeElement;
     }
     /**
+     * Register input for chip list
+     * @param {?} value
+     * @return {?}
+     */
+    set chipList(value) {
+        if (value) {
+            this._chipList = value;
+            this._chipList.registerInput(this._inputElement);
+        }
+    }
+    /**
+     * Whether or not the chipEnd event will be emitted when the input is blurred.
+     * @return {?}
+     */
+    get addOnBlur() { return this._addOnBlur; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set addOnBlur(value) { this._addOnBlur = coerceBooleanProperty(value); }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set matChipList(value) { this.chipList = value; }
+    /**
+     * @return {?}
+     */
+    get matAddOnBlur() { return this._addOnBlur; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set matAddOnBlur(value) { this.addOnBlur = value; }
+    /**
+     * @return {?}
+     */
+    get matSeparatorKeyCodes() { return this.separatorKeyCodes; }
+    /**
+     * @param {?} v
+     * @return {?}
+     */
+    set matSeparatorKeyCodes(v) { this.separatorKeyCodes = v; }
+    /**
      * Utility method to make host definition/tests more clear.
-     *
      * @param {?=} event
      * @return {?}
      */
     _keydown(event) {
-        this._add(event);
+        this._emitChipEnd(event);
     }
     /**
-     * Checks to see if the blur should emit the (chipAdded) event.
-     *
+     * Checks to see if the blur should emit the (chipEnd) event.
      * @return {?}
      */
     _blur() {
         if (this.addOnBlur) {
-            this._add();
+            this._emitChipEnd();
         }
     }
     /**
-     * Checks to see if the (chipAdded) event needs to be emitted.
-     *
+     * Checks to see if the (chipEnd) event needs to be emitted.
      * @param {?=} event
      * @return {?}
      */
-    _add(event) {
-        if (!event || this.separatorKeys.indexOf(event.keyCode) > -1) {
-            this.chipAdded.emit({ input: this._inputElement, value: this._inputElement.value });
+    _emitChipEnd(event) {
+        if (!this._inputElement.value && !!event) {
+            this._chipList._keydown(event);
+        }
+        if (!event || this.separatorKeyCodes.indexOf(event.keyCode) > -1) {
+            this.chipEnd.emit({ input: this._inputElement, value: this._inputElement.value });
             if (event) {
                 event.preventDefault();
             }
@@ -12249,8 +11901,9 @@ class MdChipInput {
 }
 MdChipInput.decorators = [
     { type: Directive, args: [{
-                selector: '[mdChipInput], [matChipInput]',
+                selector: 'input[mdChipInputFor], input[matChipInputFor]',
                 host: {
+                    'class': 'mat-chip-input',
                     '(keydown)': '_keydown($event)',
                     '(blur)': '_blur()'
                 }
@@ -12260,118 +11913,25 @@ MdChipInput.decorators = [
  * @nocollapse
  */
 MdChipInput.ctorParameters = () => [
-    { type: Renderer, },
     { type: ElementRef, },
 ];
 MdChipInput.propDecorators = {
-    'addOnBlur': [{ type: Input },],
-    'separatorKeys': [{ type: Input },],
-    'chipAdded': [{ type: Output },],
+    'chipList': [{ type: Input, args: ['mdChipInputFor',] },],
+    'addOnBlur': [{ type: Input, args: ['mdChipInputAddOnBlur',] },],
+    'separatorKeyCodes': [{ type: Input, args: ['mdChipInputSeparatorKeyCodes',] },],
+    'chipEnd': [{ type: Output, args: ['mdChipInputTokenEnd',] },],
+    'matChipList': [{ type: Input, args: ['matChipInputFor',] },],
+    'matAddOnBlur': [{ type: Input, args: ['matChipInputAddOnBlur',] },],
+    'matSeparatorKeyCodes': [{ type: Input, args: ['matChipInputSeparatorKeyCodes',] },],
 };
 
-/**
- * Applies proper (click) support and adds styling for use with the Material Design "cancel" icon
- * available at https://material.io/icons/#ic_cancel.
- *
- * Example:
- *
- *     <md-chip>
- *       <md-icon mdChipRemove>clear</md-icon>
- *     </md-chip>
- *
- * You *may* use a custom icon, but you may need to override the `md-chip-remove` positioning styles
- * to properly center the icon within the chip.
- */
-class MdChipRemove {
-    /**
-     * @param {?} _renderer
-     * @param {?} _elementRef
-     * @param {?} _parentChip
-     */
-    constructor(_renderer, _elementRef, _parentChip) {
-        this._renderer = _renderer;
-        this._elementRef = _elementRef;
-        this._parentChip = _parentChip;
-        /**
-         * Whether or not the remove icon is visible.
-         */
-        this._isVisible = false;
-        if (this._parentChip) {
-            this._onRemoveChangeSubscription = this._parentChip.onRemovableChange$
-                .subscribe((value) => {
-                this._updateParent(value);
-            });
-        }
-    }
-    /**
-     * @return {?}
-     */
-    ngOnInit() {
-        this._updateParent(true);
-    }
-    /**
-     * @return {?}
-     */
-    ngOnDestroy() {
-        this._updateParent(false);
-        this._onRemoveChangeSubscription.unsubscribe();
-    }
-    /**
-     * Calls the parent chip's public `remove()` method if applicable.
-     * @param {?} event
-     * @return {?}
-     */
-    _handleClick(event) {
-        if (this._parentChip.removable) {
-            this._parentChip.remove();
-        }
-    }
-    /**
-     * Informs the parent chip whether or not it contains a remove icon.
-     * @param {?} isRemovable
-     * @return {?}
-     */
-    _updateParent(isRemovable) {
-        this._isVisible = isRemovable;
-        this._parentChip._setHasRemoveIcon(isRemovable);
-    }
-}
-MdChipRemove.decorators = [
-    { type: Directive, args: [{
-                selector: '[md-chip-remove], [mat-chip-remove], [mdChipRemove], [matChipRemove]',
-                host: {
-                    '[class.mat-chip-remove]': 'true',
-                    '[class.mat-chip-remove-hidden]': '!_isVisible',
-                    '(click)': '_handleClick($event)'
-                }
-            },] },
-];
-/**
- * @nocollapse
- */
-MdChipRemove.ctorParameters = () => [
-    { type: Renderer, },
-    { type: ElementRef, },
-    { type: MdChip, },
-];
-
 class MdChipsModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdChipsModule,
-            providers: []
-        };
-    }
 }
 MdChipsModule.decorators = [
     { type: NgModule, args: [{
                 imports: [],
-                exports: [MdChipList, MdChip, MdChipInput, MdChipRemove],
-                declarations: [MdChipList, MdChip, MdChipInput, MdChipRemove]
+                exports: [MdChipList, MdChip, MdChipInput, MdChipRemove, MdChipRemove, MdBasicChip],
+                declarations: [MdChipList, MdChip, MdChipInput, MdChipRemove, MdChipRemove, MdBasicChip]
             },] },
 ];
 /**
@@ -12380,26 +11940,34 @@ MdChipsModule.decorators = [
 MdChipsModule.ctorParameters = () => [];
 
 /**
- * Exception thrown when attempting to load an icon with a name that cannot be found.
+ * Returns an exception to be thrown in the case when attempting to
+ * load an icon with a name that cannot be found.
  * \@docs-private
+ * @param {?} iconName
+ * @return {?}
  */
-class MdIconNameNotFoundError extends MdError {
-    /**
-     * @param {?} iconName
-     */
-    constructor(iconName) {
-        super(`Unable to find icon with the name "${iconName}"`);
-    }
+function getMdIconNameNotFoundError(iconName) {
+    return Error(`Unable to find icon with the name "${iconName}"`);
 }
 /**
- * Exception thrown when attempting to load SVG content that does not contain the expected
- * <svg> tag.
+ * Returns an exception to be thrown when the consumer attempts to use
+ * `<md-icon>` without including \@angular/http.
  * \@docs-private
+ * @return {?}
  */
-class MdIconSvgTagNotFoundError extends MdError {
-    constructor() {
-        super('<svg> tag not found');
-    }
+function getMdIconNoHttpProviderError() {
+    return Error('Could not find Http provider for use with Angular Material icons. ' +
+        'Please include the HttpModule from @angular/http in your app imports.');
+}
+/**
+ * Returns an exception to be thrown when a URL couldn't be sanitized.
+ * \@docs-private
+ * @param {?} url URL that was attempted to be sanitized.
+ * @return {?}
+ */
+function getMdIconFailedToSanitizeError(url) {
+    return Error(`The URL provided to MdIconRegistry was not trusted as a resource URL ` +
+        `via Angular's DomSanitizer. Attempted URL was "${url}".`);
 }
 /**
  * Configuration for an icon, including the URL and possibly the cached SVG element.
@@ -12414,10 +11982,6 @@ class SvgIconConfig {
         this.svgElement = null;
     }
 }
-/**
- * Returns the cache key to use for an icon namespace and name.
- */
-const iconKey = (namespace, name) => namespace + ':' + name;
 /**
  * Service to register and display icons used by the <md-icon> component.
  * - Registers icon URLs by namespace and name.
@@ -12498,8 +12062,9 @@ class MdIconRegistry {
      */
     addSvgIconSetInNamespace(namespace, url) {
         const /** @type {?} */ config = new SvgIconConfig(url);
-        if (this._iconSetConfigs.has(namespace)) {
-            this._iconSetConfigs.get(namespace).push(config);
+        const /** @type {?} */ configNamespace = this._iconSetConfigs.get(namespace);
+        if (configNamespace) {
+            configNamespace.push(config);
         }
         else {
             this._iconSetConfigs.set(namespace, [config]);
@@ -12558,17 +12123,22 @@ class MdIconRegistry {
      */
     getSvgIconFromUrl(safeUrl) {
         let /** @type {?} */ url = this._sanitizer.sanitize(SecurityContext.RESOURCE_URL, safeUrl);
-        if (this._cachedIconsByUrl.has(url)) {
-            return Observable.of(cloneSvg(this._cachedIconsByUrl.get(url)));
+        if (!url) {
+            throw getMdIconFailedToSanitizeError(safeUrl);
         }
-        return this._loadSvgIconFromConfig(new SvgIconConfig(url))
-            .do(svg => this._cachedIconsByUrl.set(url, svg))
-            .map(svg => cloneSvg(svg));
+        let /** @type {?} */ cachedIcon = this._cachedIconsByUrl.get(url);
+        if (cachedIcon) {
+            return of(cloneSvg(cachedIcon));
+        }
+        return RxChain.from(this._loadSvgIconFromConfig(new SvgIconConfig(url)))
+            .call(doOperator, svg => this._cachedIconsByUrl.set(/** @type {?} */ ((url)), svg))
+            .call(map, svg => cloneSvg(svg))
+            .result();
     }
     /**
      * Returns an Observable that produces the icon (as an <svg> DOM element) with the given name
      * and namespace. The icon must have been previously registered with addIcon or addIconSet;
-     * if not, the Observable will throw an MdIconNameNotFoundError.
+     * if not, the Observable will throw an error.
      *
      * @param {?} name Name of the icon to be retrieved.
      * @param {?=} namespace Namespace in which to look for the icon.
@@ -12577,15 +12147,16 @@ class MdIconRegistry {
     getNamedSvgIcon(name, namespace = '') {
         // Return (copy of) cached icon if possible.
         const /** @type {?} */ key = iconKey(namespace, name);
-        if (this._svgIconConfigs.has(key)) {
-            return this._getSvgFromConfig(this._svgIconConfigs.get(key));
+        const /** @type {?} */ config = this._svgIconConfigs.get(key);
+        if (config) {
+            return this._getSvgFromConfig(config);
         }
         // See if we have any icon sets registered for the namespace.
         const /** @type {?} */ iconSetConfigs = this._iconSetConfigs.get(namespace);
         if (iconSetConfigs) {
             return this._getSvgFromIconSetConfigs(name, iconSetConfigs);
         }
-        return Observable.throw(new MdIconNameNotFoundError(key));
+        return _throw(getMdIconNameNotFoundError(key));
     }
     /**
      * Returns the cached icon for a SvgIconConfig if available, or fetches it from its URL if not.
@@ -12595,13 +12166,14 @@ class MdIconRegistry {
     _getSvgFromConfig(config) {
         if (config.svgElement) {
             // We already have the SVG element for this icon, return a copy.
-            return Observable.of(cloneSvg(config.svgElement));
+            return of(cloneSvg(config.svgElement));
         }
         else {
             // Fetch the icon from the config's URL, cache it, and return a copy.
-            return this._loadSvgIconFromConfig(config)
-                .do(svg => config.svgElement = svg)
-                .map(svg => cloneSvg(svg));
+            return RxChain.from(this._loadSvgIconFromConfig(config))
+                .call(doOperator, svg => config.svgElement = svg)
+                .call(map, svg => cloneSvg(svg))
+                .result();
         }
     }
     /**
@@ -12610,7 +12182,7 @@ class MdIconRegistry {
      * if found copies the element to a new <svg> element. If not found, fetches all icon sets
      * that have not been cached, and searches again after all fetches are completed.
      * The returned Observable produces the SVG element if possible, and throws
-     * MdIconNameNotFoundError if no icon with the specified name can be found.
+     * an error if no icon with the specified name can be found.
      * @param {?} name
      * @param {?} iconSetConfigs
      * @return {?}
@@ -12623,33 +12195,35 @@ class MdIconRegistry {
             // We could cache namedIcon in _svgIconConfigs, but since we have to make a copy every
             // time anyway, there's probably not much advantage compared to just always extracting
             // it from the icon set.
-            return Observable.of(namedIcon);
+            return of(namedIcon);
         }
         // Not found in any cached icon sets. If there are icon sets with URLs that we haven't
         // fetched, fetch them now and look for iconName in the results.
         const /** @type {?} */ iconSetFetchRequests = iconSetConfigs
             .filter(iconSetConfig => !iconSetConfig.svgElement)
-            .map(iconSetConfig => this._loadSvgIconSetFromConfig(iconSetConfig)
-            .catch((err, caught) => {
-            let /** @type {?} */ url = this._sanitizer.sanitize(SecurityContext.RESOURCE_URL, iconSetConfig.url);
-            // Swallow errors fetching individual URLs so the combined Observable won't
-            // necessarily fail.
-            console.log(`Loading icon set URL: ${url} failed: ${err}`);
-            return Observable.of(null);
-        })
-            .do(svg => {
-            // Cache SVG element.
-            if (svg) {
-                iconSetConfig.svgElement = svg;
-            }
-        }));
+            .map(iconSetConfig => {
+            return RxChain.from(this._loadSvgIconSetFromConfig(iconSetConfig))
+                .call(catchOperator, (err) => {
+                let /** @type {?} */ url = this._sanitizer.sanitize(SecurityContext.RESOURCE_URL, iconSetConfig.url);
+                // Swallow errors fetching individual URLs so the combined Observable won't
+                // necessarily fail.
+                console.log(`Loading icon set URL: ${url} failed: ${err}`);
+                return of(null);
+            })
+                .call(doOperator, svg => {
+                // Cache the SVG element.
+                if (svg) {
+                    iconSetConfig.svgElement = svg;
+                }
+            })
+                .result();
+        });
         // Fetch all the icon set URLs. When the requests complete, every IconSet should have a
         // cached SVG element (unless the request failed), and we can check again for the icon.
-        return Observable.forkJoin(iconSetFetchRequests)
-            .map((ignoredResults) => {
+        return map.call(forkJoin.call(Observable, iconSetFetchRequests), () => {
             const /** @type {?} */ foundIcon = this._extractIconWithNameFromAnySet(name, iconSetConfigs);
             if (!foundIcon) {
-                throw new MdIconNameNotFoundError(name);
+                throw getMdIconNameNotFoundError(name);
             }
             return foundIcon;
         });
@@ -12682,8 +12256,7 @@ class MdIconRegistry {
      * @return {?}
      */
     _loadSvgIconFromConfig(config) {
-        return this._fetchUrl(config.url)
-            .map(svgText => this._createSvgElementForSingleIcon(svgText));
+        return map.call(this._fetchUrl(config.url), svgText => this._createSvgElementForSingleIcon(svgText));
     }
     /**
      * Loads the content of the icon set URL specified in the SvgIconConfig and creates an SVG element
@@ -12693,8 +12266,7 @@ class MdIconRegistry {
      */
     _loadSvgIconSetFromConfig(config) {
         // TODO: Document that icons should only be loaded from trusted sources.
-        return this._fetchUrl(config.url)
-            .map(svgText => this._svgElementFromString(svgText));
+        return map.call(this._fetchUrl(config.url), svgText => this._svgElementFromString(svgText));
     }
     /**
      * Creates a DOM element from the given SVG string, and adds default attributes.
@@ -12721,8 +12293,14 @@ class MdIconRegistry {
         }
         // If the icon node is itself an <svg> node, clone and return it directly. If not, set it as
         // the content of a new <svg> node.
-        if (iconNode.tagName.toLowerCase() == 'svg') {
+        if (iconNode.tagName.toLowerCase() === 'svg') {
             return this._setSvgAttributes(/** @type {?} */ (iconNode.cloneNode(true)));
+        }
+        // If the node is a <symbol>, it won't be rendered so we have to convert it into <svg>. Note
+        // that the same could be achieved by referring to it via <use href="#id">, however the <use>
+        // tag is problematic on Firefox, because it needs to include the current page path.
+        if (iconNode.nodeName.toLowerCase() === 'symbol') {
+            return this._setSvgAttributes(this._toSvgElement(iconNode));
         }
         // createElement('SVG') doesn't work as expected; the DOM ends up with
         // the correct nodes, but the SVG content doesn't render. Instead we
@@ -12746,7 +12324,21 @@ class MdIconRegistry {
         div.innerHTML = str;
         const /** @type {?} */ svg = (div.querySelector('svg'));
         if (!svg) {
-            throw new MdIconSvgTagNotFoundError();
+            throw Error('<svg> tag not found');
+        }
+        return svg;
+    }
+    /**
+     * Converts an element into an SVG node by cloning all of its children.
+     * @param {?} element
+     * @return {?}
+     */
+    _toSvgElement(element) {
+        let /** @type {?} */ svg = this._svgElementFromString('<svg></svg>');
+        for (let /** @type {?} */ i = 0; i < element.childNodes.length; i++) {
+            if (element.childNodes[i].nodeType === Node.ELEMENT_NODE) {
+                svg.appendChild(element.childNodes[i].cloneNode(true));
+            }
         }
         return svg;
     }
@@ -12773,21 +12365,27 @@ class MdIconRegistry {
      * @return {?}
      */
     _fetchUrl(safeUrl) {
-        let /** @type {?} */ url = this._sanitizer.sanitize(SecurityContext.RESOURCE_URL, safeUrl);
+        if (!this._http) {
+            throw getMdIconNoHttpProviderError();
+        }
+        const /** @type {?} */ url = this._sanitizer.sanitize(SecurityContext.RESOURCE_URL, safeUrl);
+        if (!url) {
+            throw getMdIconFailedToSanitizeError(safeUrl);
+        }
         // Store in-progress fetches to avoid sending a duplicate request for a URL when there is
         // already a request in progress for that URL. It's necessary to call share() on the
         // Observable returned by http.get() so that multiple subscribers don't cause multiple XHRs.
-        if (this._inProgressUrlFetches.has(url)) {
-            return this._inProgressUrlFetches.get(url);
+        const /** @type {?} */ inProgressFetch = this._inProgressUrlFetches.get(url);
+        if (inProgressFetch) {
+            return inProgressFetch;
         }
         // TODO(jelbourn): for some reason, the `finally` operator "loses" the generic type on the
         // Observable. Figure out why and fix it.
-        const /** @type {?} */ req = (this._http.get(url)
-            .map(response => response.text())
-            .finally(() => {
-            this._inProgressUrlFetches.delete(url);
-        })
-            .share());
+        const /** @type {?} */ req = RxChain.from(this._http.get(url))
+            .call(map, response => response.text())
+            .call(finallyOperator, () => this._inProgressUrlFetches.delete(url))
+            .call(share)
+            .result();
         this._inProgressUrlFetches.set(url, req);
         return req;
     }
@@ -12799,9 +12397,28 @@ MdIconRegistry.decorators = [
  * @nocollapse
  */
 MdIconRegistry.ctorParameters = () => [
-    { type: Http, },
+    { type: Http, decorators: [{ type: Optional },] },
     { type: DomSanitizer, },
 ];
+/**
+ * \@docs-private
+ * @param {?} parentRegistry
+ * @param {?} http
+ * @param {?} sanitizer
+ * @return {?}
+ */
+function ICON_REGISTRY_PROVIDER_FACTORY(parentRegistry, http, sanitizer) {
+    return parentRegistry || new MdIconRegistry(http, sanitizer);
+}
+/**
+ * \@docs-private
+ */
+const ICON_REGISTRY_PROVIDER = {
+    // If there is already an MdIconRegistry available, use that. Otherwise, provide a new one.
+    provide: MdIconRegistry,
+    deps: [[new Optional(), new SkipSelf(), MdIconRegistry], [new Optional(), Http], DomSanitizer],
+    useFactory: ICON_REGISTRY_PROVIDER_FACTORY
+};
 /**
  * Clones an SVGElement while preserving type information.
  * @param {?} svg
@@ -12810,26 +12427,32 @@ MdIconRegistry.ctorParameters = () => [
 function cloneSvg(svg) {
     return (svg.cloneNode(true));
 }
+/**
+ * Returns the cache key to use for an icon namespace and name.
+ * @param {?} namespace
+ * @param {?} name
+ * @return {?}
+ */
+function iconKey(namespace, name) {
+    return namespace + ':' + name;
+}
 
 /**
- * Exception thrown when an invalid icon name is passed to an md-icon component.
+ * \@docs-private
  */
-class MdIconInvalidNameError extends MdError {
+class MdIconBase {
     /**
-     * @param {?} iconName
+     * @param {?} _renderer
+     * @param {?} _elementRef
      */
-    constructor(iconName) {
-        super(`Invalid icon name: "${iconName}"`);
+    constructor(_renderer, _elementRef) {
+        this._renderer = _renderer;
+        this._elementRef = _elementRef;
     }
 }
+const _MdIconMixinBase = mixinColor(MdIconBase);
 /**
  * Component to display an icon. It can be used in the following ways:
- * - Specify the svgSrc input to load an SVG icon from a URL. The SVG content is directly inlined
- *   as a child of the <md-icon> component, so that CSS styles can easily be applied to it.
- *   The URL is loaded via an XMLHttpRequest, so it must be on the same domain as the page or its
- *   server must be configured to allow cross-domain requests.
- *   Example:
- *     <md-icon svgSrc="assets/arrow.svg"></md-icon>
  *
  * - Specify the svgIcon input to load an SVG icon from a URL previously registered with the
  *   addSvgIcon, addSvgIconInNamespace, addSvgIconSet, or addSvgIconSetInNamespace methods of
@@ -12855,48 +12478,20 @@ class MdIconInvalidNameError extends MdError {
  *   Example:
  *     <md-icon fontSet="fa" fontIcon="alarm"></md-icon>
  */
-class MdIcon {
+class MdIcon extends _MdIconMixinBase {
     /**
-     * @param {?} _elementRef
-     * @param {?} _renderer
+     * @param {?} renderer
+     * @param {?} elementRef
      * @param {?} _mdIconRegistry
+     * @param {?} ariaHidden
      */
-    constructor(_elementRef, _renderer, _mdIconRegistry) {
-        this._elementRef = _elementRef;
-        this._renderer = _renderer;
+    constructor(renderer, elementRef, _mdIconRegistry, ariaHidden) {
+        super(renderer, elementRef);
         this._mdIconRegistry = _mdIconRegistry;
-        /**
-         * Screenreader label for the icon.
-         */
-        this.hostAriaLabel = '';
-    }
-    /**
-     * Color of the icon.
-     * @return {?}
-     */
-    get color() { return this._color; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set color(value) { this._updateColor(value); }
-    /**
-     * @param {?} newColor
-     * @return {?}
-     */
-    _updateColor(newColor) {
-        this._setElementColor(this._color, false);
-        this._setElementColor(newColor, true);
-        this._color = newColor;
-    }
-    /**
-     * @param {?} color
-     * @param {?} isAdd
-     * @return {?}
-     */
-    _setElementColor(color, isAdd) {
-        if (color != null && color != '') {
-            this._renderer.setElementClass(this._elementRef.nativeElement, `mat-${color}`, isAdd);
+        // If the user has not explicitly set aria-hidden, mark the icon as hidden, as this is
+        // the right thing to do for the majority of icon use-cases.
+        if (!ariaHidden) {
+            renderer.setAttribute(elementRef.nativeElement, 'aria-hidden', 'true');
         }
     }
     /**
@@ -12905,12 +12500,12 @@ class MdIcon {
      * The separator for the two fields is ':'. If there is no separator, an empty
      * string is returned for the icon set and the entire value is returned for
      * the icon name. If the argument is falsy, returns an array of two empty strings.
-     * Throws a MdIconInvalidNameError if the name contains two or more ':' separators.
+     * Throws an error if the name contains two or more ':' separators.
      * Examples:
      *   'social:cake' -> ['social', 'cake']
      *   'penguin' -> ['', 'penguin']
      *   null -> ['', '']
-     *   'a:b:c' -> (throws MdIconInvalidNameError)
+     *   'a:b:c' -> (throws Error)
      * @param {?} iconName
      * @return {?}
      */
@@ -12926,7 +12521,7 @@ class MdIcon {
             case 2:
                 return (parts);
             default:
-                throw new MdIconInvalidNameError(iconName);
+                throw Error(`Invalid icon name: "${iconName}"`);
         }
     }
     /**
@@ -12934,18 +12529,14 @@ class MdIcon {
      * @return {?}
      */
     ngOnChanges(changes) {
-        const /** @type {?} */ changedInputs = Object.keys(changes);
         // Only update the inline SVG icon if the inputs changed, to avoid unnecessary DOM operations.
-        if (changedInputs.indexOf('svgIcon') != -1 || changedInputs.indexOf('svgSrc') != -1) {
-            if (this.svgIcon) {
-                const [namespace, iconName] = this._splitIconName(this.svgIcon);
-                this._mdIconRegistry.getNamedSvgIcon(iconName, namespace).first().subscribe(svg => this._setSvgElement(svg), (err) => console.log(`Error retrieving icon: ${err.message}`));
-            }
+        if (changes.svgIcon && this.svgIcon) {
+            const [namespace, iconName] = this._splitIconName(this.svgIcon);
+            first.call(this._mdIconRegistry.getNamedSvgIcon(iconName, namespace)).subscribe(svg => this._setSvgElement(svg), (err) => console.log(`Error retrieving icon: ${err.message}`));
         }
         if (this._usingFontIcon()) {
             this._updateFontIconClasses();
         }
-        this._updateAriaLabel();
     }
     /**
      * @return {?}
@@ -12960,48 +12551,6 @@ class MdIcon {
     /**
      * @return {?}
      */
-    ngAfterViewChecked() {
-        // Update aria label here because it may depend on the projected text content.
-        // (e.g. <md-icon>home</md-icon> should use 'home').
-        this._updateAriaLabel();
-    }
-    /**
-     * @return {?}
-     */
-    _updateAriaLabel() {
-        const /** @type {?} */ ariaLabel = this._getAriaLabel();
-        if (ariaLabel && ariaLabel !== this._previousAriaLabel) {
-            this._previousAriaLabel = ariaLabel;
-            this._renderer.setElementAttribute(this._elementRef.nativeElement, 'aria-label', ariaLabel);
-        }
-    }
-    /**
-     * @return {?}
-     */
-    _getAriaLabel() {
-        // If the parent provided an aria-label attribute value, use it as-is. Otherwise look for a
-        // reasonable value from the alt attribute, font icon name, SVG icon name, or (for ligatures)
-        // the text content of the directive.
-        const /** @type {?} */ label = this.hostAriaLabel ||
-            this.alt ||
-            this.fontIcon ||
-            this._splitIconName(this.svgIcon)[1];
-        if (label) {
-            return label;
-        }
-        // The "content" of an SVG icon is not a useful label.
-        if (this._usingFontIcon()) {
-            const /** @type {?} */ text = this._elementRef.nativeElement.textContent;
-            if (text) {
-                return text;
-            }
-        }
-        // TODO: Warn here in dev mode.
-        return null;
-    }
-    /**
-     * @return {?}
-     */
     _usingFontIcon() {
         return !this.svgIcon;
     }
@@ -13011,11 +12560,13 @@ class MdIcon {
      */
     _setSvgElement(svg) {
         const /** @type {?} */ layoutElement = this._elementRef.nativeElement;
-        // Remove existing child nodes and add the new SVG element.
-        // We would use renderer.detachView(Array.from(layoutElement.childNodes)) here,
-        // but it fails in IE11: https://github.com/angular/angular/issues/6327
-        layoutElement.innerHTML = '';
-        this._renderer.projectNodes(layoutElement, [svg]);
+        const /** @type {?} */ childCount = layoutElement.childNodes.length;
+        // Remove existing child nodes and add the new SVG element. Note that we can't
+        // use innerHTML, because IE will throw if the element has a data binding.
+        for (let /** @type {?} */ i = 0; i < childCount; i++) {
+            this._renderer.removeChild(layoutElement, layoutElement.childNodes[i]);
+        }
+        this._renderer.appendChild(layoutElement, svg);
     }
     /**
      * @return {?}
@@ -13030,19 +12581,19 @@ class MdIcon {
             this._mdIconRegistry.getDefaultFontSetClass();
         if (fontSetClass != this._previousFontSetClass) {
             if (this._previousFontSetClass) {
-                this._renderer.setElementClass(elem, this._previousFontSetClass, false);
+                this._renderer.removeClass(elem, this._previousFontSetClass);
             }
             if (fontSetClass) {
-                this._renderer.setElementClass(elem, fontSetClass, true);
+                this._renderer.addClass(elem, fontSetClass);
             }
             this._previousFontSetClass = fontSetClass;
         }
         if (this.fontIcon != this._previousFontIconClass) {
             if (this._previousFontIconClass) {
-                this._renderer.setElementClass(elem, this._previousFontIconClass, false);
+                this._renderer.removeClass(elem, this._previousFontIconClass);
             }
             if (this.fontIcon) {
-                this._renderer.setElementClass(elem, this.fontIcon, true);
+                this._renderer.addClass(elem, this.fontIcon);
             }
             this._previousFontIconClass = this.fontIcon;
         }
@@ -13051,10 +12602,11 @@ class MdIcon {
 MdIcon.decorators = [
     { type: Component, args: [{template: '<ng-content></ng-content>',
                 selector: 'md-icon, mat-icon',
-                styles: [".mat-icon{background-repeat:no-repeat;display:inline-block;fill:currentColor;height:24px;width:24px} /*# sourceMappingURL=icon.css.map */ "],
+                styles: [".mat-icon{background-repeat:no-repeat;display:inline-block;fill:currentColor;height:24px;width:24px}"],
+                inputs: ['color'],
                 host: {
                     'role': 'img',
-                    '[class.mat-icon]': 'true',
+                    'class': 'mat-icon',
                 },
                 encapsulation: ViewEncapsulation.None,
                 changeDetection: ChangeDetectionStrategy.OnPush,
@@ -13064,50 +12616,23 @@ MdIcon.decorators = [
  * @nocollapse
  */
 MdIcon.ctorParameters = () => [
+    { type: Renderer2, },
     { type: ElementRef, },
-    { type: Renderer, },
     { type: MdIconRegistry, },
+    { type: undefined, decorators: [{ type: Attribute, args: ['aria-hidden',] },] },
 ];
 MdIcon.propDecorators = {
     'svgIcon': [{ type: Input },],
     'fontSet': [{ type: Input },],
     'fontIcon': [{ type: Input },],
-    'alt': [{ type: Input },],
-    'hostAriaLabel': [{ type: Input, args: ['aria-label',] },],
-    'color': [{ type: Input },],
-};
-/**
- * @param {?} parentRegistry
- * @param {?} http
- * @param {?} sanitizer
- * @return {?}
- */
-function ICON_REGISTRY_PROVIDER_FACTORY(parentRegistry, http, sanitizer) {
-    return parentRegistry || new MdIconRegistry(http, sanitizer);
-}
-const ICON_REGISTRY_PROVIDER = {
-    // If there is already an MdIconRegistry available, use that. Otherwise, provide a new one.
-    provide: MdIconRegistry,
-    deps: [[new Optional(), new SkipSelf(), MdIconRegistry], Http, DomSanitizer],
-    useFactory: ICON_REGISTRY_PROVIDER_FACTORY,
 };
 
 class MdIconModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdIconModule,
-            providers: [],
-        };
-    }
 }
 MdIconModule.decorators = [
     { type: NgModule, args: [{
-                imports: [HttpModule, CompatibilityModule],
-                exports: [MdIcon, CompatibilityModule],
+                imports: [MdCommonModule],
+                exports: [MdIcon, MdCommonModule],
                 declarations: [MdIcon],
                 providers: [ICON_REGISTRY_PROVIDER],
             },] },
@@ -13158,9 +12683,7 @@ class MdProgressSpinnerCssMatStyler {
 MdProgressSpinnerCssMatStyler.decorators = [
     { type: Directive, args: [{
                 selector: 'md-progress-spinner, mat-progress-spinner',
-                host: {
-                    '[class.mat-progress-spinner]': 'true'
-                }
+                host: { 'class': 'mat-progress-spinner' }
             },] },
 ];
 /**
@@ -13168,24 +12691,36 @@ MdProgressSpinnerCssMatStyler.decorators = [
  */
 MdProgressSpinnerCssMatStyler.ctorParameters = () => [];
 /**
+ * \@docs-private
+ */
+class MdProgressSpinnerBase {
+    /**
+     * @param {?} _renderer
+     * @param {?} _elementRef
+     */
+    constructor(_renderer, _elementRef) {
+        this._renderer = _renderer;
+        this._elementRef = _elementRef;
+    }
+}
+const _MdProgressSpinnerMixinBase = mixinColor(MdProgressSpinnerBase, 'primary');
+/**
  * <md-progress-spinner> component.
  */
-class MdProgressSpinner {
+class MdProgressSpinner extends _MdProgressSpinnerMixinBase {
     /**
+     * @param {?} renderer
+     * @param {?} elementRef
      * @param {?} _ngZone
-     * @param {?} _elementRef
-     * @param {?} _renderer
      */
-    constructor(_ngZone, _elementRef, _renderer) {
+    constructor(renderer, elementRef, _ngZone) {
+        super(renderer, elementRef);
         this._ngZone = _ngZone;
-        this._elementRef = _elementRef;
-        this._renderer = _renderer;
         /**
          * The id of the last requested animation.
          */
         this._lastAnimationId = 0;
         this._mode = 'determinate';
-        this._color = 'primary';
         /**
          * Stroke width of the progress spinner. By default uses 10px as stroke width.
          */
@@ -13219,7 +12754,9 @@ class MdProgressSpinner {
      * @return {?}
      */
     set interdeterminateInterval(interval) {
-        clearInterval(this._interdeterminateInterval);
+        if (this._interdeterminateInterval) {
+            clearInterval(this._interdeterminateInterval);
+        }
         this._interdeterminateInterval = interval;
     }
     /**
@@ -13230,22 +12767,6 @@ class MdProgressSpinner {
         this._cleanupIndeterminateAnimation();
     }
     /**
-     * The color of the progress-spinner. Can be primary, accent, or warn.
-     * @return {?}
-     */
-    get color() { return this._color; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set color(value) {
-        if (value) {
-            this._renderer.removeClass(this._elementRef.nativeElement, `mat-${this._color}`);
-            this._renderer.addClass(this._elementRef.nativeElement, `mat-${value}`);
-            this._color = value;
-        }
-    }
-    /**
      * Value of the progress circle. It is bound to the host as the attribute aria-valuenow.
      * @return {?}
      */
@@ -13253,6 +12774,7 @@ class MdProgressSpinner {
         if (this.mode == 'determinate') {
             return this._value;
         }
+        return 0;
     }
     /**
      * @param {?} v
@@ -13272,9 +12794,7 @@ class MdProgressSpinner {
      * mode is bound to the host as the attribute host.
      * @return {?}
      */
-    get mode() {
-        return this._mode;
-    }
+    get mode() { return this._mode; }
     /**
      * @param {?} mode
      * @return {?}
@@ -13378,10 +12898,13 @@ MdProgressSpinner.decorators = [
                 host: {
                     'role': 'progressbar',
                     '[attr.aria-valuemin]': '_ariaValueMin',
-                    '[attr.aria-valuemax]': '_ariaValueMax'
+                    '[attr.aria-valuemax]': '_ariaValueMax',
+                    '[attr.aria-valuenow]': 'value',
+                    '[attr.mode]': 'mode',
                 },
-                template: "<!-- preserveAspectRatio of xMidYMid meet as the center of the viewport is the circle's center. The center of the circle will remain at the center of the md-progress-spinner element containing the SVG. --> <svg viewBox=\"0 0 100 100\" preserveAspectRatio=\"xMidYMid meet\"> <path #path [style.strokeWidth]=\"strokeWidth\"></path> </svg> ",
-                styles: [":host{display:block;height:100px;width:100px;overflow:hidden}:host svg{height:100%;width:100%;transform-origin:center}:host path{fill:transparent;transition:stroke .3s cubic-bezier(.35,0,.25,1)}:host[mode=indeterminate] svg{animation-duration:5.25s,2.887s;animation-name:mat-progress-spinner-sporadic-rotate,mat-progress-spinner-linear-rotate;animation-timing-function:cubic-bezier(.35,0,.25,1),linear;animation-iteration-count:infinite;transition:none}@keyframes mat-progress-spinner-linear-rotate{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}@keyframes mat-progress-spinner-sporadic-rotate{12.5%{transform:rotate(135deg)}25%{transform:rotate(270deg)}37.5%{transform:rotate(405deg)}50%{transform:rotate(540deg)}62.5%{transform:rotate(675deg)}75%{transform:rotate(810deg)}87.5%{transform:rotate(945deg)}100%{transform:rotate(1080deg)}} /*# sourceMappingURL=progress-spinner.css.map */ "],
+                inputs: ['color'],
+                template: "<svg viewBox=\"0 0 100 100\" preserveAspectRatio=\"xMidYMid meet\" focusable=\"false\"><path #path [style.strokeWidth]=\"strokeWidth\"></path></svg>",
+                styles: [":host{display:block;height:100px;width:100px;overflow:hidden}:host svg{height:100%;width:100%;transform-origin:center}:host path{fill:transparent;transition:stroke .3s cubic-bezier(.35,0,.25,1)}:host[mode=indeterminate] svg{animation-duration:5.25s,2.887s;animation-name:mat-progress-spinner-sporadic-rotate,mat-progress-spinner-linear-rotate;animation-timing-function:cubic-bezier(.35,0,.25,1),linear;animation-iteration-count:infinite;transition:none}@keyframes mat-progress-spinner-linear-rotate{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}@keyframes mat-progress-spinner-sporadic-rotate{12.5%{transform:rotate(135deg)}25%{transform:rotate(270deg)}37.5%{transform:rotate(405deg)}50%{transform:rotate(540deg)}62.5%{transform:rotate(675deg)}75%{transform:rotate(810deg)}87.5%{transform:rotate(945deg)}100%{transform:rotate(1080deg)}}"],
                 changeDetection: ChangeDetectionStrategy.OnPush,
             },] },
 ];
@@ -13389,16 +12912,15 @@ MdProgressSpinner.decorators = [
  * @nocollapse
  */
 MdProgressSpinner.ctorParameters = () => [
-    { type: NgZone, },
-    { type: ElementRef, },
     { type: Renderer2, },
+    { type: ElementRef, },
+    { type: NgZone, },
 ];
 MdProgressSpinner.propDecorators = {
     '_path': [{ type: ViewChild, args: ['path',] },],
     'strokeWidth': [{ type: Input },],
-    'color': [{ type: Input },],
-    'value': [{ type: Input }, { type: HostBinding, args: ['attr.aria-valuenow',] },],
-    'mode': [{ type: HostBinding, args: ['attr.mode',] }, { type: Input },],
+    'value': [{ type: Input },],
+    'mode': [{ type: Input },],
 };
 /**
  * <md-spinner> component.
@@ -13413,16 +12935,8 @@ class MdSpinner extends MdProgressSpinner {
      * @param {?} renderer
      */
     constructor(elementRef, ngZone, renderer) {
-        super(ngZone, elementRef, renderer);
+        super(renderer, elementRef, ngZone);
         this.mode = 'indeterminate';
-    }
-    /**
-     * @return {?}
-     */
-    ngOnDestroy() {
-        // The `ngOnDestroy` from `MdProgressSpinner` should be called explicitly, because
-        // in certain cases Angular won't call it (e.g. when using AoT and in unit tests).
-        super.ngOnDestroy();
     }
 }
 MdSpinner.decorators = [
@@ -13430,10 +12944,12 @@ MdSpinner.decorators = [
                 host: {
                     'role': 'progressbar',
                     'mode': 'indeterminate',
-                    '[class.mat-spinner]': 'true',
+                    'class': 'mat-spinner',
                 },
-                template: "<!-- preserveAspectRatio of xMidYMid meet as the center of the viewport is the circle's center. The center of the circle will remain at the center of the md-progress-spinner element containing the SVG. --> <svg viewBox=\"0 0 100 100\" preserveAspectRatio=\"xMidYMid meet\"> <path #path [style.strokeWidth]=\"strokeWidth\"></path> </svg> ",
-                styles: [":host{display:block;height:100px;width:100px;overflow:hidden}:host svg{height:100%;width:100%;transform-origin:center}:host path{fill:transparent;transition:stroke .3s cubic-bezier(.35,0,.25,1)}:host[mode=indeterminate] svg{animation-duration:5.25s,2.887s;animation-name:mat-progress-spinner-sporadic-rotate,mat-progress-spinner-linear-rotate;animation-timing-function:cubic-bezier(.35,0,.25,1),linear;animation-iteration-count:infinite;transition:none}@keyframes mat-progress-spinner-linear-rotate{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}@keyframes mat-progress-spinner-sporadic-rotate{12.5%{transform:rotate(135deg)}25%{transform:rotate(270deg)}37.5%{transform:rotate(405deg)}50%{transform:rotate(540deg)}62.5%{transform:rotate(675deg)}75%{transform:rotate(810deg)}87.5%{transform:rotate(945deg)}100%{transform:rotate(1080deg)}} /*# sourceMappingURL=progress-spinner.css.map */ "],
+                inputs: ['color'],
+                template: "<svg viewBox=\"0 0 100 100\" preserveAspectRatio=\"xMidYMid meet\" focusable=\"false\"><path #path [style.strokeWidth]=\"strokeWidth\"></path></svg>",
+                styles: [":host{display:block;height:100px;width:100px;overflow:hidden}:host svg{height:100%;width:100%;transform-origin:center}:host path{fill:transparent;transition:stroke .3s cubic-bezier(.35,0,.25,1)}:host[mode=indeterminate] svg{animation-duration:5.25s,2.887s;animation-name:mat-progress-spinner-sporadic-rotate,mat-progress-spinner-linear-rotate;animation-timing-function:cubic-bezier(.35,0,.25,1),linear;animation-iteration-count:infinite;transition:none}@keyframes mat-progress-spinner-linear-rotate{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}@keyframes mat-progress-spinner-sporadic-rotate{12.5%{transform:rotate(135deg)}25%{transform:rotate(270deg)}37.5%{transform:rotate(405deg)}50%{transform:rotate(540deg)}62.5%{transform:rotate(675deg)}75%{transform:rotate(810deg)}87.5%{transform:rotate(945deg)}100%{transform:rotate(1080deg)}}"],
+                changeDetection: ChangeDetectionStrategy.OnPush,
             },] },
 ];
 /**
@@ -13521,24 +13037,14 @@ function getSvgArc(currentValue, rotation, strokeWidth) {
 }
 
 class MdProgressSpinnerModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdProgressSpinnerModule,
-            providers: []
-        };
-    }
 }
 MdProgressSpinnerModule.decorators = [
     { type: NgModule, args: [{
-                imports: [CompatibilityModule],
+                imports: [MdCommonModule],
                 exports: [
                     MdProgressSpinner,
                     MdSpinner,
-                    CompatibilityModule,
+                    MdCommonModule,
                     MdProgressSpinnerCssMatStyler
                 ],
                 declarations: [
@@ -13619,13 +13125,15 @@ MdProgressBar.decorators = [
                     'role': 'progressbar',
                     'aria-valuemin': '0',
                     'aria-valuemax': '100',
+                    '[attr.aria-valuenow]': 'value',
+                    '[attr.mode]': 'mode',
                     '[class.mat-primary]': 'color == "primary"',
                     '[class.mat-accent]': 'color == "accent"',
                     '[class.mat-warn]': 'color == "warn"',
-                    '[class.mat-progress-bar]': 'true',
+                    'class': 'mat-progress-bar',
                 },
-                template: "<!-- The background div is named as such because it appears below the other divs and is not sized based on values. --> <div class=\"mat-progress-bar-background mat-progress-bar-element\"></div> <div class=\"mat-progress-bar-buffer mat-progress-bar-element\" [ngStyle]=\"_bufferTransform()\"></div> <div class=\"mat-progress-bar-primary mat-progress-bar-fill mat-progress-bar-element\" [ngStyle]=\"_primaryTransform()\"></div> <div class=\"mat-progress-bar-secondary mat-progress-bar-fill mat-progress-bar-element\"></div> ",
-                styles: [":host{display:block;height:5px;overflow:hidden;position:relative;transform:translateZ(0);transition:opacity 250ms linear;width:100%}:host .mat-progress-bar-element,:host .mat-progress-bar-fill::after{height:100%;position:absolute;width:100%}:host .mat-progress-bar-background{background-repeat:repeat-x;background-size:10px 4px;display:none}:host .mat-progress-bar-buffer{transform-origin:top left;transition:transform 250ms ease,stroke .3s cubic-bezier(.35,0,.25,1)}:host .mat-progress-bar-secondary{display:none}:host .mat-progress-bar-fill{animation:none;transform-origin:top left;transition:transform 250ms ease,stroke .3s cubic-bezier(.35,0,.25,1)}:host .mat-progress-bar-fill::after{animation:none;content:'';display:inline-block;left:0}:host[mode=query]{transform:rotateZ(180deg)}:host[mode=indeterminate] .mat-progress-bar-fill,:host[mode=query] .mat-progress-bar-fill{transition:none}:host[mode=indeterminate] .mat-progress-bar-primary,:host[mode=query] .mat-progress-bar-primary{animation:mat-progress-bar-primary-indeterminate-translate 2s infinite linear;left:-145.166611%}:host[mode=indeterminate] .mat-progress-bar-primary.mat-progress-bar-fill::after,:host[mode=query] .mat-progress-bar-primary.mat-progress-bar-fill::after{animation:mat-progress-bar-primary-indeterminate-scale 2s infinite linear}:host[mode=indeterminate] .mat-progress-bar-secondary,:host[mode=query] .mat-progress-bar-secondary{animation:mat-progress-bar-secondary-indeterminate-translate 2s infinite linear;left:-54.888891%;display:block}:host[mode=indeterminate] .mat-progress-bar-secondary.mat-progress-bar-fill::after,:host[mode=query] .mat-progress-bar-secondary.mat-progress-bar-fill::after{animation:mat-progress-bar-secondary-indeterminate-scale 2s infinite linear}:host[mode=buffer] .mat-progress-bar-background{animation:mat-progress-bar-background-scroll 250ms infinite linear;display:block}:host-context([dir=rtl]){transform:rotateY(180deg)}@keyframes mat-progress-bar-primary-indeterminate-translate{0%{transform:translateX(0)}20%{animation-timing-function:cubic-bezier(.5,0,.70173,.49582);transform:translateX(0)}59.15%{animation-timing-function:cubic-bezier(.30244,.38135,.55,.95635);transform:translateX(83.67142%)}100%{transform:translateX(200.61106%)}}@keyframes mat-progress-bar-primary-indeterminate-scale{0%{transform:scaleX(.08)}36.65%{animation-timing-function:cubic-bezier(.33473,.12482,.78584,1);transform:scaleX(.08)}69.15%{animation-timing-function:cubic-bezier(.06,.11,.6,1);transform:scaleX(.66148)}100%{transform:scaleX(.08)}}@keyframes mat-progress-bar-secondary-indeterminate-translate{0%{animation-timing-function:cubic-bezier(.15,0,.51506,.40969);transform:translateX(0)}25%{animation-timing-function:cubic-bezier(.31033,.28406,.8,.73371);transform:translateX(37.65191%)}48.35%{animation-timing-function:cubic-bezier(.4,.62704,.6,.90203);transform:translateX(84.38617%)}100%{transform:translateX(160.27778%)}}@keyframes mat-progress-bar-secondary-indeterminate-scale{0%{animation-timing-function:cubic-bezier(.15,0,.51506,.40969);transform:scaleX(.08)}19.15%{animation-timing-function:cubic-bezier(.31033,.28406,.8,.73371);transform:scaleX(.4571)}44.15%{animation-timing-function:cubic-bezier(.4,.62704,.6,.90203);transform:scaleX(.72796)}100%{transform:scaleX(.08)}}@keyframes mat-progress-bar-background-scroll{to{transform:translateX(-10px)}} /*# sourceMappingURL=progress-bar.css.map */ "],
+                template: "<div class=\"mat-progress-bar-background mat-progress-bar-element\"></div><div class=\"mat-progress-bar-buffer mat-progress-bar-element\" [ngStyle]=\"_bufferTransform()\"></div><div class=\"mat-progress-bar-primary mat-progress-bar-fill mat-progress-bar-element\" [ngStyle]=\"_primaryTransform()\"></div><div class=\"mat-progress-bar-secondary mat-progress-bar-fill mat-progress-bar-element\"></div>",
+                styles: [":host{display:block;height:5px;overflow:hidden;position:relative;transform:translateZ(0);transition:opacity 250ms linear;width:100%}:host .mat-progress-bar-element,:host .mat-progress-bar-fill::after{height:100%;position:absolute;width:100%}:host .mat-progress-bar-background{background-repeat:repeat-x;background-size:10px 4px;display:none}:host .mat-progress-bar-buffer{transform-origin:top left;transition:transform 250ms ease}:host .mat-progress-bar-secondary{display:none}:host .mat-progress-bar-fill{animation:none;transform-origin:top left;transition:transform 250ms ease}:host .mat-progress-bar-fill::after{animation:none;content:'';display:inline-block;left:0}:host[mode=query]{transform:rotateZ(180deg)}:host[mode=indeterminate] .mat-progress-bar-fill,:host[mode=query] .mat-progress-bar-fill{transition:none}:host[mode=indeterminate] .mat-progress-bar-primary,:host[mode=query] .mat-progress-bar-primary{animation:mat-progress-bar-primary-indeterminate-translate 2s infinite linear;left:-145.166611%}:host[mode=indeterminate] .mat-progress-bar-primary.mat-progress-bar-fill::after,:host[mode=query] .mat-progress-bar-primary.mat-progress-bar-fill::after{animation:mat-progress-bar-primary-indeterminate-scale 2s infinite linear}:host[mode=indeterminate] .mat-progress-bar-secondary,:host[mode=query] .mat-progress-bar-secondary{animation:mat-progress-bar-secondary-indeterminate-translate 2s infinite linear;left:-54.888891%;display:block}:host[mode=indeterminate] .mat-progress-bar-secondary.mat-progress-bar-fill::after,:host[mode=query] .mat-progress-bar-secondary.mat-progress-bar-fill::after{animation:mat-progress-bar-secondary-indeterminate-scale 2s infinite linear}:host[mode=buffer] .mat-progress-bar-background{animation:mat-progress-bar-background-scroll 250ms infinite linear;display:block}:host-context([dir=rtl]){transform:rotateY(180deg)}@keyframes mat-progress-bar-primary-indeterminate-translate{0%{transform:translateX(0)}20%{animation-timing-function:cubic-bezier(.5,0,.70173,.49582);transform:translateX(0)}59.15%{animation-timing-function:cubic-bezier(.30244,.38135,.55,.95635);transform:translateX(83.67142%)}100%{transform:translateX(200.61106%)}}@keyframes mat-progress-bar-primary-indeterminate-scale{0%{transform:scaleX(.08)}36.65%{animation-timing-function:cubic-bezier(.33473,.12482,.78584,1);transform:scaleX(.08)}69.15%{animation-timing-function:cubic-bezier(.06,.11,.6,1);transform:scaleX(.66148)}100%{transform:scaleX(.08)}}@keyframes mat-progress-bar-secondary-indeterminate-translate{0%{animation-timing-function:cubic-bezier(.15,0,.51506,.40969);transform:translateX(0)}25%{animation-timing-function:cubic-bezier(.31033,.28406,.8,.73371);transform:translateX(37.65191%)}48.35%{animation-timing-function:cubic-bezier(.4,.62704,.6,.90203);transform:translateX(84.38617%)}100%{transform:translateX(160.27778%)}}@keyframes mat-progress-bar-secondary-indeterminate-scale{0%{animation-timing-function:cubic-bezier(.15,0,.51506,.40969);transform:scaleX(.08)}19.15%{animation-timing-function:cubic-bezier(.31033,.28406,.8,.73371);transform:scaleX(.4571)}44.15%{animation-timing-function:cubic-bezier(.4,.62704,.6,.90203);transform:scaleX(.72796)}100%{transform:scaleX(.08)}}@keyframes mat-progress-bar-background-scroll{to{transform:translateX(-10px)}}"],
                 changeDetection: ChangeDetectionStrategy.OnPush,
             },] },
 ];
@@ -13635,9 +13143,9 @@ MdProgressBar.decorators = [
 MdProgressBar.ctorParameters = () => [];
 MdProgressBar.propDecorators = {
     'color': [{ type: Input },],
-    'value': [{ type: Input }, { type: HostBinding, args: ['attr.aria-valuenow',] },],
+    'value': [{ type: Input },],
     'bufferValue': [{ type: Input },],
-    'mode': [{ type: Input }, { type: HostBinding, args: ['attr.mode',] },],
+    'mode': [{ type: Input },],
 };
 /**
  * Clamps a value to be between two numbers, by default 0 and 100.
@@ -13651,21 +13159,11 @@ function clamp$1(v, min = 0, max = 100) {
 }
 
 class MdProgressBarModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdProgressBarModule,
-            providers: []
-        };
-    }
 }
 MdProgressBarModule.decorators = [
     { type: NgModule, args: [{
-                imports: [CommonModule, CompatibilityModule],
-                exports: [MdProgressBar, CompatibilityModule],
+                imports: [CommonModule, MdCommonModule],
+                exports: [MdProgressBar, MdCommonModule],
                 declarations: [MdProgressBar],
             },] },
 ];
@@ -13676,42 +13174,34 @@ MdProgressBarModule.ctorParameters = () => [];
 
 /**
  * \@docs-private
+ * @return {?}
  */
-class MdInputContainerPlaceholderConflictError extends MdError {
-    constructor() {
-        super('Placeholder attribute and child element were both specified.');
-    }
+function getMdInputContainerPlaceholderConflictError() {
+    return Error('Placeholder attribute and child element were both specified.');
 }
 /**
  * \@docs-private
+ * @param {?} type
+ * @return {?}
  */
-class MdInputContainerUnsupportedTypeError extends MdError {
-    /**
-     * @param {?} type
-     */
-    constructor(type) {
-        super(`Input type "${type}" isn't supported by md-input-container.`);
-    }
+function getMdInputContainerUnsupportedTypeError(type) {
+    return Error(`Input type "${type}" isn't supported by md-input-container.`);
 }
 /**
  * \@docs-private
+ * @param {?} align
+ * @return {?}
  */
-class MdInputContainerDuplicatedHintError extends MdError {
-    /**
-     * @param {?} align
-     */
-    constructor(align) {
-        super(`A hint was already declared for 'align="${align}"'.`);
-    }
+function getMdInputContainerDuplicatedHintError(align) {
+    return Error(`A hint was already declared for 'align="${align}"'.`);
 }
 /**
  * \@docs-private
+ * @return {?}
  */
-class MdInputContainerMissingMdInputError extends MdError {
-    constructor() {
-        super('md-input-container must contain an mdInput directive. Did you forget to add mdInput ' +
-            'to the native input or textarea element?');
-    }
+function getMdInputContainerMissingMdInputError() {
+    return Error('md-input-container must contain an mdInput directive. ' +
+        'Did you forget to add mdInput to the native input or textarea element?');
 }
 
 // Invalid input type. Using one of these will throw an MdInputContainerUnsupportedTypeError.
@@ -13727,7 +13217,7 @@ const MD_INPUT_INVALID_TYPES = [
     'reset',
     'submit'
 ];
-let nextUniqueId$1 = 0;
+let nextUniqueId$4 = 0;
 /**
  * The placeholder directive. The content can declare this to implement more
  * complex placeholders.
@@ -13748,17 +13238,21 @@ MdPlaceholder.ctorParameters = () => [];
  */
 class MdHint {
     constructor() {
-        // Whether to align the hint label at the start or end of the line.
+        /**
+         * Whether to align the hint label at the start or end of the line.
+         */
         this.align = 'start';
-        // Unique ID for the hint. Used for the aria-describedby on the input.
-        this.id = `md-input-hint-${nextUniqueId$1++}`;
+        /**
+         * Unique ID for the hint. Used for the aria-describedby on the input.
+         */
+        this.id = `md-input-hint-${nextUniqueId$4++}`;
     }
 }
 MdHint.decorators = [
     { type: Directive, args: [{
                 selector: 'md-hint, mat-hint',
                 host: {
-                    '[class.mat-hint]': 'true',
+                    'class': 'mat-hint',
                     '[class.mat-right]': 'align == "end"',
                     '[attr.id]': 'id',
                 }
@@ -13776,12 +13270,17 @@ MdHint.propDecorators = {
  * Single error message to be shown underneath the input.
  */
 class MdErrorDirective {
+    constructor() {
+        this.id = `md-input-error-${nextUniqueId$4++}`;
+    }
 }
 MdErrorDirective.decorators = [
     { type: Directive, args: [{
                 selector: 'md-error, mat-error',
                 host: {
-                    '[class.mat-input-error]': 'true'
+                    'class': 'mat-input-error',
+                    'role': 'alert',
+                    '[attr.id]': 'id',
                 }
             },] },
 ];
@@ -13789,6 +13288,9 @@ MdErrorDirective.decorators = [
  * @nocollapse
  */
 MdErrorDirective.ctorParameters = () => [];
+MdErrorDirective.propDecorators = {
+    'id': [{ type: Input },],
+};
 /**
  * Prefix to be placed the the front of the input.
  */
@@ -13796,7 +13298,7 @@ class MdPrefix {
 }
 MdPrefix.decorators = [
     { type: Directive, args: [{
-                selector: '[mdPrefix], [matPrefix], [md-prefix]'
+                selector: '[mdPrefix], [matPrefix]'
             },] },
 ];
 /**
@@ -13810,7 +13312,7 @@ class MdSuffix {
 }
 MdSuffix.decorators = [
     { type: Directive, args: [{
-                selector: '[mdSuffix], [matSuffix], [md-suffix]'
+                selector: '[mdSuffix], [matSuffix]'
             },] },
 ];
 /**
@@ -13824,12 +13326,19 @@ class MdInputDirective {
     /**
      * @param {?} _elementRef
      * @param {?} _renderer
+     * @param {?} _platform
      * @param {?} _ngControl
+     * @param {?} _parentForm
+     * @param {?} _parentFormGroup
+     * @param {?} errorOptions
      */
-    constructor(_elementRef, _renderer, _ngControl) {
+    constructor(_elementRef, _renderer, _platform, _ngControl, _parentForm, _parentFormGroup, errorOptions) {
         this._elementRef = _elementRef;
         this._renderer = _renderer;
+        this._platform = _platform;
         this._ngControl = _ngControl;
+        this._parentForm = _parentForm;
+        this._parentFormGroup = _parentFormGroup;
         /**
          * Variables used as cache for getters and setters.
          */
@@ -13837,14 +13346,26 @@ class MdInputDirective {
         this._placeholder = '';
         this._disabled = false;
         this._required = false;
+        this._readonly = false;
+        this._uid = `md-input-${nextUniqueId$4++}`;
+        this._previousNativeValue = this.value;
+        /**
+         * Whether the input is in an error state.
+         */
+        this._isErrorState = false;
         /**
          * Whether the element is focused or not.
          */
         this.focused = false;
         /**
-         * Emits an event when the placeholder changes so that the `md-input-container` can re-validate.
+         * Stream that emits whenever the state of the input changes. This allows for other components
+         * (mostly `md-input-container`) that depend on the properties of `mdInput` to update their view.
          */
-        this._placeholderChange = new EventEmitter();
+        this._stateChanges = new Subject();
+        /**
+         * Placeholder attribute of the element.
+         */
+        this.placeholder = '';
         this._neverEmptyInputTypes = [
             'date',
             'datetime',
@@ -13855,21 +13376,34 @@ class MdInputDirective {
         ].filter(t => getSupportedInputTypes().has(t));
         // Force setter to be called in case id was not specified.
         this.id = this.id;
+        this._errorOptions = errorOptions ? errorOptions : {};
+        this.errorStateMatcher = this._errorOptions.errorStateMatcher || defaultErrorStateMatcher;
+        // On some versions of iOS the caret gets stuck in the wrong place when holding down the delete
+        // key. In order to get around this we need to "jiggle" the caret loose. Since this bug only
+        // exists on iOS, we only bother to install the listener on iOS.
+        if (_platform.IOS) {
+            _renderer.listen(_elementRef.nativeElement, 'keyup', (event) => {
+                let el = event.target;
+                if (!el.value && !el.selectionStart && !el.selectionEnd) {
+                    // Note: Just setting `0, 0` doesn't fix the issue. Setting `1, 1` fixes it for the first
+                    // time that you type text and then hold delete. Toggling to `1, 1` and then back to
+                    // `0, 0` seems to completely fix it.
+                    el.setSelectionRange(1, 1);
+                    el.setSelectionRange(0, 0);
+                }
+            });
+        }
     }
     /**
      * Whether the element is disabled.
      * @return {?}
      */
-    get disabled() {
-        return this._ngControl ? this._ngControl.disabled : this._disabled;
-    }
+    get disabled() { return this._ngControl ? this._ngControl.disabled : this._disabled; }
     /**
      * @param {?} value
      * @return {?}
      */
-    set disabled(value) {
-        this._disabled = coerceBooleanProperty(value);
-    }
+    set disabled(value) { this._disabled = coerceBooleanProperty(value); }
     /**
      * Unique id of the element.
      * @return {?}
@@ -13880,21 +13414,6 @@ class MdInputDirective {
      * @return {?}
      */
     set id(value) { this._id = value || this._uid; }
-    /**
-     * Placeholder attribute of the element.
-     * @return {?}
-     */
-    get placeholder() { return this._placeholder; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set placeholder(value) {
-        if (this._placeholder !== value) {
-            this._placeholder = value;
-            this._placeholderChange.emit(this._placeholder);
-        }
-    }
     /**
      * Whether the element is required.
      * @return {?}
@@ -13921,9 +13440,19 @@ class MdInputDirective {
         // input element. To ensure that bindings for `type` work, we need to sync the setter
         // with the native property. Textarea elements don't support the type property or attribute.
         if (!this._isTextarea() && getSupportedInputTypes().has(this._type)) {
-            this._renderer.setElementProperty(this._elementRef.nativeElement, 'type', this._type);
+            this._renderer.setProperty(this._elementRef.nativeElement, 'type', this._type);
         }
     }
+    /**
+     * Whether the element is readonly.
+     * @return {?}
+     */
+    get readonly() { return this._readonly; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set readonly(value) { this._readonly = coerceBooleanProperty(value); }
     /**
      * The input element's value.
      * @return {?}
@@ -13933,8 +13462,14 @@ class MdInputDirective {
      * @param {?} value
      * @return {?}
      */
-    set value(value) { this._elementRef.nativeElement.value = value; }
+    set value(value) {
+        if (value !== this.value) {
+            this._elementRef.nativeElement.value = value;
+            this._stateChanges.next();
+        }
+    }
     /**
+     * Whether the input is empty.
      * @return {?}
      */
     get empty() {
@@ -13948,20 +13483,57 @@ class MdInputDirective {
     /**
      * @return {?}
      */
-    get _uid() { return this._cachedUid = this._cachedUid || `md-input-${nextUniqueId$1++}`; }
+    ngOnChanges() {
+        this._stateChanges.next();
+    }
+    /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        this._stateChanges.complete();
+    }
+    /**
+     * @return {?}
+     */
+    ngDoCheck() {
+        if (this._ngControl) {
+            // We need to re-evaluate this on every change detection cycle, because there are some
+            // error triggers that we can't subscribe to (e.g. parent form submissions). This means
+            // that whatever logic is in here has to be super lean or we risk destroying the performance.
+            this._updateErrorState();
+        }
+        else {
+            // When the input isn't used together with `@angular/forms`, we need to check manually for
+            // changes to the native `value` property in order to update the floating label.
+            this._dirtyCheckNativeValue();
+        }
+    }
+    /**
+     * @return {?}
+     */
+    _onFocus() {
+        if (!this._readonly) {
+            this.focused = true;
+        }
+    }
     /**
      * Focuses the input element.
      * @return {?}
      */
-    focus() { this._renderer.invokeElementMethod(this._elementRef.nativeElement, 'focus'); }
+    focus() {
+        this._elementRef.nativeElement.focus();
+    }
     /**
+     * Callback for the cases where the focused state of the input changes.
+     * @param {?} isFocused
      * @return {?}
      */
-    _onFocus() { this.focused = true; }
-    /**
-     * @return {?}
-     */
-    _onBlur() { this.focused = false; }
+    _focusChanged(isFocused) {
+        if (isFocused !== this.focused) {
+            this.focused = isFocused;
+            this._stateChanges.next();
+        }
+    }
     /**
      * @return {?}
      */
@@ -13975,23 +13547,54 @@ class MdInputDirective {
         // FormsModule or ReactiveFormsModule, because Angular forms also listens to input events.
     }
     /**
+     * Re-evaluates the error state. This is only relevant with \@angular/forms.
+     * @return {?}
+     */
+    _updateErrorState() {
+        const /** @type {?} */ oldState = this._isErrorState;
+        const /** @type {?} */ control = this._ngControl;
+        const /** @type {?} */ parent = this._parentFormGroup || this._parentForm;
+        const /** @type {?} */ newState = control && this.errorStateMatcher(/** @type {?} */ (control.control), parent);
+        if (newState !== oldState) {
+            this._isErrorState = newState;
+            this._stateChanges.next();
+        }
+    }
+    /**
+     * Does some manual dirty checking on the native input `value` property.
+     * @return {?}
+     */
+    _dirtyCheckNativeValue() {
+        const /** @type {?} */ newValue = this.value;
+        if (this._previousNativeValue !== newValue) {
+            this._previousNativeValue = newValue;
+            this._stateChanges.next();
+        }
+    }
+    /**
      * Make sure the input is a supported type.
      * @return {?}
      */
     _validateType() {
-        if (MD_INPUT_INVALID_TYPES.indexOf(this._type) !== -1) {
-            throw new MdInputContainerUnsupportedTypeError(this._type);
+        if (MD_INPUT_INVALID_TYPES.indexOf(this._type) > -1) {
+            throw getMdInputContainerUnsupportedTypeError(this._type);
         }
     }
     /**
+     * Checks whether the input type isn't one of the types that are never empty.
      * @return {?}
      */
-    _isNeverEmpty() { return this._neverEmptyInputTypes.indexOf(this._type) !== -1; }
+    _isNeverEmpty() {
+        return this._neverEmptyInputTypes.indexOf(this._type) > -1;
+    }
     /**
+     * Checks whether the input is invalid based on the native validation.
      * @return {?}
      */
     _isBadInput() {
-        return ((this._elementRef.nativeElement)).validity.badInput;
+        // The `validity` property won't be present on platform-server.
+        let /** @type {?} */ validity = ((this._elementRef.nativeElement)).validity;
+        return validity && validity.badInput;
     }
     /**
      * Determines if the component host is a textarea. If not recognizable it returns false.
@@ -13999,14 +13602,18 @@ class MdInputDirective {
      */
     _isTextarea() {
         let /** @type {?} */ nativeElement = this._elementRef.nativeElement;
-        return nativeElement ? nativeElement.nodeName.toLowerCase() === 'textarea' : false;
+        // In Universal, we don't have access to `nodeName`, but the same can be achieved with `name`.
+        // Note that this shouldn't be necessary once Angular switches to an API that resembles the
+        // DOM closer.
+        let /** @type {?} */ nodeName = this._platform.isBrowser ? nativeElement.nodeName : nativeElement.name;
+        return nodeName ? nodeName.toLowerCase() === 'textarea' : false;
     }
 }
 MdInputDirective.decorators = [
     { type: Directive, args: [{
                 selector: `input[mdInput], textarea[mdInput], input[matInput], textarea[matInput]`,
                 host: {
-                    '[class.mat-input-element]': 'true',
+                    'class': 'mat-input-element',
                     // Native input properties that are overwritten by Angular inputs need to be synced with
                     // the native input element. Otherwise property bindings for those don't work.
                     '[id]': 'id',
@@ -14014,8 +13621,9 @@ MdInputDirective.decorators = [
                     '[disabled]': 'disabled',
                     '[required]': 'required',
                     '[attr.aria-describedby]': 'ariaDescribedby || null',
-                    '(blur)': '_onBlur()',
-                    '(focus)': '_onFocus()',
+                    '[attr.aria-invalid]': '_isErrorState',
+                    '(blur)': '_focusChanged(false)',
+                    '(focus)': '_focusChanged(true)',
                     '(input)': '_onInput()',
                 }
             },] },
@@ -14025,8 +13633,12 @@ MdInputDirective.decorators = [
  */
 MdInputDirective.ctorParameters = () => [
     { type: ElementRef, },
-    { type: Renderer, },
+    { type: Renderer2, },
+    { type: Platform, },
     { type: NgControl, decorators: [{ type: Optional }, { type: Self },] },
+    { type: NgForm, decorators: [{ type: Optional },] },
+    { type: FormGroupDirective, decorators: [{ type: Optional },] },
+    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [MD_ERROR_GLOBAL_OPTIONS,] },] },
 ];
 MdInputDirective.propDecorators = {
     'disabled': [{ type: Input },],
@@ -14034,7 +13646,8 @@ MdInputDirective.propDecorators = {
     'placeholder': [{ type: Input },],
     'required': [{ type: Input },],
     'type': [{ type: Input },],
-    '_placeholderChange': [{ type: Output },],
+    'readonly': [{ type: Input },],
+    'errorStateMatcher': [{ type: Input },],
 };
 /**
  * Container for text inputs that applies Material Design styling and behavior.
@@ -14043,18 +13656,11 @@ class MdInputContainer {
     /**
      * @param {?} _elementRef
      * @param {?} _changeDetectorRef
-     * @param {?} _parentForm
-     * @param {?} _parentFormGroup
+     * @param {?} placeholderOptions
      */
-    constructor(_elementRef, _changeDetectorRef, _parentForm, _parentFormGroup) {
+    constructor(_elementRef, _changeDetectorRef, placeholderOptions) {
         this._elementRef = _elementRef;
         this._changeDetectorRef = _changeDetectorRef;
-        this._parentForm = _parentForm;
-        this._parentFormGroup = _parentFormGroup;
-        /**
-         * Alignment of the input container's content.
-         */
-        this.align = 'start';
         /**
          * Color of the input divider, based on the theme.
          */
@@ -14065,11 +13671,12 @@ class MdInputContainer {
         this._subscriptAnimationState = '';
         this._hintLabel = '';
         // Unique id for the hint label.
-        this._hintLabelId = `md-input-hint-${nextUniqueId$1++}`;
-        this._floatPlaceholder = 'auto';
+        this._hintLabelId = `md-input-hint-${nextUniqueId$4++}`;
+        this._placeholderOptions = placeholderOptions ? placeholderOptions : {};
+        this.floatPlaceholder = this._placeholderOptions.float || 'auto';
     }
     /**
-     * @deprecated Use color instead.
+     * @deprecated Use `color` instead.
      * @return {?}
      */
     get dividerColor() { return this.color; }
@@ -14079,7 +13686,7 @@ class MdInputContainer {
      */
     set dividerColor(value) { this.color = value; }
     /**
-     * Whether we should hide the required marker.
+     * Whether the required marker should be hidden.
      * @return {?}
      */
     get hideRequiredMarker() { return this._hideRequiredMarker; }
@@ -14123,20 +13730,43 @@ class MdInputContainer {
      * @return {?}
      */
     set floatPlaceholder(value) {
-        this._floatPlaceholder = value || 'auto';
+        if (value !== this._floatPlaceholder) {
+            this._floatPlaceholder = value || this._placeholderOptions.float || 'auto';
+            this._changeDetectorRef.markForCheck();
+        }
     }
     /**
      * @return {?}
      */
     ngAfterContentInit() {
-        if (!this._mdInputChild) {
-            throw new MdInputContainerMissingMdInputError();
+        this._validateInputChild();
+        // Subscribe to changes in the child input state in order to update the container UI.
+        startWith.call(this._mdInputChild._stateChanges, null).subscribe(() => {
+            this._validatePlaceholders();
+            this._syncAriaDescribedby();
+            this._changeDetectorRef.markForCheck();
+        });
+        if (this._mdInputChild._ngControl && this._mdInputChild._ngControl.valueChanges) {
+            this._mdInputChild._ngControl.valueChanges.subscribe(() => {
+                this._changeDetectorRef.markForCheck();
+            });
         }
-        this._processHints();
-        this._validatePlaceholders();
-        // Re-validate when things change.
-        this._hintChildren.changes.subscribe(() => this._processHints());
-        this._mdInputChild._placeholderChange.subscribe(() => this._validatePlaceholders());
+        // Re-validate when the number of hints changes.
+        startWith.call(this._hintChildren.changes, null).subscribe(() => {
+            this._processHints();
+            this._changeDetectorRef.markForCheck();
+        });
+        // Update the aria-described by when the number of errors changes.
+        startWith.call(this._errorChildren.changes, null).subscribe(() => {
+            this._syncAriaDescribedby();
+            this._changeDetectorRef.markForCheck();
+        });
+    }
+    /**
+     * @return {?}
+     */
+    ngAfterContentChecked() {
+        this._validateInputChild();
     }
     /**
      * @return {?}
@@ -14159,30 +13789,24 @@ class MdInputContainer {
      * Whether the input has a placeholder.
      * @return {?}
      */
-    _hasPlaceholder() { return !!(this._mdInputChild.placeholder || this._placeholderChild); }
+    _hasPlaceholder() {
+        return !!(this._mdInputChild.placeholder || this._placeholderChild);
+    }
     /**
      * Focuses the underlying input.
      * @return {?}
      */
-    _focusInput() { this._mdInputChild.focus(); }
-    /**
-     * Whether the input container is in an error state.
-     * @return {?}
-     */
-    _isErrorState() {
-        const /** @type {?} */ control = this._mdInputChild._ngControl;
-        const /** @type {?} */ isInvalid = control && control.invalid;
-        const /** @type {?} */ isTouched = control && control.touched;
-        const /** @type {?} */ isSubmitted = (this._parentFormGroup && this._parentFormGroup.submitted) ||
-            (this._parentForm && this._parentForm.submitted);
-        return !!(isInvalid && (isTouched || isSubmitted));
+    _focusInput() {
+        this._mdInputChild.focus();
     }
     /**
      * Determines whether to display hints or errors.
      * @return {?}
      */
     _getDisplayedMessages() {
-        return (this._errorChildren.length > 0 && this._isErrorState()) ? 'error' : 'hint';
+        let /** @type {?} */ input = this._mdInputChild;
+        return (this._errorChildren && this._errorChildren.length > 0 && input._isErrorState) ?
+            'error' : 'hint';
     }
     /**
      * Ensure that there is only one placeholder (either `input` attribute or child element with the
@@ -14191,7 +13815,7 @@ class MdInputContainer {
      */
     _validatePlaceholders() {
         if (this._mdInputChild.placeholder && this._placeholderChild) {
-            throw new MdInputContainerPlaceholderConflictError();
+            throw getMdInputContainerPlaceholderConflictError();
         }
     }
     /**
@@ -14209,18 +13833,18 @@ class MdInputContainer {
      */
     _validateHints() {
         if (this._hintChildren) {
-            let /** @type {?} */ startHint = null;
-            let /** @type {?} */ endHint = null;
+            let /** @type {?} */ startHint;
+            let /** @type {?} */ endHint;
             this._hintChildren.forEach((hint) => {
                 if (hint.align == 'start') {
                     if (startHint || this.hintLabel) {
-                        throw new MdInputContainerDuplicatedHintError('start');
+                        throw getMdInputContainerDuplicatedHintError('start');
                     }
                     startHint = hint;
                 }
                 else if (hint.align == 'end') {
                     if (endHint) {
-                        throw new MdInputContainerDuplicatedHintError('end');
+                        throw getMdInputContainerDuplicatedHintError('end');
                     }
                     endHint = hint;
                 }
@@ -14233,27 +13857,43 @@ class MdInputContainer {
      * @return {?}
      */
     _syncAriaDescribedby() {
-        let /** @type {?} */ ids = [];
-        let /** @type {?} */ startHint = this._hintChildren ?
-            this._hintChildren.find(hint => hint.align === 'start') : null;
-        let /** @type {?} */ endHint = this._hintChildren ?
-            this._hintChildren.find(hint => hint.align === 'end') : null;
-        if (startHint) {
-            ids.push(startHint.id);
+        if (this._mdInputChild) {
+            let /** @type {?} */ ids = [];
+            if (this._getDisplayedMessages() === 'hint') {
+                let /** @type {?} */ startHint = this._hintChildren ?
+                    this._hintChildren.find(hint => hint.align === 'start') : null;
+                let /** @type {?} */ endHint = this._hintChildren ?
+                    this._hintChildren.find(hint => hint.align === 'end') : null;
+                if (startHint) {
+                    ids.push(startHint.id);
+                }
+                else if (this._hintLabel) {
+                    ids.push(this._hintLabelId);
+                }
+                if (endHint) {
+                    ids.push(endHint.id);
+                }
+            }
+            else if (this._errorChildren) {
+                ids = this._errorChildren.map(mdError => mdError.id);
+            }
+            this._mdInputChild.ariaDescribedby = ids.join(' ');
         }
-        else if (this._hintLabel) {
-            ids.push(this._hintLabelId);
+    }
+    /**
+     * Throws an error if the container's input child was removed.
+     * @return {?}
+     */
+    _validateInputChild() {
+        if (!this._mdInputChild) {
+            throw getMdInputContainerMissingMdInputError();
         }
-        if (endHint) {
-            ids.push(endHint.id);
-        }
-        this._mdInputChild.ariaDescribedby = ids.join(' ');
     }
 }
 MdInputContainer.decorators = [
     { type: Component, args: [{selector: 'md-input-container, mat-input-container',
-                template: "<div class=\"mat-input-wrapper\"> <div class=\"mat-input-table\"> <div class=\"mat-input-prefix\" *ngIf=\"_prefixChildren.length\"> <!-- TODO(andrewseguin): remove [md-prefix] --> <ng-content select=\"[mdPrefix], [matPrefix], [md-prefix]\"></ng-content> </div> <div class=\"mat-input-infix\" [class.mat-end]=\"align == 'end'\"> <ng-content selector=\"input, textarea\"></ng-content> <span class=\"mat-input-placeholder-wrapper\"> <label class=\"mat-input-placeholder\" [attr.for]=\"_mdInputChild.id\" [class.mat-empty]=\"_mdInputChild.empty && !_shouldAlwaysFloat\" [class.mat-float]=\"_canPlaceholderFloat\" [class.mat-accent]=\"color == 'accent'\" [class.mat-warn]=\"color == 'warn'\" *ngIf=\"_hasPlaceholder()\"> <ng-content select=\"md-placeholder, mat-placeholder\"></ng-content> {{_mdInputChild.placeholder}} <span class=\"mat-placeholder-required\" *ngIf=\"!hideRequiredMarker && _mdInputChild.required\">*</span> </label> </span> </div> <div class=\"mat-input-suffix\" *ngIf=\"_suffixChildren.length\"> <!-- TODO(andrewseguin): remove [md-suffix] --> <ng-content select=\"[mdSuffix], [matSuffix], [md-suffix]\"></ng-content> </div> </div> <div class=\"mat-input-underline\" [class.mat-disabled]=\"_mdInputChild.disabled\"> <span class=\"mat-input-ripple\" [class.mat-accent]=\"color == 'accent'\" [class.mat-warn]=\"color == 'warn'\"></span> </div> <div class=\"mat-input-subscript-wrapper\" [ngSwitch]=\"_getDisplayedMessages()\"> <div *ngSwitchCase=\"'error'\" [@transitionMessages]=\"_subscriptAnimationState\"> <ng-content select=\"md-error, mat-error\"></ng-content> </div> <div class=\"mat-input-hint-wrapper\" *ngSwitchCase=\"'hint'\" [@transitionMessages]=\"_subscriptAnimationState\"> <div *ngIf=\"hintLabel\" [id]=\"_hintLabelId\" class=\"mat-hint\">{{hintLabel}}</div> <ng-content select=\"md-hint:not([align='end']), mat-hint:not([align='end'])\"></ng-content> <div class=\"mat-input-hint-spacer\"></div> <ng-content select=\"md-hint[align='end'], mat-hint[align='end']\"></ng-content> </div> </div> </div> ",
-                styles: [".mat-input-container{display:inline-block;position:relative;font-family:Roboto,\"Helvetica Neue\",sans-serif;line-height:normal;text-align:left}[dir=rtl] .mat-input-container{text-align:right}.mat-input-container .mat-icon{width:auto;height:auto;font-size:100%;vertical-align:top}.mat-input-wrapper{margin:1em 0;padding-bottom:6px}.mat-input-table{display:inline-table;flex-flow:column;vertical-align:bottom;width:100%}.mat-input-table>*{display:table-cell}.mat-input-infix{position:relative}.mat-input-element{font:inherit;background:0 0;color:currentColor;border:none;outline:0;padding:0;width:100%;vertical-align:bottom}.mat-end .mat-input-element{text-align:right}[dir=rtl] .mat-end .mat-input-element{text-align:left}.mat-input-element:-moz-ui-invalid{box-shadow:none}.mat-input-element:-webkit-autofill+.mat-input-placeholder-wrapper .mat-float{display:block;transform:translateY(-1.35em) scale(.75);width:133.33333%;transition:none}.mat-input-element::placeholder{color:transparent}.mat-input-element::-moz-placeholder{color:transparent}.mat-input-element::-webkit-input-placeholder{color:transparent}.mat-input-element:-ms-input-placeholder{color:transparent}.mat-input-placeholder{position:absolute;left:0;top:0;font-size:100%;pointer-events:none;z-index:1;padding-top:1em;width:100%;display:none;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;transform:translateY(0);transform-origin:bottom left;transition:transform .4s cubic-bezier(.25,.8,.25,1),color .4s cubic-bezier(.25,.8,.25,1),width .4s cubic-bezier(.25,.8,.25,1)}.mat-input-placeholder.mat-empty{display:block;cursor:text}.mat-focused .mat-input-placeholder.mat-float,.mat-input-placeholder.mat-float:not(.mat-empty){display:block;transform:translateY(-1.35em) scale(.75);width:133.33333%}[dir=rtl] .mat-input-placeholder{transform-origin:bottom right;left:auto;right:0}.mat-input-placeholder:not(.mat-empty){transition:none}.mat-input-placeholder-wrapper{position:absolute;left:0;top:-1em;width:100%;padding-top:1em;overflow:hidden;pointer-events:none;transform:translate3d(0,0,0)}.mat-input-placeholder-wrapper::after{content:'';display:inline-table}.mat-input-underline{position:absolute;height:1px;width:100%;margin-top:4px;border-top-width:1px;border-top-style:solid}.mat-input-underline.mat-disabled{background-image:linear-gradient(to right,rgba(0,0,0,.26) 0,rgba(0,0,0,.26) 33%,transparent 0);background-size:4px 1px;background-repeat:repeat-x;border-top:0;background-position:0}.mat-input-underline .mat-input-ripple{position:absolute;height:2px;z-index:1;top:-1px;width:100%;transform-origin:top;opacity:0;transition:opacity .4s cubic-bezier(.25,.8,.25,1)}.mat-focused .mat-input-underline .mat-input-ripple{opacity:1}.mat-input-subscript-wrapper{position:absolute;font-size:75%;top:100%;width:100%;margin-top:-1.2em;line-height:1.2em;overflow:hidden}.mat-input-hint-wrapper{display:flex}.mat-input-hint-spacer{flex:1 0 10px}.mat-input-error{display:block}.mat-input-prefix,.mat-input-suffix{width:.1px;white-space:nowrap} /*# sourceMappingURL=input-container.css.map */ "],
+                template: "<div class=\"mat-input-wrapper\"><div class=\"mat-input-flex\" #connectionContainer><div class=\"mat-input-prefix\" *ngIf=\"_prefixChildren.length\"><ng-content select=\"[mdPrefix], [matPrefix]\"></ng-content></div><div class=\"mat-input-infix\"><ng-content selector=\"input, textarea\"></ng-content><span class=\"mat-input-placeholder-wrapper\"><label class=\"mat-input-placeholder\" [attr.for]=\"_mdInputChild.id\" [class.mat-empty]=\"_mdInputChild.empty && !_shouldAlwaysFloat\" [class.mat-float]=\"_canPlaceholderFloat\" [class.mat-accent]=\"color == 'accent'\" [class.mat-warn]=\"color == 'warn'\" *ngIf=\"_hasPlaceholder()\"><ng-content select=\"md-placeholder, mat-placeholder\"></ng-content>{{_mdInputChild.placeholder}} <span class=\"mat-placeholder-required\" aria-hidden=\"true\" *ngIf=\"!hideRequiredMarker && _mdInputChild.required\">*</span></label></span></div><div class=\"mat-input-suffix\" *ngIf=\"_suffixChildren.length\"><ng-content select=\"[mdSuffix], [matSuffix]\"></ng-content></div></div><div class=\"mat-input-underline\" #underline [class.mat-disabled]=\"_mdInputChild.disabled\"><span class=\"mat-input-ripple\" [class.mat-accent]=\"color == 'accent'\" [class.mat-warn]=\"color == 'warn'\"></span></div><div class=\"mat-input-subscript-wrapper\" [ngSwitch]=\"_getDisplayedMessages()\"><div *ngSwitchCase=\"'error'\" [@transitionMessages]=\"_subscriptAnimationState\"><ng-content select=\"md-error, mat-error\"></ng-content></div><div class=\"mat-input-hint-wrapper\" *ngSwitchCase=\"'hint'\" [@transitionMessages]=\"_subscriptAnimationState\"><div *ngIf=\"hintLabel\" [id]=\"_hintLabelId\" class=\"mat-hint\">{{hintLabel}}</div><ng-content select=\"md-hint:not([align='end']), mat-hint:not([align='end'])\"></ng-content><div class=\"mat-input-hint-spacer\"></div><ng-content select=\"md-hint[align='end'], mat-hint[align='end']\"></ng-content></div></div></div>",
+                styles: [".mat-input-container{display:inline-block;position:relative;width:200px;text-align:left}[dir=rtl] .mat-input-container{text-align:right}.mat-input-wrapper{position:relative}.mat-input-flex{display:inline-flex;align-items:baseline;width:100%}.mat-input-prefix,.mat-input-suffix{white-space:nowrap;flex:none}.mat-input-prefix .mat-icon,.mat-input-suffix .mat-icon{width:1em}.mat-input-prefix .mat-icon-button,.mat-input-suffix .mat-icon-button{font:inherit;vertical-align:baseline}.mat-input-prefix .mat-icon-button .mat-icon,.mat-input-suffix .mat-icon-button .mat-icon{font-size:inherit}.mat-input-infix{display:block;position:relative;flex:auto}.mat-input-element{font:inherit;background:0 0;color:currentColor;border:none;outline:0;padding:0;margin:0;width:100%;max-width:100%;resize:vertical;vertical-align:bottom}.mat-input-element:-moz-ui-invalid{box-shadow:none}.mat-input-element:-webkit-autofill+.mat-input-placeholder-wrapper .mat-input-placeholder{display:none}.mat-input-element:-webkit-autofill+.mat-input-placeholder-wrapper .mat-float{display:block;transition:none}.mat-input-element::placeholder{color:transparent!important}.mat-input-element::-moz-placeholder{color:transparent!important}.mat-input-element::-webkit-input-placeholder{color:transparent!important}.mat-input-element:-ms-input-placeholder{color:transparent!important}.mat-input-placeholder-wrapper{position:absolute;left:0;box-sizing:content-box;width:100%;height:100%;overflow:hidden;pointer-events:none}textarea.mat-input-element{overflow:auto}.mat-input-placeholder{position:absolute;left:0;font:inherit;pointer-events:none;width:100%;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;transform:perspective(100px);-ms-transform:none;transform-origin:0 0;transition:transform .4s cubic-bezier(.25,.8,.25,1),color .4s cubic-bezier(.25,.8,.25,1),width .4s cubic-bezier(.25,.8,.25,1);display:none}.mat-focused .mat-input-placeholder.mat-float,.mat-input-placeholder.mat-empty,.mat-input-placeholder.mat-float:not(.mat-empty){display:block}[dir=rtl] .mat-input-placeholder{transform-origin:100% 0;left:auto;right:0}.mat-input-placeholder:not(.mat-empty){transition:none}.mat-input-underline{position:absolute;height:1px;width:100%}.mat-input-underline.mat-disabled{background-position:0;background-color:transparent}.mat-input-underline .mat-input-ripple{position:absolute;height:1px;top:0;left:0;width:100%;transform-origin:50%;transform:scaleX(.5);visibility:hidden;transition:background-color .3s cubic-bezier(.55,0,.55,.2)}.mat-focused .mat-input-underline .mat-input-ripple{height:2px}.mat-focused .mat-input-underline .mat-input-ripple,.mat-input-invalid .mat-input-underline .mat-input-ripple{visibility:visible;transform:scaleX(1);transition:transform 150ms linear,background-color .3s cubic-bezier(.55,0,.55,.2)}.mat-input-subscript-wrapper{position:absolute;width:100%;overflow:hidden}.mat-input-placeholder-wrapper .mat-icon,.mat-input-subscript-wrapper .mat-icon{width:1em;height:1em;font-size:inherit;vertical-align:baseline}.mat-input-hint-wrapper{display:flex}.mat-input-hint-spacer{flex:1 0 1em}.mat-input-error{display:block}"],
                 animations: [
                     trigger('transitionMessages', [
                         state('enter', style({ opacity: 1, transform: 'translateY(0%)' })),
@@ -14266,8 +13906,8 @@ MdInputContainer.decorators = [
                 host: {
                     // Remove align attribute to prevent it from interfering with layout.
                     '[attr.align]': 'null',
-                    '[class.mat-input-container]': 'true',
-                    '[class.mat-input-invalid]': '_isErrorState()',
+                    'class': 'mat-input-container',
+                    '[class.mat-input-invalid]': '_mdInputChild._isErrorState',
                     '[class.mat-focused]': '_mdInputChild.focused',
                     '[class.ng-untouched]': '_shouldForward("untouched")',
                     '[class.ng-touched]': '_shouldForward("touched")',
@@ -14279,6 +13919,7 @@ MdInputContainer.decorators = [
                     '(click)': '_focusInput()',
                 },
                 encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
             },] },
 ];
 /**
@@ -14287,16 +13928,16 @@ MdInputContainer.decorators = [
 MdInputContainer.ctorParameters = () => [
     { type: ElementRef, },
     { type: ChangeDetectorRef, },
-    { type: NgForm, decorators: [{ type: Optional },] },
-    { type: FormGroupDirective, decorators: [{ type: Optional },] },
+    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [MD_PLACEHOLDER_GLOBAL_OPTIONS,] },] },
 ];
 MdInputContainer.propDecorators = {
-    'align': [{ type: Input },],
     'color': [{ type: Input },],
     'dividerColor': [{ type: Input },],
     'hideRequiredMarker': [{ type: Input },],
     'hintLabel': [{ type: Input },],
     'floatPlaceholder': [{ type: Input },],
+    'underlineRef': [{ type: ViewChild, args: ['underline',] },],
+    '_connectionContainerRef': [{ type: ViewChild, args: ['connectionContainer',] },],
     '_mdInputChild': [{ type: ContentChild, args: [MdInputDirective,] },],
     '_placeholderChild': [{ type: ContentChild, args: [MdPlaceholder,] },],
     '_errorChildren': [{ type: ContentChildren, args: [MdErrorDirective,] },],
@@ -14311,12 +13952,17 @@ MdInputContainer.propDecorators = {
 class MdTextareaAutosize {
     /**
      * @param {?} _elementRef
+     * @param {?} _platform
+     * @param {?} formControl
      */
-    constructor(_elementRef) {
+    constructor(_elementRef, _platform, formControl) {
         this._elementRef = _elementRef;
+        this._platform = _platform;
+        if (formControl && formControl.valueChanges) {
+            formControl.valueChanges.subscribe(() => this.resizeToFitContent());
+        }
     }
     /**
-     * @deprecated Use mdAutosizeMinRows
      * @return {?}
      */
     get minRows() { return this._minRows; }
@@ -14329,7 +13975,6 @@ class MdTextareaAutosize {
         this._setMinHeight();
     }
     /**
-     * @deprecated Use mdAutosizeMaxRows
      * @return {?}
      */
     get maxRows() { return this._maxRows; }
@@ -14342,25 +13987,23 @@ class MdTextareaAutosize {
         this._setMaxHeight();
     }
     /**
-     * Minimum number of rows for this textarea.
      * @return {?}
      */
-    get mdAutosizeMinRows() { return this.minRows; }
+    get _matAutosizeMinRows() { return this.minRows; }
     /**
-     * @param {?} value
+     * @param {?} v
      * @return {?}
      */
-    set mdAutosizeMinRows(value) { this.minRows = value; }
+    set _matAutosizeMinRows(v) { this.minRows = v; }
     /**
-     * Maximum number of rows for this textarea.
      * @return {?}
      */
-    get mdAutosizeMaxRows() { return this.maxRows; }
+    get _matAutosizeMaxRows() { return this.maxRows; }
     /**
-     * @param {?} value
+     * @param {?} v
      * @return {?}
      */
-    set mdAutosizeMaxRows(value) { this.maxRows = value; }
+    set _matAutosizeMaxRows(v) { this.maxRows = v; }
     /**
      * Sets the minimum height of the textarea as determined by minRows.
      * @return {?}
@@ -14387,8 +14030,10 @@ class MdTextareaAutosize {
      * @return {?}
      */
     ngAfterViewInit() {
-        this._cacheTextareaLineHeight();
-        this.resizeToFitContent();
+        if (this._platform.isBrowser) {
+            this._cacheTextareaLineHeight();
+            this.resizeToFitContent();
+        }
     }
     /**
      * Sets a style property on the textarea element.
@@ -14423,9 +14068,15 @@ class MdTextareaAutosize {
         textareaClone.style.height = '';
         textareaClone.style.minHeight = '';
         textareaClone.style.maxHeight = '';
-        textarea.parentNode.appendChild(textareaClone);
-        this._cachedLineHeight = textareaClone.clientHeight;
-        textarea.parentNode.removeChild(textareaClone);
+        // In Firefox it happens that textarea elements are always bigger than the specified amount
+        // of rows. This is because Firefox tries to add extra space for the horizontal scrollbar.
+        // As a workaround that removes the extra space for the scrollbar, we can just set overflow
+        // to hidden. This ensures that there is no invalid calculation of the line height.
+        // See Firefox bug report: https://bugzilla.mozilla.org/show_bug.cgi?id=33654
+        textareaClone.style.overflow = 'hidden'; /** @type {?} */
+        ((textarea.parentNode)).appendChild(textareaClone);
+        this._cachedLineHeight = textareaClone.clientHeight; /** @type {?} */
+        ((textarea.parentNode)).removeChild(textareaClone);
         // Min and max heights have to be re-calculated if the cached line height changes
         this._setMinHeight();
         this._setMaxHeight();
@@ -14435,11 +14086,18 @@ class MdTextareaAutosize {
      * @return {?}
      */
     resizeToFitContent() {
-        let /** @type {?} */ textarea = (this._elementRef.nativeElement);
+        const /** @type {?} */ textarea = (this._elementRef.nativeElement);
+        if (textarea.value === this._previousValue) {
+            return;
+        }
         // Reset the textarea height to auto in order to shrink back to its default size.
+        // Also temporarily force overflow:hidden, so scroll bars do not interfere with calculations.
         textarea.style.height = 'auto';
+        textarea.style.overflow = 'hidden';
         // Use the scrollHeight to know how large the textarea *would* be if fit its entire value.
         textarea.style.height = `${textarea.scrollHeight}px`;
+        textarea.style.overflow = '';
+        this._previousValue = textarea.value;
     }
 }
 MdTextareaAutosize.decorators = [
@@ -14449,6 +14107,9 @@ MdTextareaAutosize.decorators = [
                 exportAs: 'mdTextareaAutosize',
                 host: {
                     '(input)': 'resizeToFitContent()',
+                    // Textarea elements that have the directive applied should have a single row by default.
+                    // Browsers normally show two rows by default and therefore this limits the minRows binding.
+                    'rows': '1',
                 },
             },] },
 ];
@@ -14457,25 +14118,17 @@ MdTextareaAutosize.decorators = [
  */
 MdTextareaAutosize.ctorParameters = () => [
     { type: ElementRef, },
+    { type: Platform, },
+    { type: NgControl, decorators: [{ type: Optional }, { type: Self },] },
 ];
 MdTextareaAutosize.propDecorators = {
-    'minRows': [{ type: Input },],
-    'maxRows': [{ type: Input },],
-    'mdAutosizeMinRows': [{ type: Input },],
-    'mdAutosizeMaxRows': [{ type: Input },],
+    'minRows': [{ type: Input, args: ['mdAutosizeMinRows',] },],
+    'maxRows': [{ type: Input, args: ['mdAutosizeMaxRows',] },],
+    '_matAutosizeMinRows': [{ type: Input, args: ['matAutosizeMaxRows',] },],
+    '_matAutosizeMaxRows': [{ type: Input, args: ['matAutosizeMaxRows',] },],
 };
 
 class MdInputModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdInputModule,
-            providers: [],
-        };
-    }
 }
 MdInputModule.decorators = [
     { type: NgModule, args: [{
@@ -14491,7 +14144,6 @@ MdInputModule.decorators = [
                 ],
                 imports: [
                     CommonModule,
-                    FormsModule,
                     PlatformModule,
                 ],
                 exports: [
@@ -14512,6 +14164,35 @@ MdInputModule.decorators = [
 MdInputModule.ctorParameters = () => [];
 
 /**
+ * Custom injector to be used when providing custom
+ * injection tokens to components inside a portal.
+ * \@docs-private
+ */
+class PortalInjector {
+    /**
+     * @param {?} _parentInjector
+     * @param {?} _customTokens
+     */
+    constructor(_parentInjector, _customTokens) {
+        this._parentInjector = _parentInjector;
+        this._customTokens = _customTokens;
+    }
+    /**
+     * @param {?} token
+     * @param {?=} notFoundValue
+     * @return {?}
+     */
+    get(token, notFoundValue) {
+        const /** @type {?} */ value = this._customTokens.get(token);
+        if (typeof value !== 'undefined') {
+            return value;
+        }
+        return this._parentInjector.get(token, notFoundValue);
+    }
+}
+
+const MD_SNACK_BAR_DATA = new InjectionToken('MdSnackBarData');
+/**
  * Configuration used when opening a snack-bar.
  */
 class MdSnackBarConfig {
@@ -14525,13 +14206,17 @@ class MdSnackBarConfig {
          */
         this.announcementMessage = '';
         /**
-         * The view container to place the overlay for the snack bar into.
-         */
-        this.viewContainerRef = null;
-        /**
          * The length of time in milliseconds to wait before automatically dismissing the snack bar.
          */
         this.duration = 0;
+        /**
+         * Text layout direction for the snack bar.
+         */
+        this.direction = 'ltr';
+        /**
+         * Data being injected into the child component.
+         */
+        this.data = null;
     }
 }
 
@@ -14540,33 +14225,27 @@ class MdSnackBarConfig {
  */
 class MdSnackBarRef {
     /**
-     * @param {?} instance
      * @param {?} containerInstance
      * @param {?} _overlayRef
      */
-    constructor(instance, containerInstance, _overlayRef) {
+    constructor(containerInstance, _overlayRef) {
         this._overlayRef = _overlayRef;
         /**
          * Subject for notifying the user that the snack bar has closed.
          */
         this._afterClosed = new Subject();
         /**
+         * Subject for notifying the user that the snack bar has opened and appeared.
+         */
+        this._afterOpened = new Subject();
+        /**
          * Subject for notifying the user that the snack bar action was called.
          */
         this._onAction = new Subject();
-        // Sets the readonly instance of the snack bar content component.
-        this._instance = instance;
         this.containerInstance = containerInstance;
         // Dismiss snackbar on action.
         this.onAction().subscribe(() => this.dismiss());
         containerInstance._onExit().subscribe(() => this._finishDismiss());
-    }
-    /**
-     * The instance of the component making up the content of the snack bar.
-     * @return {?}
-     */
-    get instance() {
-        return this._instance;
     }
     /**
      * Dismisses the snack bar.
@@ -14576,16 +14255,25 @@ class MdSnackBarRef {
         if (!this._afterClosed.closed) {
             this.containerInstance.exit();
         }
+        clearTimeout(this._durationTimeoutId);
     }
     /**
      * Marks the snackbar action clicked.
      * @return {?}
      */
-    _action() {
+    closeWithAction() {
         if (!this._onAction.closed) {
             this._onAction.next();
             this._onAction.complete();
         }
+    }
+    /**
+     * Dismisses the snack bar after some duration
+     * @param {?} duration
+     * @return {?}
+     */
+    _dismissAfter(duration) {
+        this._durationTimeoutId = setTimeout(() => this.dismiss(), duration);
     }
     /**
      * Marks the snackbar as opened
@@ -14629,16 +14317,6 @@ class MdSnackBarRef {
     }
 }
 
-/**
- * Error that is thrown when attempting to attach a snack bar that is already attached.
- * \@docs-private
- */
-class MdSnackBarContentAlreadyAttached extends MdError {
-    constructor() {
-        super('Attempting to attach snack bar content after content is already attached');
-    }
-}
-
 // TODO(jelbourn): we can't use constants from animation.ts here because you can't use
 // a text interpolation in anything that is analyzed statically with ngc (for AoT compile).
 const SHOW_ANIMATION = '225ms cubic-bezier(0.4,0.0,1,1)';
@@ -14679,23 +14357,22 @@ class MdSnackBarContainer extends BasePortalHost {
      */
     attachComponentPortal(portal) {
         if (this._portalHost.hasAttached()) {
-            throw new MdSnackBarContentAlreadyAttached();
+            throw Error('Attempting to attach snack bar content after content is already attached');
         }
         if (this.snackBarConfig.extraClasses) {
             // Not the most efficient way of adding classes, but the renderer doesn't allow us
             // to pass in an array or a space-separated list.
             for (let /** @type {?} */ cssClass of this.snackBarConfig.extraClasses) {
-                this._renderer.setElementClass(this._elementRef.nativeElement, cssClass, true);
+                this._renderer.addClass(this._elementRef.nativeElement, cssClass);
             }
         }
         return this._portalHost.attachComponentPortal(portal);
     }
     /**
      * Attach a template portal as content to this snack bar container.
-     * @param {?} portal
      * @return {?}
      */
-    attachTemplatePortal(portal) {
+    attachTemplatePortal() {
         throw Error('Not yet implemented');
     }
     /**
@@ -14708,9 +14385,12 @@ class MdSnackBarContainer extends BasePortalHost {
             this._completeExit();
         }
         if (event.toState === 'visible') {
+            // Note: we shouldn't use `this` inside the zone callback,
+            // because it can cause a memory leak.
+            const /** @type {?} */ onEnter = this.onEnter;
             this._ngZone.run(() => {
-                this.onEnter.next();
-                this.onEnter.complete();
+                onEnter.next();
+                onEnter.complete();
             });
         }
     }
@@ -14757,16 +14437,20 @@ class MdSnackBarContainer extends BasePortalHost {
      * @return {?}
      */
     _completeExit() {
-        this._ngZone.onMicrotaskEmpty.first().subscribe(() => {
-            this.onExit.next();
-            this.onExit.complete();
+        // Note: we shouldn't use `this` inside the zone callback,
+        // because it can cause a memory leak.
+        const /** @type {?} */ onExit = this.onExit;
+        first.call(this._ngZone.onMicrotaskEmpty).subscribe(() => {
+            onExit.next();
+            onExit.complete();
         });
     }
 }
 MdSnackBarContainer.decorators = [
     { type: Component, args: [{selector: 'snack-bar-container',
-                template: "<ng-template cdkPortalHost></ng-template> ",
-                styles: [":host{box-shadow:0 3px 5px -1px rgba(0,0,0,.2),0 6px 10px 0 rgba(0,0,0,.14),0 1px 18px 0 rgba(0,0,0,.12);background:#323232;border-radius:2px;box-sizing:content-box;display:block;max-width:568px;min-width:288px;padding:14px 24px;transform:translateY(100%)}@media screen and (-ms-high-contrast:active){:host{border:solid 1px}} /*# sourceMappingURL=snack-bar-container.css.map */ "],
+                template: "<ng-template cdkPortalHost></ng-template>",
+                styles: [":host{box-shadow:0 3px 5px -1px rgba(0,0,0,.2),0 6px 10px 0 rgba(0,0,0,.14),0 1px 18px 0 rgba(0,0,0,.12);background:#323232;border-radius:2px;box-sizing:content-box;display:block;max-width:568px;min-width:288px;padding:14px 24px;transform:translateY(100%)}@media screen and (-ms-high-contrast:active){:host{border:solid 1px}}"],
+                changeDetection: ChangeDetectionStrategy.OnPush,
                 host: {
                     'role': 'alert',
                     '[@state]': 'animationState',
@@ -14774,6 +14458,7 @@ MdSnackBarContainer.decorators = [
                 },
                 animations: [
                     trigger('state', [
+                        state('void', style({ transform: 'translateY(100%)' })),
                         state('initial', style({ transform: 'translateY(100%)' })),
                         state('visible', style({ transform: 'translateY(0%)' })),
                         state('complete', style({ transform: 'translateY(100%)' })),
@@ -14788,7 +14473,7 @@ MdSnackBarContainer.decorators = [
  */
 MdSnackBarContainer.ctorParameters = () => [
     { type: NgZone, },
-    { type: Renderer, },
+    { type: Renderer2, },
     { type: ElementRef, },
 ];
 MdSnackBarContainer.propDecorators = {
@@ -14801,55 +14486,46 @@ MdSnackBarContainer.propDecorators = {
  */
 class SimpleSnackBar {
     /**
-     * Dismisses the snack bar.
+     * @param {?} snackBarRef
+     * @param {?} data
+     */
+    constructor(snackBarRef, data) {
+        this.snackBarRef = snackBarRef;
+        this.data = data;
+    }
+    /**
+     * Performs the action on the snack bar.
      * @return {?}
      */
-    dismiss() {
-        this.snackBarRef._action();
+    action() {
+        this.snackBarRef.closeWithAction();
     }
     /**
      * If the action button should be shown.
      * @return {?}
      */
-    get hasAction() { return !!this.action; }
+    get hasAction() {
+        return !!this.data.action;
+    }
 }
 SimpleSnackBar.decorators = [
     { type: Component, args: [{selector: 'simple-snack-bar',
-                template: "{{message}} <button class=\"mat-simple-snackbar-action\" *ngIf=\"hasAction\" (click)=\"dismiss()\">{{action}}</button> ",
-                styles: [":host{display:flex;justify-content:space-between;color:#fff;line-height:20px;font-size:14px;font-family:Roboto,\"Helvetica Neue\",sans-serif}.mat-simple-snackbar-action{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;cursor:pointer;outline:0;border:none;background:0 0;text-transform:uppercase;color:inherit;line-height:1;flex-shrink:0;margin-left:48px;font-family:inherit;font-size:inherit;font-weight:600} /*# sourceMappingURL=simple-snack-bar.css.map */ "],
+                template: "{{data.message}} <button class=\"mat-simple-snackbar-action\" *ngIf=\"hasAction\" (click)=\"action()\">{{data.action}}</button>",
+                styles: [".mat-simple-snackbar{display:flex;justify-content:space-between;color:#fff;line-height:20px}.mat-simple-snackbar-action{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;cursor:pointer;outline:0;border:none;-webkit-tap-highlight-color:transparent;background:0 0;color:inherit;flex-shrink:0;margin-left:48px}[dir=rtl] .mat-simple-snackbar-action{margin-right:48px;margin-left:0}"],
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
                 host: {
-                    '[class.mat-simple-snackbar]': 'true',
+                    'class': 'mat-simple-snackbar',
                 }
             },] },
 ];
 /**
  * @nocollapse
  */
-SimpleSnackBar.ctorParameters = () => [];
-
-/**
- * Extends an object with the *enumerable* and *own* properties of one or more source objects,
- * similar to Object.assign.
- *
- * @param {?} dest The object which will have properties copied to it.
- * @param {...?} sources The source objects from which properties will be copied.
- * @return {?}
- */
-function extendObject(dest, ...sources) {
-    if (dest == null) {
-        throw TypeError('Cannot convert undefined or null to object');
-    }
-    for (let /** @type {?} */ source of sources) {
-        if (source != null) {
-            for (let /** @type {?} */ key in source) {
-                if (source.hasOwnProperty(key)) {
-                    dest[key] = source[key];
-                }
-            }
-        }
-    }
-    return dest;
-}
+SimpleSnackBar.ctorParameters = () => [
+    { type: MdSnackBarRef, },
+    { type: undefined, decorators: [{ type: Inject, args: [MD_SNACK_BAR_DATA,] },] },
+];
 
 /**
  * Service to dispatch Material Design snack bar messages.
@@ -14858,20 +14534,28 @@ class MdSnackBar {
     /**
      * @param {?} _overlay
      * @param {?} _live
+     * @param {?} _injector
      * @param {?} _parentSnackBar
      */
-    constructor(_overlay, _live, _parentSnackBar) {
+    constructor(_overlay, _live, _injector, _parentSnackBar) {
         this._overlay = _overlay;
         this._live = _live;
+        this._injector = _injector;
         this._parentSnackBar = _parentSnackBar;
+        /**
+         * Reference to the current snack bar in the view *at this level* (in the Angular injector tree).
+         * If there is a parent snack-bar service, all operations should delegate to that parent
+         * via `_openedSnackBarRef`.
+         */
+        this._snackBarRefAtThisLevel = null;
     }
     /**
      * Reference to the currently opened snackbar at *any* level.
      * @return {?}
      */
     get _openedSnackBarRef() {
-        return this._parentSnackBar ?
-            this._parentSnackBar._openedSnackBarRef : this._snackBarRefAtThisLevel;
+        const /** @type {?} */ parent = this._parentSnackBar;
+        return parent ? parent._openedSnackBarRef : this._snackBarRefAtThisLevel;
     }
     /**
      * @param {?} value
@@ -14895,10 +14579,8 @@ class MdSnackBar {
      * @return {?}
      */
     openFromComponent(component, config) {
-        config = _applyConfigDefaults(config);
-        let /** @type {?} */ overlayRef = this._createOverlay();
-        let /** @type {?} */ snackBarContainer = this._attachSnackBarContainer(overlayRef, config);
-        let /** @type {?} */ snackBarRef = this._attachSnackbarContent(component, snackBarContainer, overlayRef);
+        const /** @type {?} */ _config = _applyConfigDefaults(config);
+        const /** @type {?} */ snackBarRef = this._attach(component, _config);
         // When the snackbar is dismissed, clear the reference to it.
         snackBarRef.afterDismissed().subscribe(() => {
             // Clear the snackbar ref if it hasn't already been replaced by a newer snackbar.
@@ -14906,25 +14588,25 @@ class MdSnackBar {
                 this._openedSnackBarRef = null;
             }
         });
-        // If a snack bar is already in view, dismiss it and enter the new snack bar after exit
-        // animation is complete.
         if (this._openedSnackBarRef) {
+            // If a snack bar is already in view, dismiss it and enter the
+            // new snack bar after exit animation is complete.
             this._openedSnackBarRef.afterDismissed().subscribe(() => {
                 snackBarRef.containerInstance.enter();
             });
             this._openedSnackBarRef.dismiss();
-            // If no snack bar is in view, enter the new snack bar.
         }
         else {
+            // If no snack bar is in view, enter the new snack bar.
             snackBarRef.containerInstance.enter();
         }
         // If a dismiss timeout is provided, set up dismiss based on after the snackbar is opened.
-        if (config.duration > 0) {
-            snackBarRef.afterOpened().subscribe(() => {
-                setTimeout(() => snackBarRef.dismiss(), config.duration);
-            });
+        if (_config.duration && _config.duration > 0) {
+            snackBarRef.afterOpened().subscribe(() => snackBarRef._dismissAfter(/** @type {?} */ ((((_config)).duration))));
         }
-        this._live.announce(config.announcementMessage, config.politeness);
+        if (_config.announcementMessage) {
+            this._live.announce(_config.announcementMessage, _config.politeness);
+        }
         this._openedSnackBarRef = snackBarRef;
         return this._openedSnackBarRef;
     }
@@ -14935,13 +14617,13 @@ class MdSnackBar {
      * @param {?=} config Additional configuration options for the snackbar.
      * @return {?}
      */
-    open(message, action = '', config = {}) {
-        config.announcementMessage = message;
-        let /** @type {?} */ simpleSnackBarRef = this.openFromComponent(SimpleSnackBar, config);
-        simpleSnackBarRef.instance.snackBarRef = simpleSnackBarRef;
-        simpleSnackBarRef.instance.message = message;
-        simpleSnackBarRef.instance.action = action;
-        return simpleSnackBarRef;
+    open(message, action = '', config) {
+        const /** @type {?} */ _config = _applyConfigDefaults(config);
+        // Since the user doesn't have access to the component, we can
+        // override the data to pass in our own message and action.
+        _config.data = { message, action };
+        _config.announcementMessage = message;
+        return this.openFromComponent(SimpleSnackBar, _config);
     }
     /**
      * Dismisses the currently-visible snack bar.
@@ -14959,8 +14641,8 @@ class MdSnackBar {
      * @return {?}
      */
     _attachSnackBarContainer(overlayRef, config) {
-        let /** @type {?} */ containerPortal = new ComponentPortal(MdSnackBarContainer, config.viewContainerRef);
-        let /** @type {?} */ containerRef = overlayRef.attach(containerPortal);
+        const /** @type {?} */ containerPortal = new ComponentPortal(MdSnackBarContainer, config.viewContainerRef);
+        const /** @type {?} */ containerRef = overlayRef.attach(containerPortal);
         containerRef.instance.snackBarConfig = config;
         return containerRef.instance;
     }
@@ -14968,25 +14650,44 @@ class MdSnackBar {
      * Places a new component as the content of the snack bar container.
      * @template T
      * @param {?} component
-     * @param {?} container
-     * @param {?} overlayRef
+     * @param {?} config
      * @return {?}
      */
-    _attachSnackbarContent(component, container, overlayRef) {
-        let /** @type {?} */ portal = new ComponentPortal(component);
-        let /** @type {?} */ contentRef = container.attachComponentPortal(portal);
-        return new MdSnackBarRef(contentRef.instance, container, overlayRef);
+    _attach(component, config) {
+        const /** @type {?} */ overlayRef = this._createOverlay(config);
+        const /** @type {?} */ container = this._attachSnackBarContainer(overlayRef, config);
+        const /** @type {?} */ snackBarRef = new MdSnackBarRef(container, overlayRef);
+        const /** @type {?} */ injector = this._createInjector(config, snackBarRef);
+        const /** @type {?} */ portal = new ComponentPortal(component, undefined, injector);
+        const /** @type {?} */ contentRef = container.attachComponentPortal(portal);
+        // We can't pass this via the injector, because the injector is created earlier.
+        snackBarRef.instance = contentRef.instance;
+        return snackBarRef;
     }
     /**
      * Creates a new overlay and places it in the correct location.
+     * @param {?} config The user-specified snack bar config.
      * @return {?}
      */
-    _createOverlay() {
-        let /** @type {?} */ state$$1 = new OverlayState();
-        state$$1.positionStrategy = this._overlay.position().global()
-            .centerHorizontally()
-            .bottom('0');
+    _createOverlay(config) {
+        const /** @type {?} */ state$$1 = new OverlayState();
+        state$$1.direction = config.direction;
+        state$$1.positionStrategy = this._overlay.position().global().centerHorizontally().bottom('0');
         return this._overlay.create(state$$1);
+    }
+    /**
+     * Creates an injector to be used inside of a snack bar component.
+     * @template T
+     * @param {?} config Config that was used to create the snack bar.
+     * @param {?} snackBarRef Reference to the snack bar.
+     * @return {?}
+     */
+    _createInjector(config, snackBarRef) {
+        const /** @type {?} */ userInjector = config && config.viewContainerRef && config.viewContainerRef.injector;
+        const /** @type {?} */ injectionTokens = new WeakMap();
+        injectionTokens.set(MdSnackBarRef, snackBarRef);
+        injectionTokens.set(MD_SNACK_BAR_DATA, config.data);
+        return new PortalInjector(userInjector || this._injector, injectionTokens);
     }
 }
 MdSnackBar.decorators = [
@@ -14998,11 +14699,12 @@ MdSnackBar.decorators = [
 MdSnackBar.ctorParameters = () => [
     { type: Overlay, },
     { type: LiveAnnouncer, },
+    { type: Injector, },
     { type: MdSnackBar, decorators: [{ type: Optional }, { type: SkipSelf },] },
 ];
 /**
  * Applies default options to the snackbar config.
- * @param {?} config The configuration to which the defaults will be applied.
+ * @param {?=} config The configuration to which the defaults will be applied.
  * @return {?} The new configuration object with defaults applied.
  */
 function _applyConfigDefaults(config) {
@@ -15010,16 +14712,6 @@ function _applyConfigDefaults(config) {
 }
 
 class MdSnackBarModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdSnackBarModule,
-            providers: []
-        };
-    }
 }
 MdSnackBarModule.decorators = [
     { type: NgModule, args: [{
@@ -15027,9 +14719,9 @@ MdSnackBarModule.decorators = [
                     OverlayModule,
                     PortalModule,
                     CommonModule,
-                    CompatibilityModule,
+                    MdCommonModule,
                 ],
-                exports: [MdSnackBarContainer, CompatibilityModule],
+                exports: [MdSnackBarContainer, MdCommonModule],
                 declarations: [MdSnackBarContainer, SimpleSnackBar],
                 entryComponents: [MdSnackBarContainer, SimpleSnackBar],
                 providers: [MdSnackBar, LIVE_ANNOUNCER_PROVIDER]
@@ -15041,9 +14733,13 @@ MdSnackBarModule.decorators = [
 MdSnackBarModule.ctorParameters = () => [];
 
 /**
+ * Workaround for https://github.com/angular/angular/issues/17849
+ */
+const _MdTabLabelBaseClass = TemplatePortalDirective;
+/**
  * Used to flag tab labels for use with the portal directive
  */
-class MdTabLabel extends TemplatePortalDirective {
+class MdTabLabel extends _MdTabLabelBaseClass {
     /**
      * @param {?} templateRef
      * @param {?} viewContainerRef
@@ -15054,7 +14750,7 @@ class MdTabLabel extends TemplatePortalDirective {
 }
 MdTabLabel.decorators = [
     { type: Directive, args: [{
-                selector: '[md-tab-label], [mat-tab-label]',
+                selector: '[md-tab-label], [mat-tab-label], [mdTabLabel], [matTabLabel]',
             },] },
 ];
 /**
@@ -15065,11 +14761,18 @@ MdTabLabel.ctorParameters = () => [
     { type: ViewContainerRef, },
 ];
 
-class MdTab {
+/**
+ * \@docs-private
+ */
+class MdTabBase {
+}
+const _MdTabMixinBase = mixinDisabled(MdTabBase);
+class MdTab extends _MdTabMixinBase {
     /**
      * @param {?} _viewContainerRef
      */
     constructor(_viewContainerRef) {
+        super();
         this._viewContainerRef = _viewContainerRef;
         /**
          * The plain text label for the tab, used when there is no template label.
@@ -15080,6 +14783,10 @@ class MdTab {
          */
         this._contentPortal = null;
         /**
+         * Emits whenever the label changes.
+         */
+        this._labelChange = new Subject();
+        /**
          * The relatively indexed position where 0 represents the center, negative is left, and positive
          * represents the right.
          */
@@ -15089,22 +14796,26 @@ class MdTab {
          * was already a selected tab. Provides context of what position the tab should originate from.
          */
         this.origin = null;
-        this._disabled = false;
     }
     /**
      * @return {?}
      */
     get content() { return this._contentPortal; }
     /**
-     * Whether the tab is disabled
-     * @param {?} value
+     * @param {?} changes
      * @return {?}
      */
-    set disabled(value) { this._disabled = coerceBooleanProperty(value); }
+    ngOnChanges(changes) {
+        if (changes.hasOwnProperty('textLabel')) {
+            this._labelChange.next();
+        }
+    }
     /**
      * @return {?}
      */
-    get disabled() { return this._disabled; }
+    ngOnDestroy() {
+        this._labelChange.complete();
+    }
     /**
      * @return {?}
      */
@@ -15114,7 +14825,9 @@ class MdTab {
 }
 MdTab.decorators = [
     { type: Component, args: [{selector: 'md-tab, mat-tab',
-                template: "<!-- Create a template for the content of the <md-tab> so that we can grab a reference to this TemplateRef and use it in a Portal to render the tab content in the appropriate place in the tab-group. --> <ng-template><ng-content></ng-content></ng-template> ",
+                template: "<ng-template><ng-content></ng-content></ng-template>",
+                inputs: ['disabled'],
+                changeDetection: ChangeDetectionStrategy.OnPush,
             },] },
 ];
 /**
@@ -15127,29 +14840,45 @@ MdTab.propDecorators = {
     'templateLabel': [{ type: ContentChild, args: [MdTabLabel,] },],
     '_content': [{ type: ViewChild, args: [TemplateRef,] },],
     'textLabel': [{ type: Input, args: ['label',] },],
-    'disabled': [{ type: Input },],
 };
 
 /**
  * Used to generate unique ID's for each tab component
  */
-let nextId$2 = 0;
+let nextId = 0;
 /**
  * A simple change event emitted on focus or selection changes.
  */
 class MdTabChangeEvent {
 }
 /**
+ * \@docs-private
+ */
+class MdTabGroupBase {
+    /**
+     * @param {?} _renderer
+     * @param {?} _elementRef
+     */
+    constructor(_renderer, _elementRef) {
+        this._renderer = _renderer;
+        this._elementRef = _elementRef;
+    }
+}
+const _MdTabGroupMixinBase = mixinColor(mixinDisableRipple(MdTabGroupBase), 'primary');
+/**
  * Material design tab-group component.  Supports basic tab pairs (label + content) and includes
  * animated ink-bar, keyboard navigation, and screen reader.
  * See: https://www.google.com/design/spec/components/tabs.html
  */
-class MdTabGroup {
+class MdTabGroup extends _MdTabGroupMixinBase {
     /**
      * @param {?} _renderer
+     * @param {?} elementRef
+     * @param {?} _changeDetectorRef
      */
-    constructor(_renderer) {
-        this._renderer = _renderer;
+    constructor(_renderer, elementRef, _changeDetectorRef) {
+        super(_renderer, elementRef);
+        this._changeDetectorRef = _changeDetectorRef;
         /**
          * Whether this component has been initialized.
          */
@@ -15161,10 +14890,7 @@ class MdTabGroup {
         /**
          * Snapshot of the height of the tab body wrapper before another tab is activated.
          */
-        this._tabBodyWrapperHeight = null;
-        /**
-         * Whether the tab group should grow to the size of the active tab
-         */
+        this._tabBodyWrapperHeight = 0;
         this._dynamicHeight = false;
         this._selectedIndex = null;
         /**
@@ -15179,9 +14905,10 @@ class MdTabGroup {
          * Event emitted when the tab selection has changed.
          */
         this.selectChange = new EventEmitter(true);
-        this._groupId = nextId$2++;
+        this._groupId = nextId++;
     }
     /**
+     * Whether the tab group should grow to the size of the active tab.
      * @return {?}
      */
     get dynamicHeight() { return this._dynamicHeight; }
@@ -15211,11 +14938,28 @@ class MdTabGroup {
      */
     get selectedIndex() { return this._selectedIndex; }
     /**
+     * Background color of the tab group.
+     * @return {?}
+     */
+    get backgroundColor() { return this._backgroundColor; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set backgroundColor(value) {
+        let /** @type {?} */ nativeElement = this._elementRef.nativeElement;
+        this._renderer.removeClass(nativeElement, `mat-background-${this.backgroundColor}`);
+        if (value) {
+            this._renderer.addClass(nativeElement, `mat-background-${value}`);
+        }
+        this._backgroundColor = value;
+    }
+    /**
      * Output to enable support for two-way binding on `[(selectedIndex)]`
      * @return {?}
      */
     get selectedIndexChange() {
-        return this.selectChange.map(event => event.index);
+        return map.call(this.selectChange, event => event.index);
     }
     /**
      * After the content is checked, this component knows what tabs have been defined
@@ -15228,23 +14972,49 @@ class MdTabGroup {
         // Clamp the next selected index to the bounds of 0 and the tabs length. Note the `|| 0`, which
         // ensures that values like NaN can't get through and which would otherwise throw the
         // component into an infinite loop (since Math.max(NaN, 0) === NaN).
-        this._indexToSelect =
+        let /** @type {?} */ indexToSelect = this._indexToSelect =
             Math.min(this._tabs.length - 1, Math.max(this._indexToSelect || 0, 0));
         // If there is a change in selected index, emit a change event. Should not trigger if
         // the selected index has not yet been initialized.
-        if (this._selectedIndex != this._indexToSelect && this._selectedIndex != null) {
-            this.selectChange.emit(this._createChangeEvent(this._indexToSelect));
+        if (this._selectedIndex != indexToSelect && this._selectedIndex != null) {
+            this.selectChange.emit(this._createChangeEvent(indexToSelect));
         }
         // Setup the position for each tab and optionally setup an origin on the next selected tab.
         this._tabs.forEach((tab, index) => {
-            tab.position = index - this._indexToSelect;
+            tab.position = index - indexToSelect;
             // If there is already a selected tab, then set up an origin for the next selected tab
             // if it doesn't have one already.
             if (this._selectedIndex != null && tab.position == 0 && !tab.origin) {
-                tab.origin = this._indexToSelect - this._selectedIndex;
+                tab.origin = indexToSelect - this._selectedIndex;
             }
         });
-        this._selectedIndex = this._indexToSelect;
+        if (this._selectedIndex !== indexToSelect) {
+            this._selectedIndex = indexToSelect;
+            this._changeDetectorRef.markForCheck();
+        }
+    }
+    /**
+     * @return {?}
+     */
+    ngAfterContentInit() {
+        this._subscribeToTabLabels();
+        // Subscribe to changes in the amount of tabs, in order to be
+        // able to re-render the content as new tabs are added or removed.
+        this._tabsSubscription = this._tabs.changes.subscribe(() => {
+            this._subscribeToTabLabels();
+            this._changeDetectorRef.markForCheck();
+        });
+    }
+    /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        if (this._tabsSubscription) {
+            this._tabsSubscription.unsubscribe();
+        }
+        if (this._tabLabelSubscription) {
+            this._tabLabelSubscription.unsubscribe();
+        }
     }
     /**
      * Waits one frame for the view to update, then updates the ink bar
@@ -15274,6 +15044,21 @@ class MdTabGroup {
         return event;
     }
     /**
+     * Subscribes to changes in the tab labels. This is needed, because the \@Input for the label is
+     * on the MdTab component, whereas the data binding is inside the MdTabGroup. In order for the
+     * binding to be updated, we need to subscribe to changes in it and trigger change detection
+     * manually.
+     * @return {?}
+     */
+    _subscribeToTabLabels() {
+        if (this._tabLabelSubscription) {
+            this._tabLabelSubscription.unsubscribe();
+        }
+        this._tabLabelSubscription = merge(...this._tabs.map(tab => tab._labelChange)).subscribe(() => {
+            this._changeDetectorRef.markForCheck();
+        });
+    }
+    /**
      * Returns a unique id for each tab label element
      * @param {?} i
      * @return {?}
@@ -15299,11 +15084,11 @@ class MdTabGroup {
         if (!this._dynamicHeight || !this._tabBodyWrapperHeight) {
             return;
         }
-        this._renderer.setElementStyle(this._tabBodyWrapper.nativeElement, 'height', this._tabBodyWrapperHeight + 'px');
+        this._renderer.setStyle(this._tabBodyWrapper.nativeElement, 'height', this._tabBodyWrapperHeight + 'px');
         // This conditional forces the browser to paint the height so that
         // the animation to the new height can have an origin.
         if (this._tabBodyWrapper.nativeElement.offsetHeight) {
-            this._renderer.setElementStyle(this._tabBodyWrapper.nativeElement, 'height', tabHeight + 'px');
+            this._renderer.setStyle(this._tabBodyWrapper.nativeElement, 'height', tabHeight + 'px');
         }
     }
     /**
@@ -15312,15 +15097,17 @@ class MdTabGroup {
      */
     _removeTabBodyWrapperHeight() {
         this._tabBodyWrapperHeight = this._tabBodyWrapper.nativeElement.clientHeight;
-        this._renderer.setElementStyle(this._tabBodyWrapper.nativeElement, 'height', '');
+        this._renderer.setStyle(this._tabBodyWrapper.nativeElement, 'height', '');
     }
 }
 MdTabGroup.decorators = [
     { type: Component, args: [{selector: 'md-tab-group, mat-tab-group',
-                template: "<md-tab-header [selectedIndex]=\"selectedIndex\" #tabHeader (indexFocused)=\"_focusChanged($event)\" (selectFocusedIndex)=\"selectedIndex = $event\"> <div class=\"mat-tab-label\" role=\"tab\" md-tab-label-wrapper md-ripple *ngFor=\"let tab of _tabs; let i = index\" [id]=\"_getTabLabelId(i)\" [tabIndex]=\"selectedIndex == i ? 0 : -1\" [attr.aria-controls]=\"_getTabContentId(i)\" [attr.aria-selected]=\"selectedIndex == i\" [class.mat-tab-label-active]=\"selectedIndex == i\" [disabled]=\"tab.disabled\" (click)=\"tabHeader.focusIndex = selectedIndex = i\"> <!-- If there is a label template, use it. --> <ng-template [ngIf]=\"tab.templateLabel\"> <ng-template [cdkPortalHost]=\"tab.templateLabel\"></ng-template> </ng-template> <!-- If there is not a label template, fall back to the text label. --> <ng-template [ngIf]=\"!tab.templateLabel\">{{tab.textLabel}}</ng-template> </div> </md-tab-header> <div class=\"mat-tab-body-wrapper\" #tabBodyWrapper> <md-tab-body role=\"tabpanel\" *ngFor=\"let tab of _tabs; let i = index\" [id]=\"_getTabContentId(i)\" [attr.aria-labelledby]=\"_getTabLabelId(i)\" [class.mat-tab-body-active]=\"selectedIndex == i\" [content]=\"tab.content\" [position]=\"tab.position\" [origin]=\"tab.origin\" (onCentered)=\"_removeTabBodyWrapperHeight()\" (onCentering)=\"_setTabBodyWrapperHeight($event)\"> </md-tab-body> </div> ",
-                styles: [":host{display:flex;flex-direction:column;font-family:Roboto,\"Helvetica Neue\",sans-serif}:host.mat-tab-group-inverted-header{flex-direction:column-reverse}.mat-tab-label{line-height:48px;height:48px;padding:0 12px;font-size:14px;font-family:Roboto,\"Helvetica Neue\",sans-serif;font-weight:500;cursor:pointer;box-sizing:border-box;opacity:.6;min-width:160px;text-align:center;position:relative}.mat-tab-label:focus{outline:0;opacity:1}@media (max-width:600px){.mat-tab-label{min-width:72px}}:host[mat-stretch-tabs] .mat-tab-label,:host[md-stretch-tabs] .mat-tab-label{flex-basis:0;flex-grow:1}.mat-tab-body-wrapper{position:relative;overflow:hidden;display:flex;transition:height .5s cubic-bezier(.35,0,.25,1)}.mat-tab-body{position:absolute;top:0;left:0;right:0;bottom:0;display:block;overflow:hidden}.mat-tab-body.mat-tab-body-active{position:relative;overflow-x:hidden;overflow-y:auto;z-index:1;flex-grow:1}:host.mat-tab-group-dynamic-height .mat-tab-body.mat-tab-body-active{overflow-y:hidden}.mat-tab-disabled{cursor:default;pointer-events:none} /*# sourceMappingURL=tab-group.css.map */ "],
+                template: "<md-tab-header #tabHeader [selectedIndex]=\"selectedIndex\" [disableRipple]=\"disableRipple\" (indexFocused)=\"_focusChanged($event)\" (selectFocusedIndex)=\"selectedIndex = $event\"><div class=\"mat-tab-label\" role=\"tab\" mdTabLabelWrapper md-ripple *ngFor=\"let tab of _tabs; let i = index\" [id]=\"_getTabLabelId(i)\" [tabIndex]=\"selectedIndex == i ? 0 : -1\" [attr.aria-controls]=\"_getTabContentId(i)\" [attr.aria-selected]=\"selectedIndex == i\" [class.mat-tab-label-active]=\"selectedIndex == i\" [disabled]=\"tab.disabled\" [mdRippleDisabled]=\"disableRipple\" (click)=\"tabHeader.focusIndex = selectedIndex = i\"><ng-template [ngIf]=\"tab.templateLabel\"><ng-template [cdkPortalHost]=\"tab.templateLabel\"></ng-template></ng-template><ng-template [ngIf]=\"!tab.templateLabel\">{{tab.textLabel}}</ng-template></div></md-tab-header><div class=\"mat-tab-body-wrapper\" #tabBodyWrapper><md-tab-body role=\"tabpanel\" *ngFor=\"let tab of _tabs; let i = index\" [id]=\"_getTabContentId(i)\" [attr.aria-labelledby]=\"_getTabLabelId(i)\" [class.mat-tab-body-active]=\"selectedIndex == i\" [content]=\"tab.content\" [position]=\"tab.position\" [origin]=\"tab.origin\" (onCentered)=\"_removeTabBodyWrapperHeight()\" (onCentering)=\"_setTabBodyWrapperHeight($event)\"></md-tab-body></div>",
+                styles: [":host{display:flex;flex-direction:column}:host.mat-tab-group-inverted-header{flex-direction:column-reverse}.mat-tab-label{height:48px;padding:0 12px;cursor:pointer;box-sizing:border-box;opacity:.6;min-width:160px;text-align:center;display:inline-flex;justify-content:center;align-items:center;white-space:nowrap;position:relative}.mat-tab-label:focus{outline:0;opacity:1}.mat-tab-label.mat-tab-disabled{cursor:default;pointer-events:none}@media (max-width:600px){.mat-tab-label{min-width:72px}}:host[mat-stretch-tabs] .mat-tab-label,:host[md-stretch-tabs] .mat-tab-label{flex-basis:0;flex-grow:1}.mat-tab-body-wrapper{position:relative;overflow:hidden;display:flex;transition:height .5s cubic-bezier(.35,0,.25,1)}.mat-tab-body{position:absolute;top:0;left:0;right:0;bottom:0;display:block;overflow:hidden}.mat-tab-body.mat-tab-body-active{position:relative;overflow-x:hidden;overflow-y:auto;z-index:1;flex-grow:1}:host.mat-tab-group-dynamic-height .mat-tab-body.mat-tab-body-active{overflow-y:hidden}"],
+                changeDetection: ChangeDetectionStrategy.OnPush,
+                inputs: ['color', 'disableRipple'],
                 host: {
-                    '[class.mat-tab-group]': 'true',
+                    'class': 'mat-tab-group',
                     '[class.mat-tab-group-dynamic-height]': 'dynamicHeight',
                     '[class.mat-tab-group-inverted-header]': 'headerPosition === "below"',
                 }
@@ -15330,7 +15117,9 @@ MdTabGroup.decorators = [
  * @nocollapse
  */
 MdTabGroup.ctorParameters = () => [
-    { type: Renderer, },
+    { type: Renderer2, },
+    { type: ElementRef, },
+    { type: ChangeDetectorRef, },
 ];
 MdTabGroup.propDecorators = {
     '_tabs': [{ type: ContentChildren, args: [MdTab,] },],
@@ -15339,44 +15128,36 @@ MdTabGroup.propDecorators = {
     '_dynamicHeightDeprecated': [{ type: Input, args: ['md-dynamic-height',] },],
     'selectedIndex': [{ type: Input },],
     'headerPosition': [{ type: Input },],
+    'backgroundColor': [{ type: Input },],
     'selectedIndexChange': [{ type: Output },],
     'focusChange': [{ type: Output },],
     'selectChange': [{ type: Output },],
 };
 
 /**
+ * \@docs-private
+ */
+class MdTabLabelWrapperBase {
+}
+const _MdTabLabelWrapperMixinBase = mixinDisabled(MdTabLabelWrapperBase);
+/**
  * Used in the `md-tab-group` view to display tab labels.
  * \@docs-private
  */
-class MdTabLabelWrapper {
+class MdTabLabelWrapper extends _MdTabLabelWrapperMixinBase {
     /**
      * @param {?} elementRef
-     * @param {?} _renderer
      */
-    constructor(elementRef, _renderer) {
+    constructor(elementRef) {
+        super();
         this.elementRef = elementRef;
-        this._renderer = _renderer;
-        /**
-         * Whether the tab label is disabled.
-         */
-        this._disabled = false;
     }
-    /**
-     * Whether the element is disabled.
-     * @return {?}
-     */
-    get disabled() { return this._disabled; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set disabled(value) { this._disabled = coerceBooleanProperty(value); }
     /**
      * Sets focus on the wrapper element
      * @return {?}
      */
     focus() {
-        this._renderer.invokeElementMethod(this.elementRef.nativeElement, 'focus');
+        this.elementRef.nativeElement.focus();
     }
     /**
      * @return {?}
@@ -15393,7 +15174,8 @@ class MdTabLabelWrapper {
 }
 MdTabLabelWrapper.decorators = [
     { type: Directive, args: [{
-                selector: '[md-tab-label-wrapper], [mat-tab-label-wrapper]',
+                selector: '[mdTabLabelWrapper], [matTabLabelWrapper]',
+                inputs: ['disabled'],
                 host: {
                     '[class.mat-tab-disabled]': 'disabled'
                 }
@@ -15404,11 +15186,7 @@ MdTabLabelWrapper.decorators = [
  */
 MdTabLabelWrapper.ctorParameters = () => [
     { type: ElementRef, },
-    { type: Renderer, },
 ];
-MdTabLabelWrapper.propDecorators = {
-    'disabled': [{ type: Input },],
-};
 
 /**
  * The ink-bar is used to display and animate the line underneath the current active tab label.
@@ -15433,49 +15211,46 @@ class MdInkBar {
      */
     alignToElement(element) {
         this.show();
-        this._ngZone.runOutsideAngular(() => {
-            requestAnimationFrame(() => {
-                this._renderer.setElementStyle(this._elementRef.nativeElement, 'left', this._getLeftPosition(element));
-                this._renderer.setElementStyle(this._elementRef.nativeElement, 'width', this._getElementWidth(element));
+        if (typeof requestAnimationFrame !== 'undefined') {
+            this._ngZone.runOutsideAngular(() => {
+                requestAnimationFrame(() => this._setStyles(element));
             });
-        });
+        }
+        else {
+            this._setStyles(element);
+        }
     }
     /**
      * Shows the ink bar.
      * @return {?}
      */
     show() {
-        this._renderer.setElementStyle(this._elementRef.nativeElement, 'visibility', 'visible');
+        this._renderer.setStyle(this._elementRef.nativeElement, 'visibility', 'visible');
     }
     /**
      * Hides the ink bar.
      * @return {?}
      */
     hide() {
-        this._renderer.setElementStyle(this._elementRef.nativeElement, 'visibility', 'hidden');
+        this._renderer.setStyle(this._elementRef.nativeElement, 'visibility', 'hidden');
     }
     /**
-     * Generates the pixel distance from the left based on the provided element in string format.
+     * Sets the proper styles to the ink bar element.
      * @param {?} element
      * @return {?}
      */
-    _getLeftPosition(element) {
-        return element ? element.offsetLeft + 'px' : '0';
-    }
-    /**
-     * Generates the pixel width from the provided element in string format.
-     * @param {?} element
-     * @return {?}
-     */
-    _getElementWidth(element) {
-        return element ? element.offsetWidth + 'px' : '0';
+    _setStyles(element) {
+        const /** @type {?} */ left = element ? (element.offsetLeft || 0) + 'px' : '0';
+        const /** @type {?} */ width = element ? (element.offsetWidth || 0) + 'px' : '0';
+        this._renderer.setStyle(this._elementRef.nativeElement, 'left', left);
+        this._renderer.setStyle(this._elementRef.nativeElement, 'width', width);
     }
 }
 MdInkBar.decorators = [
     { type: Directive, args: [{
                 selector: 'md-ink-bar, mat-ink-bar',
                 host: {
-                    '[class.mat-ink-bar]': 'true',
+                    'class': 'mat-ink-bar',
                 },
             },] },
 ];
@@ -15483,27 +15258,77 @@ MdInkBar.decorators = [
  * @nocollapse
  */
 MdInkBar.ctorParameters = () => [
-    { type: Renderer, },
+    { type: Renderer2, },
     { type: ElementRef, },
     { type: NgZone, },
 ];
 
 /**
+ * \@docs-private
+ */
+class MdTabNavBase {
+    /**
+     * @param {?} _renderer
+     * @param {?} _elementRef
+     */
+    constructor(_renderer, _elementRef) {
+        this._renderer = _renderer;
+        this._elementRef = _elementRef;
+    }
+}
+const _MdTabNavMixinBase = mixinDisableRipple(mixinColor(MdTabNavBase, 'primary'));
+/**
  * Navigation component matching the styles of the tab group header.
  * Provides anchored navigation with animated ink bar.
  */
-class MdTabNavBar {
+class MdTabNav extends _MdTabNavMixinBase {
     /**
+     * @param {?} renderer
+     * @param {?} elementRef
      * @param {?} _dir
      * @param {?} _ngZone
+     * @param {?} _changeDetectorRef
      */
-    constructor(_dir, _ngZone) {
+    constructor(renderer, elementRef, _dir, _ngZone, _changeDetectorRef) {
+        super(renderer, elementRef);
         this._dir = _dir;
         this._ngZone = _ngZone;
+        this._changeDetectorRef = _changeDetectorRef;
         /**
-         * Combines listeners that will re-align the ink bar whenever they're invoked.
+         * Subject that emits when the component has been destroyed.
          */
-        this._realignInkBar = null;
+        this._onDestroy = new Subject();
+        this._disableRipple = false;
+    }
+    /**
+     * Background color of the tab nav.
+     * @return {?}
+     */
+    get backgroundColor() { return this._backgroundColor; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set backgroundColor(value) {
+        let /** @type {?} */ nativeElement = this._elementRef.nativeElement;
+        this._renderer.removeClass(nativeElement, `mat-background-${this.backgroundColor}`);
+        if (value) {
+            this._renderer.addClass(nativeElement, `mat-background-${value}`);
+        }
+        this._backgroundColor = value;
+    }
+    /**
+     * Whether ripples should be disabled for all links or not.
+     * @return {?}
+     */
+    get disableRipple() { return this._disableRipple; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set disableRipple(value) {
+        this._disableRipple = coerceBooleanProperty(value);
+        this._setLinkDisableRipple();
     }
     /**
      * Notifies the component that the active link has been changed.
@@ -15513,18 +15338,23 @@ class MdTabNavBar {
     updateActiveLink(element) {
         this._activeLinkChanged = this._activeLinkElement != element;
         this._activeLinkElement = element;
+        if (this._activeLinkChanged) {
+            this._changeDetectorRef.markForCheck();
+        }
     }
     /**
      * @return {?}
      */
     ngAfterContentInit() {
-        this._realignInkBar = this._ngZone.runOutsideAngular(() => {
-            let /** @type {?} */ dirChange = this._dir ? this._dir.dirChange : Observable.of(null);
+        this._resizeSubscription = this._ngZone.runOutsideAngular(() => {
+            let /** @type {?} */ dirChange = this._dir ? this._dir.change : of(null);
             let /** @type {?} */ resize = typeof window !== 'undefined' ?
-                Observable.fromEvent(window, 'resize').auditTime(10) :
-                Observable.of(null);
-            return Observable.merge(dirChange, resize).subscribe(() => this._alignInkBar());
+                auditTime.call(fromEvent(window, 'resize'), 10) :
+                of(null);
+            return takeUntil.call(merge(dirChange, resize), this._onDestroy)
+                .subscribe(() => this._alignInkBar());
         });
+        this._setLinkDisableRipple();
     }
     /**
      * Checks if the active link has been changed and, if so, will update the ink bar.
@@ -15540,9 +15370,9 @@ class MdTabNavBar {
      * @return {?}
      */
     ngOnDestroy() {
-        if (this._realignInkBar) {
-            this._realignInkBar.unsubscribe();
-            this._realignInkBar = null;
+        this._onDestroy.next();
+        if (this._resizeSubscription) {
+            this._resizeSubscription.unsubscribe();
         }
     }
     /**
@@ -15554,39 +15384,71 @@ class MdTabNavBar {
             this._inkBar.alignToElement(this._activeLinkElement.nativeElement);
         }
     }
+    /**
+     * Sets the `disableRipple` property on each link of the navigation bar.
+     * @return {?}
+     */
+    _setLinkDisableRipple() {
+        if (this._tabLinks) {
+            this._tabLinks.forEach(link => link.disableRipple = this.disableRipple);
+        }
+    }
 }
-MdTabNavBar.decorators = [
+MdTabNav.decorators = [
     { type: Component, args: [{selector: '[md-tab-nav-bar], [mat-tab-nav-bar]',
-                template: "<div class=\"mat-tab-links\"> <ng-content></ng-content> <md-ink-bar></md-ink-bar> </div> ",
-                styles: [".mat-tab-nav-bar{overflow:hidden;position:relative;flex-shrink:0}.mat-tab-links{position:relative}.mat-tab-link{line-height:48px;height:48px;padding:0 12px;font-size:14px;font-family:Roboto,\"Helvetica Neue\",sans-serif;font-weight:500;cursor:pointer;box-sizing:border-box;opacity:.6;min-width:160px;text-align:center;display:inline-block;vertical-align:top;text-decoration:none;position:relative;overflow:hidden}.mat-tab-link:focus{outline:0;opacity:1}@media (max-width:600px){.mat-tab-link{min-width:72px}}.mat-ink-bar{position:absolute;bottom:0;height:2px;transition:.5s cubic-bezier(.35,0,.25,1)}.mat-tab-group-inverted-header .mat-ink-bar{bottom:auto;top:0} /*# sourceMappingURL=tab-nav-bar.css.map */ "],
-                host: {
-                    '[class.mat-tab-nav-bar]': 'true',
-                },
+                inputs: ['color', 'disableRipple'],
+                template: "<div class=\"mat-tab-links\" (cdkObserveContent)=\"_alignInkBar()\"><ng-content></ng-content><md-ink-bar></md-ink-bar></div>",
+                styles: [".mat-tab-nav-bar{overflow:hidden;position:relative;flex-shrink:0}.mat-tab-links{position:relative}.mat-tab-link{height:48px;padding:0 12px;cursor:pointer;box-sizing:border-box;opacity:.6;min-width:160px;text-align:center;display:inline-flex;justify-content:center;align-items:center;white-space:nowrap;vertical-align:top;text-decoration:none;position:relative;overflow:hidden}.mat-tab-link:focus{outline:0;opacity:1}.mat-tab-link.mat-tab-disabled{cursor:default;pointer-events:none}@media (max-width:600px){.mat-tab-link{min-width:72px}}.mat-ink-bar{position:absolute;bottom:0;height:2px;transition:.5s cubic-bezier(.35,0,.25,1)}.mat-tab-group-inverted-header .mat-ink-bar{bottom:auto;top:0}"],
+                host: { 'class': 'mat-tab-nav-bar' },
                 encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
             },] },
 ];
 /**
  * @nocollapse
  */
-MdTabNavBar.ctorParameters = () => [
-    { type: Dir, decorators: [{ type: Optional },] },
+MdTabNav.ctorParameters = () => [
+    { type: Renderer2, },
+    { type: ElementRef, },
+    { type: Directionality, decorators: [{ type: Optional },] },
     { type: NgZone, },
+    { type: ChangeDetectorRef, },
 ];
-MdTabNavBar.propDecorators = {
+MdTabNav.propDecorators = {
     '_inkBar': [{ type: ViewChild, args: [MdInkBar,] },],
+    '_tabLinks': [{ type: ContentChildren, args: [forwardRef(() => MdTabLink), { descendants: true },] },],
+    'backgroundColor': [{ type: Input },],
 };
+class MdTabLinkBase {
+}
+const _MdTabLinkMixinBase = mixinDisabled(MdTabLinkBase);
 /**
  * Link inside of a `md-tab-nav-bar`.
  */
-class MdTabLink {
+class MdTabLink extends _MdTabLinkMixinBase {
     /**
      * @param {?} _mdTabNavBar
      * @param {?} _elementRef
+     * @param {?} ngZone
+     * @param {?} ruler
+     * @param {?} platform
+     * @param {?} globalOptions
      */
-    constructor(_mdTabNavBar, _elementRef) {
+    constructor(_mdTabNavBar, _elementRef, ngZone, ruler, platform, globalOptions) {
+        super();
         this._mdTabNavBar = _mdTabNavBar;
         this._elementRef = _elementRef;
+        /**
+         * Whether the tab link is active or not.
+         */
         this._isActive = false;
+        /**
+         * Whether the ripples for this tab should be disabled or not.
+         */
+        this._disableRipple = false;
+        // Manually create a ripple instance that uses the tab link element as trigger element.
+        // Notice that the lifecycle hooks for the ripple config won't be called anymore.
+        this._tabLinkRipple = new MdRipple(_elementRef, ngZone, ruler, platform, globalOptions);
     }
     /**
      * Whether the link is active.
@@ -15603,12 +15465,45 @@ class MdTabLink {
             this._mdTabNavBar.updateActiveLink(this._elementRef);
         }
     }
+    /**
+     * Whether ripples should be disabled or not.
+     * @return {?}
+     */
+    get disableRipple() { return this._disableRipple; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set disableRipple(value) {
+        this._disableRipple = value;
+        this._tabLinkRipple.disabled = this.disableRipple;
+        this._tabLinkRipple._updateRippleRenderer();
+    }
+    /**
+     * \@docs-private
+     * @return {?}
+     */
+    get tabIndex() {
+        return this.disabled ? -1 : 0;
+    }
+    /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        // Manually call the ngOnDestroy lifecycle hook of the ripple instance because it won't be
+        // called automatically since its instance is not created by Angular.
+        this._tabLinkRipple.ngOnDestroy();
+    }
 }
 MdTabLink.decorators = [
     { type: Directive, args: [{
-                selector: '[md-tab-link], [mat-tab-link]',
+                selector: '[md-tab-link], [mat-tab-link], [mdTabLink], [matTabLink]',
+                inputs: ['disabled'],
                 host: {
-                    '[class.mat-tab-link]': 'true',
+                    'class': 'mat-tab-link',
+                    '[attr.aria-disabled]': 'disabled.toString()',
+                    '[attr.tabindex]': 'tabIndex',
+                    '[class.mat-tab-disabled]': 'disabled'
                 }
             },] },
 ];
@@ -15616,44 +15511,16 @@ MdTabLink.decorators = [
  * @nocollapse
  */
 MdTabLink.ctorParameters = () => [
-    { type: MdTabNavBar, },
+    { type: MdTabNav, },
     { type: ElementRef, },
+    { type: NgZone, },
+    { type: ViewportRuler, },
+    { type: Platform, },
+    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [MD_RIPPLE_GLOBAL_OPTIONS,] },] },
 ];
 MdTabLink.propDecorators = {
     'active': [{ type: Input },],
 };
-/**
- * Simple directive that extends the ripple and matches the selector of the MdTabLink. This
- * adds the ripple behavior to nav bar labels.
- */
-class MdTabLinkRipple extends MdRipple {
-    /**
-     * @param {?} elementRef
-     * @param {?} ngZone
-     * @param {?} ruler
-     * @param {?} globalOptions
-     */
-    constructor(elementRef, ngZone, ruler, globalOptions) {
-        super(elementRef, ngZone, ruler, globalOptions);
-    }
-}
-MdTabLinkRipple.decorators = [
-    { type: Directive, args: [{
-                selector: '[md-tab-link], [mat-tab-link]',
-                host: {
-                    '[class.mat-tab-link]': 'true',
-                },
-            },] },
-];
-/**
- * @nocollapse
- */
-MdTabLinkRipple.ctorParameters = () => [
-    { type: ElementRef, },
-    { type: NgZone, },
-    { type: ViewportRuler, },
-    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [MD_RIPPLE_GLOBAL_OPTIONS,] },] },
-];
 
 /**
  * Wrapper for the contents of a tab.
@@ -15661,12 +15528,12 @@ MdTabLinkRipple.ctorParameters = () => [
  */
 class MdTabBody {
     /**
-     * @param {?} _dir
      * @param {?} _elementRef
+     * @param {?} _dir
      */
-    constructor(_dir, _elementRef) {
-        this._dir = _dir;
+    constructor(_elementRef, _dir) {
         this._elementRef = _elementRef;
+        this._dir = _dir;
         /**
          * Event emitted when the tab begins to animate towards the center as the active tab.
          */
@@ -15771,17 +15638,20 @@ class MdTabBody {
 }
 MdTabBody.decorators = [
     { type: Component, args: [{selector: 'md-tab-body, mat-tab-body',
-                template: "<div class=\"mat-tab-body-content\" #content [@translateTab]=\"_position\" (@translateTab.start)=\"_onTranslateTabStarted($event)\" (@translateTab.done)=\"_onTranslateTabComplete($event)\"> <ng-template cdkPortalHost></ng-template> </div> ",
-                styles: [".mat-tab-body-content{height:100%;overflow:auto} /*# sourceMappingURL=tab-body.css.map */ "],
+                template: "<div class=\"mat-tab-body-content\" #content [@translateTab]=\"_position\" (@translateTab.start)=\"_onTranslateTabStarted($event)\" (@translateTab.done)=\"_onTranslateTabComplete($event)\"><ng-template cdkPortalHost></ng-template></div>",
+                styles: [".mat-tab-body-content{height:100%;overflow:auto}.mat-tab-group-dynamic-height .mat-tab-body-content{overflow:hidden}"],
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
                 host: {
-                    '[class.mat-tab-body]': 'true',
+                    'class': 'mat-tab-body',
                 },
                 animations: [
                     trigger('translateTab', [
+                        state('void', style({ transform: 'translate3d(0%, 0, 0)' })),
                         state('left', style({ transform: 'translate3d(-100%, 0, 0)' })),
-                        state('left-origin-center', style({ transform: 'translate3d(0, 0, 0)' })),
-                        state('right-origin-center', style({ transform: 'translate3d(0, 0, 0)' })),
-                        state('center', style({ transform: 'translate3d(0, 0, 0)' })),
+                        state('left-origin-center', style({ transform: 'translate3d(0%, 0, 0)' })),
+                        state('right-origin-center', style({ transform: 'translate3d(0%, 0, 0)' })),
+                        state('center', style({ transform: 'translate3d(0%, 0, 0)' })),
                         state('right', style({ transform: 'translate3d(100%, 0, 0)' })),
                         transition('* => left, * => right, left => center, right => center', animate('500ms cubic-bezier(0.35, 0, 0.25, 1)')),
                         transition('void => left-origin-center', [
@@ -15800,8 +15670,8 @@ MdTabBody.decorators = [
  * @nocollapse
  */
 MdTabBody.ctorParameters = () => [
-    { type: Dir, decorators: [{ type: Optional },] },
     { type: ElementRef, },
+    { type: Directionality, decorators: [{ type: Optional },] },
 ];
 MdTabBody.propDecorators = {
     '_portalHost': [{ type: ViewChild, args: [PortalHostDirective,] },],
@@ -15818,21 +15688,33 @@ MdTabBody.propDecorators = {
  */
 const EXAGGERATED_OVERSCROLL = 60;
 /**
+ * \@docs-private
+ */
+class MdTabHeaderBase {
+}
+const _MdTabHeaderMixinBase = mixinDisableRipple(MdTabHeaderBase);
+/**
  * The header of the tab group which displays a list of all the tabs in the tab group. Includes
  * an ink bar that follows the currently selected tab. When the tabs list's width exceeds the
  * width of the header container, then arrows will be displayed to allow the user to scroll
  * left and right across the header.
  * \@docs-private
  */
-class MdTabHeader {
+class MdTabHeader extends _MdTabHeaderMixinBase {
     /**
      * @param {?} _elementRef
      * @param {?} _ngZone
+     * @param {?} _renderer
+     * @param {?} _changeDetectorRef
      * @param {?} _dir
+     * @param {?} platform
      */
-    constructor(_elementRef, _ngZone, _dir) {
+    constructor(_elementRef, _ngZone, _renderer, _changeDetectorRef, _dir, platform) {
+        super();
         this._elementRef = _elementRef;
         this._ngZone = _ngZone;
+        this._renderer = _renderer;
+        this._changeDetectorRef = _changeDetectorRef;
         this._dir = _dir;
         /**
          * The tab index that is focused.
@@ -15871,6 +15753,12 @@ class MdTabHeader {
          * Event emitted when a label is focused.
          */
         this.indexFocused = new EventEmitter();
+        if (platform.isBrowser) {
+            // TODO: Add library level window listener https://goo.gl/y25X5M
+            this._resizeSubscription = RxChain.from(fromEvent(window, 'resize'))
+                .call(debounceTime, 150)
+                .subscribe(() => this._checkPaginationEnabled());
+        }
     }
     /**
      * The index of the active tab.
@@ -15894,6 +15782,7 @@ class MdTabHeader {
         if (this._tabLabelCount != this._labelWrappers.length) {
             this._updatePagination();
             this._tabLabelCount = this._labelWrappers.length;
+            this._changeDetectorRef.markForCheck();
         }
         // If the selected index has changed, scroll to the label and check if the scrolling controls
         // should be disabled.
@@ -15902,12 +15791,14 @@ class MdTabHeader {
             this._checkScrollingControls();
             this._alignInkBarToSelectedTab();
             this._selectedIndexChanged = false;
+            this._changeDetectorRef.markForCheck();
         }
         // If the scroll distance has been changed (tab selected, focused, scroll controls activated),
         // then translate the header to reflect this.
         if (this._scrollDistanceChanged) {
             this._updateTabScrollPosition();
             this._scrollDistanceChanged = false;
+            this._changeDetectorRef.markForCheck();
         }
     }
     /**
@@ -15933,11 +15824,11 @@ class MdTabHeader {
      */
     ngAfterContentInit() {
         this._realignInkBar = this._ngZone.runOutsideAngular(() => {
-            let /** @type {?} */ dirChange = this._dir ? this._dir.dirChange : Observable.of(null);
+            let /** @type {?} */ dirChange = this._dir ? this._dir.change : of(null);
             let /** @type {?} */ resize = typeof window !== 'undefined' ?
-                Observable.fromEvent(window, 'resize').auditTime(10) :
-                Observable.of(null);
-            return Observable.merge(dirChange, resize).startWith(null).subscribe(() => {
+                auditTime.call(fromEvent(window, 'resize'), 10) :
+                of(null);
+            return startWith.call(merge(dirChange, resize), null).subscribe(() => {
                 this._updatePagination();
                 this._alignInkBarToSelectedTab();
             });
@@ -15951,6 +15842,10 @@ class MdTabHeader {
             this._realignInkBar.unsubscribe();
             this._realignInkBar = null;
         }
+        if (this._resizeSubscription) {
+            this._resizeSubscription.unsubscribe();
+            this._resizeSubscription = null;
+        }
     }
     /**
      * Callback for when the MutationObserver detects that the content has changed.
@@ -15959,6 +15854,7 @@ class MdTabHeader {
     _onContentChanges() {
         this._updatePagination();
         this._alignInkBarToSelectedTab();
+        this._changeDetectorRef.markForCheck();
     }
     /**
      * Updating the view whether pagination should be enabled or not
@@ -15998,7 +15894,7 @@ class MdTabHeader {
             return true;
         }
         const /** @type {?} */ tab = this._labelWrappers ? this._labelWrappers.toArray()[index] : null;
-        return tab && !tab.disabled;
+        return !!tab && !tab.disabled;
     }
     /**
      * Sets focus on the HTML element for the label wrapper and scrolls it into the view if
@@ -16068,11 +15964,9 @@ class MdTabHeader {
      * @return {?}
      */
     _updateTabScrollPosition() {
-        let /** @type {?} */ translateX = this.scrollDistance + 'px';
-        if (this._getLayoutDirection() == 'ltr') {
-            translateX = '-' + translateX;
-        }
-        applyCssTransform(this._tabList.nativeElement, `translate3d(${translateX}, 0, 0)`);
+        const /** @type {?} */ scrollDistance = this.scrollDistance;
+        const /** @type {?} */ translateX = this._getLayoutDirection() === 'ltr' ? -scrollDistance : scrollDistance;
+        this._renderer.setStyle(this._tabList.nativeElement, 'transform', `translate3d(${translateX}px, 0, 0)`);
     }
     /**
      * Sets the distance in pixels that the tab header should be transformed in the X-axis.
@@ -16114,9 +16008,7 @@ class MdTabHeader {
      * @return {?}
      */
     _scrollToLabel(labelIndex) {
-        const /** @type {?} */ selectedLabel = this._labelWrappers
-            ? this._labelWrappers.toArray()[labelIndex]
-            : null;
+        const /** @type {?} */ selectedLabel = this._labelWrappers ? this._labelWrappers.toArray()[labelIndex] : null;
         if (!selectedLabel) {
             return;
         }
@@ -16157,6 +16049,7 @@ class MdTabHeader {
         if (!this._showPaginationControls) {
             this.scrollDistance = 0;
         }
+        this._changeDetectorRef.markForCheck();
     }
     /**
      * Evaluate whether the before and after controls should be enabled or disabled.
@@ -16172,6 +16065,7 @@ class MdTabHeader {
         // Check if the pagination arrows should be activated.
         this._disableScrollBefore = this.scrollDistance == 0;
         this._disableScrollAfter = this.scrollDistance == this._getMaxScrollDistance();
+        this._changeDetectorRef.markForCheck();
     }
     /**
      * Determines what is the maximum length in pixels that can be set for the scroll distance. This
@@ -16184,7 +16078,7 @@ class MdTabHeader {
     _getMaxScrollDistance() {
         const /** @type {?} */ lengthOfTabList = this._tabList.nativeElement.scrollWidth;
         const /** @type {?} */ viewLength = this._tabListContainer.nativeElement.offsetWidth;
-        return lengthOfTabList - viewLength;
+        return (lengthOfTabList - viewLength) || 0;
     }
     /**
      * Tells the ink-bar to align itself to the current label wrapper
@@ -16199,9 +16093,11 @@ class MdTabHeader {
 }
 MdTabHeader.decorators = [
     { type: Component, args: [{selector: 'md-tab-header, mat-tab-header',
-                template: "<div class=\"mat-tab-header-pagination mat-tab-header-pagination-before mat-elevation-z4\" aria-hidden=\"true\" md-ripple [mdRippleDisabled]=\"_disableScrollBefore\" [class.mat-tab-header-pagination-disabled]=\"_disableScrollBefore\" (click)=\"_scrollHeader('before')\"> <div class=\"mat-tab-header-pagination-chevron\"></div> </div> <div class=\"mat-tab-label-container\" #tabListContainer (keydown)=\"_handleKeydown($event)\"> <div class=\"mat-tab-list\" #tabList role=\"tablist\" (cdkObserveContent)=\"_onContentChanges()\"> <div class=\"mat-tab-labels\"> <ng-content></ng-content> </div> <md-ink-bar></md-ink-bar> </div> </div> <div class=\"mat-tab-header-pagination mat-tab-header-pagination-after mat-elevation-z4\" aria-hidden=\"true\" md-ripple [mdRippleDisabled]=\"_disableScrollAfter\" [class.mat-tab-header-pagination-disabled]=\"_disableScrollAfter\" (click)=\"_scrollHeader('after')\"> <div class=\"mat-tab-header-pagination-chevron\"></div> </div> ",
-                styles: [".mat-tab-header{display:flex;overflow:hidden;position:relative;flex-shrink:0}.mat-tab-label{line-height:48px;height:48px;padding:0 12px;font-size:14px;font-family:Roboto,\"Helvetica Neue\",sans-serif;font-weight:500;cursor:pointer;box-sizing:border-box;opacity:.6;min-width:160px;text-align:center;position:relative}.mat-tab-label:focus{outline:0;opacity:1}@media (max-width:600px){.mat-tab-label{min-width:72px}}.mat-ink-bar{position:absolute;bottom:0;height:2px;transition:.5s cubic-bezier(.35,0,.25,1)}.mat-tab-group-inverted-header .mat-ink-bar{bottom:auto;top:0}.mat-tab-header-pagination{position:relative;display:none;justify-content:center;align-items:center;min-width:32px;cursor:pointer;z-index:2}.mat-tab-header-pagination-controls-enabled .mat-tab-header-pagination{display:flex}.mat-tab-header-pagination-before,.mat-tab-header-rtl .mat-tab-header-pagination-after{padding-left:4px}.mat-tab-header-pagination-before .mat-tab-header-pagination-chevron,.mat-tab-header-rtl .mat-tab-header-pagination-after .mat-tab-header-pagination-chevron{transform:rotate(-135deg)}.mat-tab-header-pagination-after,.mat-tab-header-rtl .mat-tab-header-pagination-before{padding-right:4px}.mat-tab-header-pagination-after .mat-tab-header-pagination-chevron,.mat-tab-header-rtl .mat-tab-header-pagination-before .mat-tab-header-pagination-chevron{transform:rotate(45deg)}.mat-tab-header-pagination-chevron{border-style:solid;border-width:2px 2px 0 0;content:'';height:8px;width:8px}.mat-tab-header-pagination-disabled{box-shadow:none;cursor:default}.mat-tab-header-pagination-disabled .mat-tab-header-pagination-chevron{border-color:#ccc}.mat-tab-label-container{display:flex;flex-grow:1;overflow:hidden;z-index:1}.mat-tab-list{flex-grow:1;position:relative;transition:transform .5s cubic-bezier(.35,0,.25,1)}.mat-tab-labels{display:flex} /*# sourceMappingURL=tab-header.css.map */ "],
+                template: "<div class=\"mat-tab-header-pagination mat-tab-header-pagination-before mat-elevation-z4\" aria-hidden=\"true\" md-ripple [mdRippleDisabled]=\"_disableScrollBefore || disableRipple\" [class.mat-tab-header-pagination-disabled]=\"_disableScrollBefore\" (click)=\"_scrollHeader('before')\"><div class=\"mat-tab-header-pagination-chevron\"></div></div><div class=\"mat-tab-label-container\" #tabListContainer (keydown)=\"_handleKeydown($event)\"><div class=\"mat-tab-list\" #tabList role=\"tablist\" (cdkObserveContent)=\"_onContentChanges()\"><div class=\"mat-tab-labels\"><ng-content></ng-content></div><md-ink-bar></md-ink-bar></div></div><div class=\"mat-tab-header-pagination mat-tab-header-pagination-after mat-elevation-z4\" aria-hidden=\"true\" md-ripple [mdRippleDisabled]=\"_disableScrollAfter || disableRipple\" [class.mat-tab-header-pagination-disabled]=\"_disableScrollAfter\" (click)=\"_scrollHeader('after')\"><div class=\"mat-tab-header-pagination-chevron\"></div></div>",
+                styles: [".mat-tab-header{display:flex;overflow:hidden;position:relative;flex-shrink:0}.mat-tab-label{height:48px;padding:0 12px;cursor:pointer;box-sizing:border-box;opacity:.6;min-width:160px;text-align:center;display:inline-flex;justify-content:center;align-items:center;white-space:nowrap;position:relative}.mat-tab-label:focus{outline:0;opacity:1}.mat-tab-label.mat-tab-disabled{cursor:default;pointer-events:none}@media (max-width:600px){.mat-tab-label{min-width:72px}}.mat-ink-bar{position:absolute;bottom:0;height:2px;transition:.5s cubic-bezier(.35,0,.25,1)}.mat-tab-group-inverted-header .mat-ink-bar{bottom:auto;top:0}.mat-tab-header-pagination{position:relative;display:none;justify-content:center;align-items:center;min-width:32px;cursor:pointer;z-index:2}.mat-tab-header-pagination-controls-enabled .mat-tab-header-pagination{display:flex}.mat-tab-header-pagination-before,.mat-tab-header-rtl .mat-tab-header-pagination-after{padding-left:4px}.mat-tab-header-pagination-before .mat-tab-header-pagination-chevron,.mat-tab-header-rtl .mat-tab-header-pagination-after .mat-tab-header-pagination-chevron{transform:rotate(-135deg)}.mat-tab-header-pagination-after,.mat-tab-header-rtl .mat-tab-header-pagination-before{padding-right:4px}.mat-tab-header-pagination-after .mat-tab-header-pagination-chevron,.mat-tab-header-rtl .mat-tab-header-pagination-before .mat-tab-header-pagination-chevron{transform:rotate(45deg)}.mat-tab-header-pagination-chevron{border-style:solid;border-width:2px 2px 0 0;content:'';height:8px;width:8px}.mat-tab-header-pagination-disabled{box-shadow:none;cursor:default}.mat-tab-label-container{display:flex;flex-grow:1;overflow:hidden;z-index:1}.mat-tab-list{flex-grow:1;position:relative;transition:transform .5s cubic-bezier(.35,0,.25,1)}.mat-tab-labels{display:flex}"],
+                inputs: ['disableRipple'],
                 encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
                 host: {
                     'class': 'mat-tab-header',
                     '[class.mat-tab-header-pagination-controls-enabled]': '_showPaginationControls',
@@ -16215,7 +16111,10 @@ MdTabHeader.decorators = [
 MdTabHeader.ctorParameters = () => [
     { type: ElementRef, },
     { type: NgZone, },
-    { type: Dir, decorators: [{ type: Optional },] },
+    { type: Renderer2, },
+    { type: ChangeDetectorRef, },
+    { type: Directionality, decorators: [{ type: Optional },] },
+    { type: Platform, },
 ];
 MdTabHeader.propDecorators = {
     '_labelWrappers': [{ type: ContentChildren, args: [MdTabLabelWrapper,] },],
@@ -16228,33 +16127,25 @@ MdTabHeader.propDecorators = {
 };
 
 class MdTabsModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdTabsModule,
-            providers: []
-        };
-    }
 }
 MdTabsModule.decorators = [
     { type: NgModule, args: [{
                 imports: [
                     CommonModule,
+                    MdCommonModule,
                     PortalModule,
                     MdRippleModule,
-                    ObserveContentModule,
+                    ObserversModule,
+                    ScrollDispatchModule,
                 ],
                 // Don't export all components because some are only to be used internally.
                 exports: [
+                    MdCommonModule,
                     MdTabGroup,
                     MdTabLabel,
                     MdTab,
-                    MdTabNavBar,
+                    MdTabNav,
                     MdTabLink,
-                    MdTabLinkRipple
                 ],
                 declarations: [
                     MdTabGroup,
@@ -16262,13 +16153,12 @@ MdTabsModule.decorators = [
                     MdTab,
                     MdInkBar,
                     MdTabLabelWrapper,
-                    MdTabNavBar,
+                    MdTabNav,
                     MdTabLink,
                     MdTabBody,
-                    MdTabLinkRipple,
                     MdTabHeader
                 ],
-                providers: [VIEWPORT_RULER_PROVIDER, SCROLL_DISPATCHER_PROVIDER],
+                providers: [VIEWPORT_RULER_PROVIDER],
             },] },
 ];
 /**
@@ -16281,64 +16171,43 @@ class MdToolbarRow {
 MdToolbarRow.decorators = [
     { type: Directive, args: [{
                 selector: 'md-toolbar-row, mat-toolbar-row',
-                host: {
-                    '[class.mat-toolbar-row]': 'true',
-                },
+                host: { 'class': 'mat-toolbar-row' },
             },] },
 ];
 /**
  * @nocollapse
  */
 MdToolbarRow.ctorParameters = () => [];
-class MdToolbar {
+/**
+ * \@docs-private
+ */
+class MdToolbarBase {
     /**
-     * @param {?} elementRef
+     * @param {?} _renderer
+     * @param {?} _elementRef
+     */
+    constructor(_renderer, _elementRef) {
+        this._renderer = _renderer;
+        this._elementRef = _elementRef;
+    }
+}
+const _MdToolbarMixinBase = mixinColor(MdToolbarBase);
+class MdToolbar extends _MdToolbarMixinBase {
+    /**
      * @param {?} renderer
+     * @param {?} elementRef
      */
-    constructor(elementRef, renderer) {
-        this.elementRef = elementRef;
-        this.renderer = renderer;
-    }
-    /**
-     * The color of the toolbar. Can be primary, accent, or warn.
-     * @return {?}
-     */
-    get color() {
-        return this._color;
-    }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set color(value) {
-        this._updateColor(value);
-    }
-    /**
-     * @param {?} newColor
-     * @return {?}
-     */
-    _updateColor(newColor) {
-        this._setElementColor(this._color, false);
-        this._setElementColor(newColor, true);
-        this._color = newColor;
-    }
-    /**
-     * @param {?} color
-     * @param {?} isAdd
-     * @return {?}
-     */
-    _setElementColor(color, isAdd) {
-        if (color != null && color != '') {
-            this.renderer.setElementClass(this.elementRef.nativeElement, `mat-${color}`, isAdd);
-        }
+    constructor(renderer, elementRef) {
+        super(renderer, elementRef);
     }
 }
 MdToolbar.decorators = [
     { type: Component, args: [{selector: 'md-toolbar, mat-toolbar',
-                template: "<div class=\"mat-toolbar-layout\"> <md-toolbar-row> <ng-content></ng-content> </md-toolbar-row> <ng-content select=\"md-toolbar-row, mat-toolbar-row\"></ng-content> </div> ",
-                styles: [".mat-toolbar{display:flex;box-sizing:border-box;width:100%;font-size:20px;font-weight:500;font-family:Roboto,\"Helvetica Neue\",sans-serif;padding:0 16px;flex-direction:column}.mat-toolbar .mat-toolbar-row{display:flex;box-sizing:border-box;width:100%;flex-direction:row;align-items:center;white-space:nowrap}.mat-toolbar{min-height:64px}.mat-toolbar-row{height:64px}@media (max-width:600px){.mat-toolbar{min-height:56px}.mat-toolbar-row{height:56px}} /*# sourceMappingURL=toolbar.css.map */ "],
+                template: "<div class=\"mat-toolbar-layout\"><md-toolbar-row><ng-content></ng-content></md-toolbar-row><ng-content select=\"md-toolbar-row, mat-toolbar-row\"></ng-content></div>",
+                styles: [".mat-toolbar{display:flex;box-sizing:border-box;width:100%;padding:0 16px;flex-direction:column}.mat-toolbar .mat-toolbar-row{display:flex;box-sizing:border-box;width:100%;flex-direction:row;align-items:center;white-space:nowrap}.mat-toolbar{min-height:64px}.mat-toolbar-row{height:64px}@media (max-width:600px){.mat-toolbar{min-height:56px}.mat-toolbar-row{height:56px}}"],
+                inputs: ['color'],
                 host: {
-                    '[class.mat-toolbar]': 'true',
+                    'class': 'mat-toolbar',
                     'role': 'toolbar'
                 },
                 changeDetection: ChangeDetectionStrategy.OnPush,
@@ -16349,29 +16218,16 @@ MdToolbar.decorators = [
  * @nocollapse
  */
 MdToolbar.ctorParameters = () => [
+    { type: Renderer2, },
     { type: ElementRef, },
-    { type: Renderer, },
 ];
-MdToolbar.propDecorators = {
-    'color': [{ type: Input },],
-};
 
 class MdToolbarModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdToolbarModule,
-            providers: []
-        };
-    }
 }
 MdToolbarModule.decorators = [
     { type: NgModule, args: [{
-                imports: [CompatibilityModule],
-                exports: [MdToolbar, MdToolbarRow, CompatibilityModule],
+                imports: [MdCommonModule],
+                exports: [MdToolbar, MdToolbarRow, MdCommonModule],
                 declarations: [MdToolbar, MdToolbarRow],
             },] },
 ];
@@ -16381,19 +16237,6 @@ MdToolbarModule.decorators = [
 MdToolbarModule.ctorParameters = () => [];
 
 /**
- * Exception thrown when a tooltip has an invalid position.
- * \@docs-private
- */
-class MdTooltipInvalidPositionError extends MdError {
-    /**
-     * @param {?} position
-     */
-    constructor(position) {
-        super(`Tooltip position "${position}" is invalid.`);
-    }
-}
-
-/**
  * Time in ms to delay before changing the tooltip visibility to hidden
  */
 const TOUCHEND_HIDE_DELAY = 1500;
@@ -16401,6 +16244,38 @@ const TOUCHEND_HIDE_DELAY = 1500;
  * Time in ms to throttle repositioning after scroll events.
  */
 const SCROLL_THROTTLE_MS = 20;
+/**
+ * CSS class that will be attached to the overlay panel.
+ */
+const TOOLTIP_PANEL_CLASS = 'mat-tooltip-panel';
+/**
+ * Creates an error to be thrown if the user supplied an invalid tooltip position.
+ * @param {?} position
+ * @return {?}
+ */
+function getMdTooltipInvalidPositionError(position) {
+    return Error(`Tooltip position "${position}" is invalid.`);
+}
+/**
+ * Injection token that determines the scroll handling while a tooltip is visible.
+ */
+const MD_TOOLTIP_SCROLL_STRATEGY = new InjectionToken('md-tooltip-scroll-strategy');
+/**
+ * \@docs-private
+ * @param {?} overlay
+ * @return {?}
+ */
+function MD_TOOLTIP_SCROLL_STRATEGY_PROVIDER_FACTORY(overlay) {
+    return () => overlay.scrollStrategies.reposition({ scrollThrottle: SCROLL_THROTTLE_MS });
+}
+/**
+ * \@docs-private
+ */
+const MD_TOOLTIP_SCROLL_STRATEGY_PROVIDER = {
+    provide: MD_TOOLTIP_SCROLL_STRATEGY,
+    deps: [Overlay],
+    useFactory: MD_TOOLTIP_SCROLL_STRATEGY_PROVIDER_FACTORY
+};
 /**
  * Directive that attaches a material design tooltip to the host element. Animates the showing and
  * hiding of a tooltip provided position (defaults to below the element).
@@ -16416,9 +16291,10 @@ class MdTooltip {
      * @param {?} _ngZone
      * @param {?} _renderer
      * @param {?} _platform
+     * @param {?} _scrollStrategy
      * @param {?} _dir
      */
-    constructor(_overlay, _elementRef, _scrollDispatcher, _viewContainerRef, _ngZone, _renderer, _platform, _dir) {
+    constructor(_overlay, _elementRef, _scrollDispatcher, _viewContainerRef, _ngZone, _renderer, _platform, _scrollStrategy, _dir) {
         this._overlay = _overlay;
         this._elementRef = _elementRef;
         this._scrollDispatcher = _scrollDispatcher;
@@ -16426,6 +16302,7 @@ class MdTooltip {
         this._ngZone = _ngZone;
         this._renderer = _renderer;
         this._platform = _platform;
+        this._scrollStrategy = _scrollStrategy;
         this._dir = _dir;
         this._position = 'below';
         this._disabled = false;
@@ -16440,8 +16317,10 @@ class MdTooltip {
         // The mouse events shouldn't be bound on iOS devices, because
         // they can prevent the first tap from firing its click event.
         if (!_platform.IOS) {
-            _renderer.listen(_elementRef.nativeElement, 'mouseenter', () => this.show());
-            _renderer.listen(_elementRef.nativeElement, 'mouseleave', () => this.hide());
+            this._enterListener =
+                _renderer.listen(_elementRef.nativeElement, 'mouseenter', () => this.show());
+            this._leaveListener =
+                _renderer.listen(_elementRef.nativeElement, 'mouseleave', () => this.hide());
         }
     }
     /**
@@ -16500,8 +16379,21 @@ class MdTooltip {
      */
     set message(value) {
         this._message = value;
+        this._setTooltipMessage(this._message);
+    }
+    /**
+     * Classes to be passed to the tooltip. Supports the same syntax as `ngClass`.
+     * @return {?}
+     */
+    get tooltipClass() { return this._tooltipClass; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set tooltipClass(value) {
+        this._tooltipClass = value;
         if (this._tooltipInstance) {
-            this._setTooltipMessage(this._message);
+            this._setTooltipClass(this._tooltipClass);
         }
     }
     /**
@@ -16562,15 +16454,12 @@ class MdTooltip {
     /**
      * @return {?}
      */
-    ngOnInit() {
-        // When a scroll on the page occurs, update the position in case this tooltip needs
-        // to be repositioned.
-        this.scrollSubscription = this._scrollDispatcher.scrolled(SCROLL_THROTTLE_MS, () => {
-            if (this._overlayRef) {
-                this._overlayRef.updatePosition();
-            }
-        });
-    }
+    get _matClass() { return this.tooltipClass; }
+    /**
+     * @param {?} v
+     * @return {?}
+     */
+    set _matClass(v) { this.tooltipClass = v; }
     /**
      * Dispose the tooltip when destroyed.
      * @return {?}
@@ -16579,8 +16468,10 @@ class MdTooltip {
         if (this._tooltipInstance) {
             this._disposeTooltip();
         }
-        if (this.scrollSubscription) {
-            this.scrollSubscription.unsubscribe();
+        // Clean up the event listeners set in the constructor
+        if (!this._platform.IOS) {
+            this._enterListener();
+            this._leaveListener();
         }
     }
     /**
@@ -16595,8 +16486,9 @@ class MdTooltip {
         if (!this._tooltipInstance) {
             this._createTooltip();
         }
-        this._setTooltipMessage(this._message);
-        this._tooltipInstance.show(this._position, delay);
+        this._setTooltipClass(this._tooltipClass);
+        this._setTooltipMessage(this._message); /** @type {?} */
+        ((this._tooltipInstance)).show(this._position, delay);
     }
     /**
      * Hides the tooltip after the delay in ms, defaults to tooltip-delay-hide or 0ms if no input
@@ -16627,11 +16519,12 @@ class MdTooltip {
      * @return {?}
      */
     _createTooltip() {
-        this._createOverlay();
+        let /** @type {?} */ overlayRef = this._createOverlay();
         let /** @type {?} */ portal = new ComponentPortal(TooltipComponent, this._viewContainerRef);
-        this._tooltipInstance = this._overlayRef.attach(portal).instance;
+        this._tooltipInstance = overlayRef.attach(portal).instance; /** @type {?} */
+        ((
         // Dispose the overlay when finished the shown tooltip.
-        this._tooltipInstance.afterHidden().subscribe(() => {
+        this._tooltipInstance)).afterHidden().subscribe(() => {
             // Check first if the tooltip has already been removed through this components destroy.
             if (this._tooltipInstance) {
                 this._disposeTooltip();
@@ -16657,16 +16550,22 @@ class MdTooltip {
             }
         });
         let /** @type {?} */ config = new OverlayState();
+        config.direction = this._dir ? this._dir.value : 'ltr';
         config.positionStrategy = strategy;
+        config.panelClass = TOOLTIP_PANEL_CLASS;
+        config.scrollStrategy = this._scrollStrategy();
         this._overlayRef = this._overlay.create(config);
+        return this._overlayRef;
     }
     /**
      * Disposes the current tooltip and the overlay it is attached to
      * @return {?}
      */
     _disposeTooltip() {
-        this._overlayRef.dispose();
-        this._overlayRef = null;
+        if (this._overlayRef) {
+            this._overlayRef.dispose();
+            this._overlayRef = null;
+        }
         this._tooltipInstance = null;
     }
     /**
@@ -16688,7 +16587,7 @@ class MdTooltip {
             this.position == 'before' && !isDirectionLtr) {
             return { originX: 'end', originY: 'center' };
         }
-        throw new MdTooltipInvalidPositionError(this.position);
+        throw getMdTooltipInvalidPositionError(this.position);
     }
     /**
      * Returns the overlay position based on the user's preference
@@ -16712,7 +16611,7 @@ class MdTooltip {
             this.position == 'before' && !isLtr) {
             return { overlayX: 'start', overlayY: 'center' };
         }
-        throw new MdTooltipInvalidPositionError(this.position);
+        throw getMdTooltipInvalidPositionError(this.position);
     }
     /**
      * Updates the tooltip message and repositions the overlay according to the new message length
@@ -16722,13 +16621,26 @@ class MdTooltip {
     _setTooltipMessage(message) {
         // Must wait for the message to be painted to the tooltip so that the overlay can properly
         // calculate the correct positioning based on the size of the text.
-        this._tooltipInstance.message = message;
-        this._tooltipInstance._markForCheck();
-        this._ngZone.onMicrotaskEmpty.first().subscribe(() => {
-            if (this._tooltipInstance) {
-                this._overlayRef.updatePosition();
-            }
-        });
+        if (this._tooltipInstance) {
+            this._tooltipInstance.message = message;
+            this._tooltipInstance._markForCheck();
+            first.call(this._ngZone.onMicrotaskEmpty).subscribe(() => {
+                if (this._tooltipInstance) {
+                    ((this._overlayRef)).updatePosition();
+                }
+            });
+        }
+    }
+    /**
+     * Updates the tooltip class
+     * @param {?} tooltipClass
+     * @return {?}
+     */
+    _setTooltipClass(tooltipClass) {
+        if (this._tooltipInstance) {
+            this._tooltipInstance.tooltipClass = tooltipClass;
+            this._tooltipInstance._markForCheck();
+        }
     }
 }
 MdTooltip.decorators = [
@@ -16750,9 +16662,10 @@ MdTooltip.ctorParameters = () => [
     { type: ScrollDispatcher, },
     { type: ViewContainerRef, },
     { type: NgZone, },
-    { type: Renderer, },
+    { type: Renderer2, },
     { type: Platform, },
-    { type: Dir, decorators: [{ type: Optional },] },
+    { type: undefined, decorators: [{ type: Inject, args: [MD_TOOLTIP_SCROLL_STRATEGY,] },] },
+    { type: Directionality, decorators: [{ type: Optional },] },
 ];
 MdTooltip.propDecorators = {
     'position': [{ type: Input, args: ['mdTooltipPosition',] },],
@@ -16761,12 +16674,14 @@ MdTooltip.propDecorators = {
     'showDelay': [{ type: Input, args: ['mdTooltipShowDelay',] },],
     'hideDelay': [{ type: Input, args: ['mdTooltipHideDelay',] },],
     'message': [{ type: Input, args: ['mdTooltip',] },],
+    'tooltipClass': [{ type: Input, args: ['mdTooltipClass',] },],
     '_deprecatedMessage': [{ type: Input, args: ['md-tooltip',] },],
     '_matMessage': [{ type: Input, args: ['matTooltip',] },],
     '_matPosition': [{ type: Input, args: ['matTooltipPosition',] },],
     '_matDisabled': [{ type: Input, args: ['matTooltipDisabled',] },],
     '_matHideDelay': [{ type: Input, args: ['matTooltipHideDelay',] },],
     '_matShowDelay': [{ type: Input, args: ['matTooltipShowDelay',] },],
+    '_matClass': [{ type: Input, args: ['matTooltipClass',] },],
 };
 /**
  * Internal component that wraps the tooltip's content.
@@ -16880,7 +16795,7 @@ class TooltipComponent {
             case 'below':
                 this._transformOrigin = 'top';
                 break;
-            default: throw new MdTooltipInvalidPositionError(value);
+            default: throw getMdTooltipInvalidPositionError(value);
         }
     }
     /**
@@ -16915,8 +16830,10 @@ class TooltipComponent {
 }
 TooltipComponent.decorators = [
     { type: Component, args: [{selector: 'md-tooltip-component, mat-tooltip-component',
-                template: "<div class=\"mat-tooltip\" [style.transform-origin]=\"_transformOrigin\" [@state]=\"_visibility\" (@state.done)=\"_afterVisibilityAnimation($event)\"> {{message}} </div>",
-                styles: [":host{pointer-events:none}.mat-tooltip{color:#fff;padding:6px 8px;border-radius:2px;font-family:Roboto,\"Helvetica Neue\",sans-serif;font-size:10px;margin:14px;max-width:250px}@media screen and (-ms-high-contrast:active){.mat-tooltip{outline:solid 1px}} /*# sourceMappingURL=tooltip.css.map */ "],
+                template: "<div class=\"mat-tooltip\" [ngClass]=\"tooltipClass\" [style.transform-origin]=\"_transformOrigin\" [@state]=\"_visibility\" (@state.done)=\"_afterVisibilityAnimation($event)\">{{message}}</div>",
+                styles: [".mat-tooltip-panel{pointer-events:none!important}.mat-tooltip{color:#fff;border-radius:2px;margin:14px;max-width:250px;padding-left:8px;padding-right:8px}@media screen and (-ms-high-contrast:active){.mat-tooltip{outline:solid 1px}}"],
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
                 animations: [
                     trigger('state', [
                         state('void', style({ transform: 'scale(0)' })),
@@ -16928,6 +16845,9 @@ TooltipComponent.decorators = [
                     ])
                 ],
                 host: {
+                    // Forces the element to have a layout in IE and Edge. This fixes issues where the element
+                    // won't be rendered if the animations are disabled or there is no web animations polyfill.
+                    '[style.zoom]': '_visibility === "visible" ? 1 : null',
                     '(body:click)': 'this._handleBodyInteraction()'
                 }
             },] },
@@ -16936,28 +16856,24 @@ TooltipComponent.decorators = [
  * @nocollapse
  */
 TooltipComponent.ctorParameters = () => [
-    { type: Dir, decorators: [{ type: Optional },] },
+    { type: Directionality, decorators: [{ type: Optional },] },
     { type: ChangeDetectorRef, },
 ];
 
 class MdTooltipModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdTooltipModule,
-            providers: []
-        };
-    }
 }
 MdTooltipModule.decorators = [
     { type: NgModule, args: [{
-                imports: [OverlayModule, CompatibilityModule, PlatformModule],
-                exports: [MdTooltip, TooltipComponent, CompatibilityModule],
+                imports: [
+                    CommonModule,
+                    OverlayModule,
+                    MdCommonModule,
+                    PlatformModule
+                ],
+                exports: [MdTooltip, TooltipComponent, MdCommonModule],
                 declarations: [MdTooltip, TooltipComponent],
                 entryComponents: [TooltipComponent],
+                providers: [MD_TOOLTIP_SCROLL_STRATEGY_PROVIDER],
             },] },
 ];
 /**
@@ -16966,93 +16882,87 @@ MdTooltipModule.decorators = [
 MdTooltipModule.ctorParameters = () => [];
 
 /**
- * Exception thrown when menu trigger doesn't have a valid md-menu instance
+ * Throws an exception for the case when menu trigger doesn't have a valid md-menu instance
  * \@docs-private
+ * @return {?}
  */
-class MdMenuMissingError extends MdError {
-    constructor() {
-        super(`md-menu-trigger: must pass in an md-menu instance.
+function throwMdMenuMissingError() {
+    throw Error(`md-menu-trigger: must pass in an md-menu instance.
 
     Example:
       <md-menu #menu="mdMenu"></md-menu>
-      <button [mdMenuTriggerFor]="menu"></button>
-    `);
-    }
+      <button [mdMenuTriggerFor]="menu"></button>`);
 }
 /**
- * Exception thrown when menu's x-position value isn't valid.
+ * Throws an exception for the case when menu's x-position value isn't valid.
  * In other words, it doesn't match 'before' or 'after'.
  * \@docs-private
+ * @return {?}
  */
-class MdMenuInvalidPositionX extends MdError {
-    constructor() {
-        super(`x-position value must be either 'before' or after'.
-      Example: <md-menu x-position="before" #menu="mdMenu"></md-menu>
-    `);
-    }
+function throwMdMenuInvalidPositionX() {
+    throw Error(`x-position value must be either 'before' or after'.
+      Example: <md-menu x-position="before" #menu="mdMenu"></md-menu>`);
 }
 /**
- * Exception thrown when menu's y-position value isn't valid.
+ * Throws an exception for the case when menu's y-position value isn't valid.
  * In other words, it doesn't match 'above' or 'below'.
  * \@docs-private
+ * @return {?}
  */
-class MdMenuInvalidPositionY extends MdError {
-    constructor() {
-        super(`y-position value must be either 'above' or below'.
-      Example: <md-menu y-position="above" #menu="mdMenu"></md-menu>
-    `);
-    }
+function throwMdMenuInvalidPositionY() {
+    throw Error(`y-position value must be either 'above' or below'.
+      Example: <md-menu y-position="above" #menu="mdMenu"></md-menu>`);
 }
 
+/**
+ * \@docs-private
+ */
+class MdMenuItemBase {
+}
+const _MdMenuItemMixinBase = mixinDisabled(MdMenuItemBase);
 /**
  * This directive is intended to be used inside an md-menu tag.
  * It exists mostly to set the role attribute.
  */
-class MdMenuItem {
+class MdMenuItem extends _MdMenuItemMixinBase {
     /**
-     * @param {?} _renderer
      * @param {?} _elementRef
      */
-    constructor(_renderer, _elementRef) {
-        this._renderer = _renderer;
+    constructor(_elementRef) {
+        super();
         this._elementRef = _elementRef;
         /**
-         * Whether the menu item is disabled
+         * Stream that emits when the menu item is hovered.
          */
-        this._disabled = false;
+        this.hover = new Subject();
+        /**
+         * Whether the menu item is highlighted.
+         */
+        this._highlighted = false;
+        /**
+         * Whether the menu item acts as a trigger for a sub-menu.
+         */
+        this._triggersSubmenu = false;
     }
     /**
      * Focuses the menu item.
      * @return {?}
      */
     focus() {
-        this._renderer.invokeElementMethod(this._getHostElement(), 'focus');
+        this._getHostElement().focus();
     }
     /**
-     * Whether the menu item is disabled.
      * @return {?}
      */
-    get disabled() { return this._disabled; }
-    /**
-     * @param {?} value
-     * @return {?}
-     */
-    set disabled(value) {
-        this._disabled = coerceBooleanProperty(value);
+    ngOnDestroy() {
+        this.hover.complete();
     }
     /**
      * Used to set the `tabindex`.
      * @return {?}
      */
     _getTabIndex() {
-        return this._disabled ? '-1' : '0';
-    }
-    /**
-     * Used to set the HTML `disabled` attribute. Necessary for links to be disabled properly.
-     * @return {?}
-     */
-    _getDisabledAttr() {
-        return this._disabled ? true : null;
+        return this.disabled ? '-1' : '0';
     }
     /**
      * Returns the host DOM element.
@@ -17072,35 +16982,46 @@ class MdMenuItem {
             event.stopPropagation();
         }
     }
+    /**
+     * Emits to the hover stream.
+     * @return {?}
+     */
+    _emitHoverEvent() {
+        if (!this.disabled) {
+            this.hover.next(this);
+        }
+    }
 }
 MdMenuItem.decorators = [
     { type: Component, args: [{selector: '[md-menu-item], [mat-menu-item]',
+                inputs: ['disabled'],
                 host: {
                     'role': 'menuitem',
-                    '[class.mat-menu-item]': 'true',
+                    'class': 'mat-menu-item',
+                    '[class.mat-menu-item-highlighted]': '_highlighted',
+                    '[class.mat-menu-item-submenu-trigger]': '_triggersSubmenu',
                     '[attr.tabindex]': '_getTabIndex()',
                     '[attr.aria-disabled]': 'disabled.toString()',
-                    '[attr.disabled]': '_getDisabledAttr()',
+                    '[attr.disabled]': 'disabled || null',
                     '(click)': '_checkDisabled($event)',
+                    '(mouseenter)': '_emitHoverEvent()',
                 },
-                template: "<ng-content></ng-content> <div class=\"mat-menu-ripple\" *ngIf=\"!disabled\" md-ripple [mdRippleTrigger]=\"_getHostElement()\"> </div> ",
-                exportAs: 'mdMenuItem'
+                changeDetection: ChangeDetectionStrategy.OnPush,
+                template: "<ng-content></ng-content><div class=\"mat-menu-ripple\" *ngIf=\"!disabled\" md-ripple [mdRippleTrigger]=\"_getHostElement()\"></div>",
+                exportAs: 'mdMenuItem',
             },] },
 ];
 /**
  * @nocollapse
  */
 MdMenuItem.ctorParameters = () => [
-    { type: Renderer, },
     { type: ElementRef, },
 ];
-MdMenuItem.propDecorators = {
-    'disabled': [{ type: Input },],
-};
 
 /**
  * Below are all the animations for the md-menu component.
- * Animation duration and timing values are based on AngularJS Material.
+ * Animation duration and timing values are based on:
+ * https://material.io/guidelines/components/menus.html#menus-usage
  */
 /**
  * This animation controls the menu panel's entry and exit from the page.
@@ -17112,20 +17033,22 @@ MdMenuItem.propDecorators = {
  */
 // TODO(kara): switch to :enter and :leave once Mobile Safari is sorted out.
 const transformMenu = trigger('transformMenu', [
-    state('showing', style({
-        opacity: 1,
-        transform: `scale(1)`
+    state('void', style({
+        opacity: 0,
+        // This starts off from 0.01, instead of 0, because there's an issue in the Angular animations
+        // as of 4.2, which causes the animation to be skipped if it starts from 0.
+        transform: 'scale(0.01, 0.01)'
     })),
-    transition('void => *', [
-        style({
-            opacity: 0,
-            transform: `scale(0)`
-        }),
-        animate(`200ms cubic-bezier(0.25, 0.8, 0.25, 1)`)
-    ]),
-    transition('* => void', [
-        animate('50ms 100ms linear', style({ opacity: 0 }))
-    ])
+    state('enter-start', style({
+        opacity: 1,
+        transform: 'scale(1, 0.5)'
+    })),
+    state('enter', style({
+        transform: 'scale(1, 1)'
+    })),
+    transition('void => enter-start', animate('100ms linear')),
+    transition('enter-start => enter', animate('300ms cubic-bezier(0.25, 0.8, 0.25, 1)')),
+    transition('* => void', animate('150ms 50ms linear', style({ opacity: 0 })))
 ]);
 /**
  * This animation fades in the background color and content of the menu panel
@@ -17135,67 +17058,77 @@ const fadeInItems = trigger('fadeInItems', [
     state('showing', style({ opacity: 1 })),
     transition('void => *', [
         style({ opacity: 0 }),
-        animate(`200ms 100ms cubic-bezier(0.55, 0, 0.55, 0.2)`)
+        animate('400ms 100ms cubic-bezier(0.55, 0, 0.55, 0.2)')
     ])
 ]);
 
-// TODO(kara): prevent-close functionality
+/**
+ * Injection token to be used to override the default options for `md-menu`.
+ */
+const MD_MENU_DEFAULT_OPTIONS = new InjectionToken('md-menu-default-options');
+/**
+ * Start elevation for the menu panel.
+ * \@docs-private
+ */
+const MD_MENU_BASE_ELEVATION = 2;
 class MdMenu {
     /**
-     * @param {?} posX
-     * @param {?} posY
-     * @param {?} deprecatedPosX
-     * @param {?} deprecatedPosY
+     * @param {?} _elementRef
+     * @param {?} _defaultOptions
      */
-    constructor(posX, posY, deprecatedPosX, deprecatedPosY) {
+    constructor(_elementRef, _defaultOptions) {
+        this._elementRef = _elementRef;
+        this._defaultOptions = _defaultOptions;
+        this._xPosition = this._defaultOptions.xPosition;
+        this._yPosition = this._defaultOptions.yPosition;
         /**
          * Config object to be passed into the menu's ngClass
          */
         this._classList = {};
         /**
-         * Position of the menu in the X axis.
+         * Current state of the panel animation.
          */
-        this.positionX = 'after';
+        this._panelAnimationState = 'void';
         /**
-         * Position of the menu in the Y axis.
+         * Whether the menu should overlap its trigger.
          */
-        this.positionY = 'below';
-        this.overlapTrigger = true;
+        this.overlapTrigger = this._defaultOptions.overlapTrigger;
         /**
          * Event emitted when the menu is closed.
          */
         this.close = new EventEmitter();
-        // TODO(kara): Remove kebab-case attributes after next release
-        if (deprecatedPosX) {
-            this._setPositionX(deprecatedPosX);
-        }
-        if (deprecatedPosY) {
-            this._setPositionY(deprecatedPosY);
-        }
-        if (posX) {
-            this._setPositionX(posX);
-        }
-        if (posY) {
-            this._setPositionY(posY);
-        }
-        this.setPositionClasses(this.positionX, this.positionY);
     }
     /**
+     * Position of the menu in the X axis.
      * @return {?}
      */
-    ngAfterContentInit() {
-        this._keyManager = new FocusKeyManager(this.items).withWrap();
-        this._tabSubscription = this._keyManager.tabOut.subscribe(() => {
-            this._emitCloseEvent();
-        });
+    get xPosition() { return this._xPosition; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set xPosition(value) {
+        if (value !== 'before' && value !== 'after') {
+            throwMdMenuInvalidPositionX();
+        }
+        this._xPosition = value;
+        this.setPositionClasses();
     }
     /**
+     * Position of the menu in the Y axis.
      * @return {?}
      */
-    ngOnDestroy() {
-        if (this._tabSubscription) {
-            this._tabSubscription.unsubscribe();
+    get yPosition() { return this._yPosition; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set yPosition(value) {
+        if (value !== 'above' && value !== 'below') {
+            throwMdMenuInvalidPositionY();
         }
+        this._yPosition = value;
+        this.setPositionClasses();
     }
     /**
      * This method takes classes set on the host md-menu element and applies them on the
@@ -17205,11 +17138,63 @@ class MdMenu {
      * @return {?}
      */
     set classList(classes) {
-        this._classList = classes.split(' ').reduce((obj, className) => {
-            obj[className] = true;
-            return obj;
-        }, {});
-        this.setPositionClasses(this.positionX, this.positionY);
+        if (classes && classes.length) {
+            this._classList = classes.split(' ').reduce((obj, className) => {
+                obj[className] = true;
+                return obj;
+            }, {});
+            this._elementRef.nativeElement.className = '';
+            this.setPositionClasses();
+        }
+    }
+    /**
+     * @return {?}
+     */
+    ngAfterContentInit() {
+        this._keyManager = new FocusKeyManager(this.items).withWrap();
+        this._tabSubscription = this._keyManager.tabOut.subscribe(() => this.close.emit('keydown'));
+    }
+    /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        if (this._tabSubscription) {
+            this._tabSubscription.unsubscribe();
+        }
+        this.close.emit();
+        this.close.complete();
+    }
+    /**
+     * Stream that emits whenever the hovered menu item changes.
+     * @return {?}
+     */
+    hover() {
+        return merge(...this.items.map(item => item.hover));
+    }
+    /**
+     * Handle a keyboard event from the menu, delegating to the appropriate action.
+     * @param {?} event
+     * @return {?}
+     */
+    _handleKeydown(event) {
+        switch (event.keyCode) {
+            case ESCAPE:
+                this.close.emit('keydown');
+                event.stopPropagation();
+                break;
+            case LEFT_ARROW:
+                if (this.parentMenu && this.direction === 'ltr') {
+                    this.close.emit('keydown');
+                }
+                break;
+            case RIGHT_ARROW:
+                if (this.parentMenu && this.direction === 'rtl') {
+                    this.close.emit('keydown');
+                }
+                break;
+            default:
+                this._keyManager.onKeydown(event);
+        }
     }
     /**
      * Focus the first item in the menu. This method is used by the menu trigger
@@ -17220,52 +17205,66 @@ class MdMenu {
         this._keyManager.setFirstItemActive();
     }
     /**
-     * This emits a close event to which the trigger is subscribed. When emitted, the
-     * trigger will close the menu.
-     * @return {?}
-     */
-    _emitCloseEvent() {
-        this.close.emit();
-    }
-    /**
-     * @param {?} pos
-     * @return {?}
-     */
-    _setPositionX(pos) {
-        if (pos !== 'before' && pos !== 'after') {
-            throw new MdMenuInvalidPositionX();
-        }
-        this.positionX = pos;
-    }
-    /**
-     * @param {?} pos
-     * @return {?}
-     */
-    _setPositionY(pos) {
-        if (pos !== 'above' && pos !== 'below') {
-            throw new MdMenuInvalidPositionY();
-        }
-        this.positionY = pos;
-    }
-    /**
      * It's necessary to set position-based classes to ensure the menu panel animation
      * folds out from the correct direction.
-     * @param {?} posX
-     * @param {?} posY
+     * @param {?=} posX
+     * @param {?=} posY
      * @return {?}
      */
-    setPositionClasses(posX, posY) {
-        this._classList['mat-menu-before'] = posX == 'before';
-        this._classList['mat-menu-after'] = posX == 'after';
-        this._classList['mat-menu-above'] = posY == 'above';
-        this._classList['mat-menu-below'] = posY == 'below';
+    setPositionClasses(posX = this.xPosition, posY = this.yPosition) {
+        this._classList['mat-menu-before'] = posX === 'before';
+        this._classList['mat-menu-after'] = posX === 'after';
+        this._classList['mat-menu-above'] = posY === 'above';
+        this._classList['mat-menu-below'] = posY === 'below';
+    }
+    /**
+     * Sets the menu panel elevation.
+     * @param {?} depth Number of parent menus that come before the menu.
+     * @return {?}
+     */
+    setElevation(depth) {
+        // The elevation starts at the base and increases by one for each level.
+        const /** @type {?} */ newElevation = `mat-elevation-z${MD_MENU_BASE_ELEVATION + depth}`;
+        const /** @type {?} */ customElevation = Object.keys(this._classList).find(c => c.startsWith('mat-elevation-z'));
+        if (!customElevation || customElevation === this._previousElevation) {
+            if (this._previousElevation) {
+                this._classList[this._previousElevation] = false;
+            }
+            this._classList[newElevation] = true;
+            this._previousElevation = newElevation;
+        }
+    }
+    /**
+     * Starts the enter animation.
+     * @return {?}
+     */
+    _startAnimation() {
+        this._panelAnimationState = 'enter-start';
+    }
+    /**
+     * Resets the panel animation to its initial state.
+     * @return {?}
+     */
+    _resetAnimation() {
+        this._panelAnimationState = 'void';
+    }
+    /**
+     * Callback that is invoked when the panel animation completes.
+     * @param {?} event
+     * @return {?}
+     */
+    _onAnimationDone(event) {
+        // After the initial expansion is done, trigger the second phase of the enter animation.
+        if (event.toState === 'enter-start') {
+            this._panelAnimationState = 'enter';
+        }
     }
 }
 MdMenu.decorators = [
     { type: Component, args: [{selector: 'md-menu, mat-menu',
-                host: { 'role': 'menu' },
-                template: "<ng-template> <div class=\"mat-menu-panel\" [ngClass]=\"_classList\" (keydown)=\"_keyManager.onKeydown($event)\" (click)=\"_emitCloseEvent()\" [@transformMenu]=\"'showing'\"> <div class=\"mat-menu-content\" [@fadeInItems]=\"'showing'\"> <ng-content></ng-content> </div> </div> </ng-template> ",
-                styles: [".mat-menu-panel{box-shadow:0 5px 5px -3px rgba(0,0,0,.2),0 8px 10px 1px rgba(0,0,0,.14),0 3px 14px 2px rgba(0,0,0,.12);min-width:112px;max-width:280px;overflow:auto;-webkit-overflow-scrolling:touch;max-height:calc(100vh - 48px)}.mat-menu-panel.mat-menu-after.mat-menu-below{transform-origin:left top}.mat-menu-panel.mat-menu-after.mat-menu-above{transform-origin:left bottom}.mat-menu-panel.mat-menu-before.mat-menu-below{transform-origin:right top}.mat-menu-panel.mat-menu-before.mat-menu-above{transform-origin:right bottom}[dir=rtl] .mat-menu-panel.mat-menu-after.mat-menu-below{transform-origin:right top}[dir=rtl] .mat-menu-panel.mat-menu-after.mat-menu-above{transform-origin:right bottom}[dir=rtl] .mat-menu-panel.mat-menu-before.mat-menu-below{transform-origin:left top}[dir=rtl] .mat-menu-panel.mat-menu-before.mat-menu-above{transform-origin:left bottom}@media screen and (-ms-high-contrast:active){.mat-menu-panel{outline:solid 1px}}.mat-menu-content{padding-top:8px;padding-bottom:8px}.mat-menu-item{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;cursor:pointer;outline:0;border:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;line-height:48px;height:48px;padding:0 16px;font-size:16px;font-family:Roboto,\"Helvetica Neue\",sans-serif;text-align:left;text-decoration:none;position:relative}.mat-menu-item[disabled]{cursor:default}[dir=rtl] .mat-menu-item{text-align:right}.mat-menu-item .mat-icon{margin-right:16px}[dir=rtl] .mat-menu-item .mat-icon{margin-left:16px;margin-right:0}button.mat-menu-item{width:100%}.mat-menu-ripple{position:absolute;top:0;left:0;bottom:0;right:0} /*# sourceMappingURL=menu.css.map */ "],
+                template: "<ng-template><div class=\"mat-menu-panel\" [ngClass]=\"_classList\" (keydown)=\"_handleKeydown($event)\" (click)=\"close.emit('click')\" [@transformMenu]=\"_panelAnimationState\" (@transformMenu.done)=\"_onAnimationDone($event)\" role=\"menu\"><div class=\"mat-menu-content\" [@fadeInItems]=\"'showing'\"><ng-content></ng-content></div></div></ng-template>",
+                styles: [".mat-menu-panel{min-width:112px;max-width:280px;overflow:auto;-webkit-overflow-scrolling:touch;max-height:calc(100vh - 48px);border-radius:2px}.mat-menu-panel:not([class*=mat-elevation-z]){box-shadow:0 3px 1px -2px rgba(0,0,0,.2),0 2px 2px 0 rgba(0,0,0,.14),0 1px 5px 0 rgba(0,0,0,.12)}.mat-menu-panel.mat-menu-after.mat-menu-below{transform-origin:left top}.mat-menu-panel.mat-menu-after.mat-menu-above{transform-origin:left bottom}.mat-menu-panel.mat-menu-before.mat-menu-below{transform-origin:right top}.mat-menu-panel.mat-menu-before.mat-menu-above{transform-origin:right bottom}[dir=rtl] .mat-menu-panel.mat-menu-after.mat-menu-below{transform-origin:right top}[dir=rtl] .mat-menu-panel.mat-menu-after.mat-menu-above{transform-origin:right bottom}[dir=rtl] .mat-menu-panel.mat-menu-before.mat-menu-below{transform-origin:left top}[dir=rtl] .mat-menu-panel.mat-menu-before.mat-menu-above{transform-origin:left bottom}.mat-menu-panel.ng-animating{pointer-events:none}@media screen and (-ms-high-contrast:active){.mat-menu-panel{outline:solid 1px}}.mat-menu-content{padding-top:8px;padding-bottom:8px}.mat-menu-item{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;cursor:pointer;outline:0;border:none;-webkit-tap-highlight-color:transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;line-height:48px;height:48px;padding:0 16px;text-align:left;text-decoration:none;position:relative}.mat-menu-item[disabled]{cursor:default}[dir=rtl] .mat-menu-item{text-align:right}.mat-menu-item .mat-icon{margin-right:16px}[dir=rtl] .mat-menu-item .mat-icon{margin-left:16px;margin-right:0}.mat-menu-item .mat-icon{vertical-align:middle}.mat-menu-item-submenu-trigger{padding-right:32px}.mat-menu-item-submenu-trigger::after{width:0;height:0;border-style:solid;border-width:5px 0 5px 5px;border-color:transparent transparent transparent currentColor;content:'';display:inline-block;position:absolute;top:50%;right:16px;transform:translateY(-50%)}[dir=rtl] .mat-menu-item-submenu-trigger{padding-right:8px;padding-left:32px}[dir=rtl] .mat-menu-item-submenu-trigger::after{right:auto;left:16px;transform:rotateY(180deg) translateY(-50%)}button.mat-menu-item{width:100%}.mat-menu-ripple{position:absolute;top:0;left:0;bottom:0;right:0}"],
+                changeDetection: ChangeDetectionStrategy.OnPush,
                 encapsulation: ViewEncapsulation.None,
                 animations: [
                     transformMenu,
@@ -17278,12 +17277,12 @@ MdMenu.decorators = [
  * @nocollapse
  */
 MdMenu.ctorParameters = () => [
-    { type: undefined, decorators: [{ type: Attribute, args: ['xPosition',] },] },
-    { type: undefined, decorators: [{ type: Attribute, args: ['yPosition',] },] },
-    { type: undefined, decorators: [{ type: Attribute, args: ['x-position',] },] },
-    { type: undefined, decorators: [{ type: Attribute, args: ['y-position',] },] },
+    { type: ElementRef, },
+    { type: undefined, decorators: [{ type: Inject, args: [MD_MENU_DEFAULT_OPTIONS,] },] },
 ];
 MdMenu.propDecorators = {
+    'xPosition': [{ type: Input },],
+    'yPosition': [{ type: Input },],
     'templateRef': [{ type: ViewChild, args: [TemplateRef,] },],
     'items': [{ type: ContentChildren, args: [MdMenuItem,] },],
     'overlapTrigger': [{ type: Input },],
@@ -17291,6 +17290,30 @@ MdMenu.propDecorators = {
     'close': [{ type: Output },],
 };
 
+/**
+ * Injection token that determines the scroll handling while the menu is open.
+ */
+const MD_MENU_SCROLL_STRATEGY = new InjectionToken('md-menu-scroll-strategy');
+/**
+ * \@docs-private
+ * @param {?} overlay
+ * @return {?}
+ */
+function MD_MENU_SCROLL_STRATEGY_PROVIDER_FACTORY(overlay) {
+    return () => overlay.scrollStrategies.reposition();
+}
+/**
+ * \@docs-private
+ */
+const MD_MENU_SCROLL_STRATEGY_PROVIDER = {
+    provide: MD_MENU_SCROLL_STRATEGY,
+    deps: [Overlay],
+    useFactory: MD_MENU_SCROLL_STRATEGY_PROVIDER_FACTORY,
+};
+/**
+ * Default top padding of the menu panel.
+ */
+const MENU_PANEL_TOP_PADDING = 8;
 /**
  * This directive is intended to be used in conjunction with an md-menu tag.  It is
  * responsible for toggling the display of the provided menu instance.
@@ -17300,15 +17323,20 @@ class MdMenuTrigger {
      * @param {?} _overlay
      * @param {?} _element
      * @param {?} _viewContainerRef
-     * @param {?} _renderer
+     * @param {?} _scrollStrategy
+     * @param {?} _parentMenu
+     * @param {?} _menuItemInstance
      * @param {?} _dir
      */
-    constructor(_overlay, _element, _viewContainerRef, _renderer, _dir) {
+    constructor(_overlay, _element, _viewContainerRef, _scrollStrategy, _parentMenu, _menuItemInstance, _dir) {
         this._overlay = _overlay;
         this._element = _element;
         this._viewContainerRef = _viewContainerRef;
-        this._renderer = _renderer;
+        this._scrollStrategy = _scrollStrategy;
+        this._parentMenu = _parentMenu;
+        this._menuItemInstance = _menuItemInstance;
         this._dir = _dir;
+        this._overlayRef = null;
         this._menuOpen = false;
         this._openedByMouse = false;
         /**
@@ -17319,6 +17347,9 @@ class MdMenuTrigger {
          * Event emitted when the associated menu is closed.
          */
         this.onMenuClose = new EventEmitter();
+        if (_menuItemInstance) {
+            _menuItemInstance._triggersSubmenu = this.triggersSubmenu();
+        }
     }
     /**
      * @deprecated
@@ -17354,17 +17385,54 @@ class MdMenuTrigger {
      */
     ngAfterViewInit() {
         this._checkMenu();
-        this.menu.close.subscribe(() => this.closeMenu());
+        this.menu.close.subscribe(reason => {
+            this.closeMenu();
+            // If a click closed the menu, we should close the entire chain of nested menus.
+            if (reason === 'click' && this._parentMenu) {
+                this._parentMenu.close.emit(reason);
+            }
+        });
+        if (this.triggersSubmenu()) {
+            // Subscribe to changes in the hovered item in order to toggle the panel.
+            this._hoverSubscription = filter
+                .call(this._parentMenu.hover(), active => active === this._menuItemInstance)
+                .subscribe(() => {
+                this._openedByMouse = true;
+                this.openMenu();
+            });
+        }
     }
     /**
      * @return {?}
      */
-    ngOnDestroy() { this.destroyMenu(); }
+    ngOnDestroy() {
+        if (this._overlayRef) {
+            this._overlayRef.dispose();
+            this._overlayRef = null;
+        }
+        this._cleanUpSubscriptions();
+    }
     /**
      * Whether the menu is open.
      * @return {?}
      */
-    get menuOpen() { return this._menuOpen; }
+    get menuOpen() {
+        return this._menuOpen;
+    }
+    /**
+     * The text direction of the containing app.
+     * @return {?}
+     */
+    get dir() {
+        return this._dir && this._dir.value === 'rtl' ? 'rtl' : 'ltr';
+    }
+    /**
+     * Whether the menu triggers a sub-menu or a top-level one.
+     * @return {?}
+     */
+    triggersSubmenu() {
+        return !!(this._menuItemInstance && this._parentMenu);
+    }
     /**
      * Toggles the menu between the open and closed states.
      * @return {?}
@@ -17378,10 +17446,12 @@ class MdMenuTrigger {
      */
     openMenu() {
         if (!this._menuOpen) {
-            this._createOverlay();
-            this._overlayRef.attach(this._portal);
-            this._subscribeToBackdrop();
+            this._createOverlay().attach(this._portal);
+            this._closeSubscription = this._menuClosingActions().subscribe(() => this.menu.close.emit());
             this._initMenu();
+            if (this.menu instanceof MdMenu) {
+                this.menu._startAnimation();
+            }
         }
     }
     /**
@@ -17389,21 +17459,13 @@ class MdMenuTrigger {
      * @return {?}
      */
     closeMenu() {
-        if (this._overlayRef) {
+        if (this._overlayRef && this.menuOpen) {
             this._overlayRef.detach();
-            this._backdropSubscription.unsubscribe();
+            this._closeSubscription.unsubscribe();
             this._resetMenu();
-        }
-    }
-    /**
-     * Removes the menu from the DOM.
-     * @return {?}
-     */
-    destroyMenu() {
-        if (this._overlayRef) {
-            this._overlayRef.dispose();
-            this._overlayRef = null;
-            this._cleanUpSubscriptions();
+            if (this.menu instanceof MdMenu) {
+                this.menu._resetAnimation();
+            }
         }
     }
     /**
@@ -17411,26 +17473,7 @@ class MdMenuTrigger {
      * @return {?}
      */
     focus() {
-        this._renderer.invokeElementMethod(this._element.nativeElement, 'focus');
-    }
-    /**
-     * The text direction of the containing app.
-     * @return {?}
-     */
-    get dir() {
-        return this._dir && this._dir.value === 'rtl' ? 'rtl' : 'ltr';
-    }
-    /**
-     * This method ensures that the menu closes when the overlay backdrop is clicked.
-     * We do not use first() here because doing so would not catch clicks from within
-     * the menu, and it would fail to unsubscribe properly. Instead, we unsubscribe
-     * explicitly when the menu is closed or destroyed.
-     * @return {?}
-     */
-    _subscribeToBackdrop() {
-        this._backdropSubscription = this._overlayRef.backdropClick().subscribe(() => {
-            this.menu._emitCloseEvent();
-        });
+        this._element.nativeElement.focus();
     }
     /**
      * This method sets the menu state to open and focuses the first item if
@@ -17438,12 +17481,30 @@ class MdMenuTrigger {
      * @return {?}
      */
     _initMenu() {
+        this.menu.parentMenu = this.triggersSubmenu() ? this._parentMenu : undefined;
+        this.menu.direction = this.dir;
+        this._setMenuElevation();
         this._setIsMenuOpen(true);
         // Should only set focus if opened via the keyboard, so keyboard users can
         // can easily navigate menu items. According to spec, mouse users should not
         // see the focus style.
         if (!this._openedByMouse) {
             this.menu.focusFirstItem();
+        }
+    }
+    /**
+     * Updates the menu elevation based on the amount of parent menus that it has.
+     * @return {?}
+     */
+    _setMenuElevation() {
+        if (this.menu.setElevation) {
+            let /** @type {?} */ depth = 0;
+            let /** @type {?} */ parentMenu = this.menu.parentMenu;
+            while (parentMenu) {
+                depth++;
+                parentMenu = parentMenu.parentMenu;
+            }
+            this.menu.setElevation(depth);
         }
     }
     /**
@@ -17467,20 +17528,23 @@ class MdMenuTrigger {
     _setIsMenuOpen(isOpen) {
         this._menuOpen = isOpen;
         this._menuOpen ? this.onMenuOpen.emit() : this.onMenuClose.emit();
+        if (this.triggersSubmenu()) {
+            this._menuItemInstance._highlighted = isOpen;
+        }
     }
     /**
-     *  This method checks that a valid instance of MdMenu has been passed into
-     *  mdMenuTriggerFor. If not, an exception is thrown.
+     * This method checks that a valid instance of MdMenu has been passed into
+     * mdMenuTriggerFor. If not, an exception is thrown.
      * @return {?}
      */
     _checkMenu() {
         if (!this.menu) {
-            throw new MdMenuMissingError();
+            throwMdMenuMissingError();
         }
     }
     /**
-     *  This method creates the overlay from the provided menu's template and saves its
-     *  OverlayRef so that it can be attached to the DOM when openMenu is called.
+     * This method creates the overlay from the provided menu's template and saves its
+     * OverlayRef so that it can be attached to the DOM when openMenu is called.
      * @return {?}
      */
     _createOverlay() {
@@ -17490,6 +17554,7 @@ class MdMenuTrigger {
             this._subscribeToPositions(/** @type {?} */ (config.positionStrategy));
             this._overlayRef = this._overlay.create(config);
         }
+        return this._overlayRef;
     }
     /**
      * This method builds the configuration object needed to create the overlay, the OverlayState.
@@ -17497,11 +17562,11 @@ class MdMenuTrigger {
      */
     _getOverlayConfig() {
         const /** @type {?} */ overlayState = new OverlayState();
-        overlayState.positionStrategy = this._getPosition()
-            .withDirection(this.dir);
-        overlayState.hasBackdrop = true;
+        overlayState.positionStrategy = this._getPosition();
+        overlayState.hasBackdrop = !this.triggersSubmenu();
         overlayState.backdropClass = 'cdk-overlay-transparent-backdrop';
         overlayState.direction = this.dir;
+        overlayState.scrollStrategy = this._scrollStrategy();
         return overlayState;
     }
     /**
@@ -17512,12 +17577,9 @@ class MdMenuTrigger {
      * @return {?}
      */
     _subscribeToPositions(position) {
-        this._positionSubscription = position.onPositionChange.subscribe((change) => {
-            const /** @type {?} */ posX = change.connectionPair.originX === 'start' ? 'after' : 'before';
-            let /** @type {?} */ posY = change.connectionPair.originY === 'top' ? 'below' : 'above';
-            if (!this.menu.overlapTrigger) {
-                posY = posY === 'below' ? 'above' : 'below';
-            }
+        this._positionSubscription = position.onPositionChange.subscribe(change => {
+            const /** @type {?} */ posX = change.connectionPair.overlayX === 'start' ? 'after' : 'before';
+            const /** @type {?} */ posY = change.connectionPair.overlayY === 'top' ? 'below' : 'above';
             this.menu.setPositionClasses(posX, posY);
         });
     }
@@ -17527,38 +17589,93 @@ class MdMenuTrigger {
      * @return {?} ConnectedPositionStrategy
      */
     _getPosition() {
-        const [posX, fallbackX] = this.menu.positionX === 'before' ? ['end', 'start'] : ['start', 'end'];
-        const [overlayY, fallbackOverlayY] = this.menu.positionY === 'above' ? ['bottom', 'top'] : ['top', 'bottom'];
-        let /** @type {?} */ originY = overlayY;
-        let /** @type {?} */ fallbackOriginY = fallbackOverlayY;
-        if (!this.menu.overlapTrigger) {
+        let [originX, originFallbackX] = this.menu.xPosition === 'before' ? ['end', 'start'] : ['start', 'end'];
+        let [overlayY, overlayFallbackY] = this.menu.yPosition === 'above' ? ['bottom', 'top'] : ['top', 'bottom'];
+        let [originY, originFallbackY] = [overlayY, overlayFallbackY];
+        let [overlayX, overlayFallbackX] = [originX, originFallbackX];
+        let /** @type {?} */ offsetY = 0;
+        if (this.triggersSubmenu()) {
+            // When the menu is a sub-menu, it should always align itself
+            // to the edges of the trigger, instead of overlapping it.
+            overlayFallbackX = originX = this.menu.xPosition === 'before' ? 'start' : 'end';
+            originFallbackX = overlayX = originX === 'end' ? 'start' : 'end';
+            // TODO(crisbeto): this should be a function, once the overlay supports it.
+            // Right now it will be wrong for the fallback positions.
+            offsetY = overlayY === 'bottom' ? MENU_PANEL_TOP_PADDING : -MENU_PANEL_TOP_PADDING;
+        }
+        else if (!this.menu.overlapTrigger) {
             originY = overlayY === 'top' ? 'bottom' : 'top';
-            fallbackOriginY = fallbackOverlayY === 'top' ? 'bottom' : 'top';
+            originFallbackY = overlayFallbackY === 'top' ? 'bottom' : 'top';
         }
         return this._overlay.position()
-            .connectedTo(this._element, { originX: posX, originY: originY }, { overlayX: posX, overlayY: overlayY })
-            .withFallbackPosition({ originX: fallbackX, originY: originY }, { overlayX: fallbackX, overlayY: overlayY })
-            .withFallbackPosition({ originX: posX, originY: fallbackOriginY }, { overlayX: posX, overlayY: fallbackOverlayY })
-            .withFallbackPosition({ originX: fallbackX, originY: fallbackOriginY }, { overlayX: fallbackX, overlayY: fallbackOverlayY });
+            .connectedTo(this._element, { originX, originY }, { overlayX, overlayY })
+            .withDirection(this.dir)
+            .withOffsetY(offsetY)
+            .withFallbackPosition({ originX: originFallbackX, originY }, { overlayX: overlayFallbackX, overlayY })
+            .withFallbackPosition({ originX, originY: originFallbackY }, { overlayX, overlayY: overlayFallbackY })
+            .withFallbackPosition({ originX: originFallbackX, originY: originFallbackY }, { overlayX: overlayFallbackX, overlayY: overlayFallbackY });
     }
     /**
+     * Cleans up the active subscriptions.
      * @return {?}
      */
     _cleanUpSubscriptions() {
-        if (this._backdropSubscription) {
-            this._backdropSubscription.unsubscribe();
-        }
-        if (this._positionSubscription) {
-            this._positionSubscription.unsubscribe();
-        }
+        [
+            this._closeSubscription,
+            this._positionSubscription,
+            this._hoverSubscription
+        ]
+            .filter(subscription => !!subscription)
+            .forEach(subscription => subscription.unsubscribe());
     }
     /**
+     * Returns a stream that emits whenever an action that should close the menu occurs.
+     * @return {?}
+     */
+    _menuClosingActions() {
+        const /** @type {?} */ backdrop = ((this._overlayRef)).backdropClick();
+        const /** @type {?} */ parentClose = this._parentMenu ? this._parentMenu.close : of(null);
+        const /** @type {?} */ hover = this._parentMenu ? RxChain.from(this._parentMenu.hover())
+            .call(filter, active => active !== this._menuItemInstance)
+            .call(filter, () => this._menuOpen)
+            .result() : of(null);
+        return merge(backdrop, parentClose, hover);
+    }
+    /**
+     * Handles mouse presses on the trigger.
      * @param {?} event
      * @return {?}
      */
     _handleMousedown(event) {
         if (!isFakeMousedownFromScreenReader(event)) {
             this._openedByMouse = true;
+        }
+    }
+    /**
+     * Handles key presses on the trigger.
+     * @param {?} event
+     * @return {?}
+     */
+    _handleKeydown(event) {
+        const /** @type {?} */ keyCode = event.keyCode;
+        if (this.triggersSubmenu() && ((keyCode === RIGHT_ARROW && this.dir === 'ltr') ||
+            (keyCode === LEFT_ARROW && this.dir === 'rtl'))) {
+            this.openMenu();
+        }
+    }
+    /**
+     * Handles click events on the trigger.
+     * @param {?} event
+     * @return {?}
+     */
+    _handleClick(event) {
+        if (this.triggersSubmenu()) {
+            // Stop event propagation to avoid closing the parent menu.
+            event.stopPropagation();
+            this.openMenu();
+        }
+        else {
+            this.toggleMenu();
         }
     }
 }
@@ -17569,7 +17686,8 @@ MdMenuTrigger.decorators = [
                 host: {
                     'aria-haspopup': 'true',
                     '(mousedown)': '_handleMousedown($event)',
-                    '(click)': 'toggleMenu()',
+                    '(keydown)': '_handleKeydown($event)',
+                    '(click)': '_handleClick($event)',
                 },
                 exportAs: 'mdMenuTrigger'
             },] },
@@ -17581,8 +17699,10 @@ MdMenuTrigger.ctorParameters = () => [
     { type: Overlay, },
     { type: ElementRef, },
     { type: ViewContainerRef, },
-    { type: Renderer, },
-    { type: Dir, decorators: [{ type: Optional },] },
+    { type: undefined, decorators: [{ type: Inject, args: [MD_MENU_SCROLL_STRATEGY,] },] },
+    { type: MdMenu, decorators: [{ type: Optional },] },
+    { type: MdMenuItem, decorators: [{ type: Optional }, { type: Self },] },
+    { type: Directionality, decorators: [{ type: Optional },] },
 ];
 MdMenuTrigger.propDecorators = {
     '_deprecatedMdMenuTriggerFor': [{ type: Input, args: ['md-menu-trigger-for',] },],
@@ -17594,16 +17714,6 @@ MdMenuTrigger.propDecorators = {
 };
 
 class MdMenuModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdMenuModule,
-            providers: [],
-        };
-    }
 }
 MdMenuModule.decorators = [
     { type: NgModule, args: [{
@@ -17611,10 +17721,21 @@ MdMenuModule.decorators = [
                     OverlayModule,
                     CommonModule,
                     MdRippleModule,
-                    CompatibilityModule,
+                    MdCommonModule,
                 ],
-                exports: [MdMenu, MdMenuItem, MdMenuTrigger, CompatibilityModule],
+                exports: [MdMenu, MdMenuItem, MdMenuTrigger, MdCommonModule],
                 declarations: [MdMenu, MdMenuItem, MdMenuTrigger],
+                providers: [
+                    MD_MENU_SCROLL_STRATEGY_PROVIDER,
+                    {
+                        provide: MD_MENU_DEFAULT_OPTIONS,
+                        useValue: {
+                            overlapTrigger: true,
+                            xPosition: 'after',
+                            yPosition: 'below',
+                        },
+                    }
+                ],
             },] },
 ];
 /**
@@ -17623,28 +17744,87 @@ MdMenuModule.decorators = [
 MdMenuModule.ctorParameters = () => [];
 
 /**
+ * Configuration for opening a modal dialog with the MdDialog service.
+ */
+class MdDialogConfig {
+    constructor() {
+        /**
+         * The ARIA role of the dialog element.
+         */
+        this.role = 'dialog';
+        /**
+         * Custom class for the overlay pane.
+         */
+        this.panelClass = '';
+        /**
+         * Whether the dialog has a backdrop.
+         */
+        this.hasBackdrop = true;
+        /**
+         * Custom class for the backdrop,
+         */
+        this.backdropClass = '';
+        /**
+         * Whether the user can use escape or clicking outside to close a modal.
+         */
+        this.disableClose = false;
+        /**
+         * Width of the dialog.
+         */
+        this.width = '';
+        /**
+         * Height of the dialog.
+         */
+        this.height = '';
+        /**
+         * Data being injected into the child component.
+         */
+        this.data = null;
+        /**
+         * Layout direction for the dialog's content.
+         */
+        this.direction = 'ltr';
+        /**
+         * ID of the element that describes the dialog.
+         */
+        this.ariaDescribedBy = null;
+        // TODO(jelbourn): add configuration for lifecycle hooks, ARIA labelling.
+    }
+}
+
+// TODO(jelbourn): resizing
+// TODO(jelbourn): afterOpen and beforeClose
+// Counter for unique dialog ids.
+let uniqueId = 0;
+/**
  * Reference to a dialog opened via the MdDialog service.
  */
 class MdDialogRef {
     /**
      * @param {?} _overlayRef
      * @param {?} _containerInstance
+     * @param {?=} id
      */
-    constructor(_overlayRef, _containerInstance) {
+    constructor(_overlayRef, _containerInstance, id = `md-dialog-${uniqueId++}`) {
         this._overlayRef = _overlayRef;
         this._containerInstance = _containerInstance;
+        this.id = id;
+        /**
+         * Whether the user is allowed to close the dialog.
+         */
+        this.disableClose = this._containerInstance._config.disableClose;
         /**
          * Subject for notifying the user that the dialog has finished closing.
          */
         this._afterClosed = new Subject();
-        _containerInstance._onAnimationStateChange
-            .filter((event) => event.toState === 'exit')
+        RxChain.from(_containerInstance._animationStateChanged)
+            .call(filter, event => event.phaseName === 'done' && event.toState === 'exit')
+            .call(first)
             .subscribe(() => {
             this._overlayRef.dispose();
-            this.componentInstance = null;
-        }, null, () => {
             this._afterClosed.next(this._result);
             this._afterClosed.complete();
+            this.componentInstance = null;
         });
     }
     /**
@@ -17654,8 +17834,12 @@ class MdDialogRef {
      */
     close(dialogResult) {
         this._result = dialogResult;
-        this._containerInstance._exit();
-        this._overlayRef.detachBackdrop(); // Transition the backdrop in parallel with the dialog.
+        // Transition the backdrop in parallel to the dialog.
+        RxChain.from(this._containerInstance._animationStateChanged)
+            .call(filter, event => event.phaseName === 'start')
+            .call(first)
+            .subscribe(() => this._overlayRef.detachBackdrop());
+        this._containerInstance._startExitAnimation();
     }
     /**
      * Gets an observable that is notified when the dialog is finished closing.
@@ -17698,6 +17882,13 @@ class MdDialogRef {
         return this;
     }
     /**
+     * Returns whether the dialog is animating.
+     * @return {?}
+     */
+    _isAnimating() {
+        return this._containerInstance._isAnimating;
+    }
+    /**
      * Fetches the position strategy object from the overlay ref.
      * @return {?}
      */
@@ -17706,84 +17897,15 @@ class MdDialogRef {
     }
 }
 
-const MD_DIALOG_DATA = new OpaqueToken('MdDialogData');
 /**
- * Custom injector type specifically for instantiating components with a dialog.
- */
-class DialogInjector {
-    /**
-     * @param {?} _parentInjector
-     * @param {?} _dialogRef
-     * @param {?} _data
-     */
-    constructor(_parentInjector, _dialogRef, _data) {
-        this._parentInjector = _parentInjector;
-        this._dialogRef = _dialogRef;
-        this._data = _data;
-    }
-    /**
-     * @param {?} token
-     * @param {?=} notFoundValue
-     * @return {?}
-     */
-    get(token, notFoundValue) {
-        if (token === MdDialogRef) {
-            return this._dialogRef;
-        }
-        if (token === MD_DIALOG_DATA) {
-            return this._data;
-        }
-        return this._parentInjector.get(token, notFoundValue);
-    }
-}
-
-/**
- * Configuration for opening a modal dialog with the MdDialog service.
- */
-class MdDialogConfig {
-    constructor() {
-        /**
-         * The ARIA role of the dialog element.
-         */
-        this.role = 'dialog';
-        /**
-         * Whether the dialog has a backdrop.
-         */
-        this.hasBackdrop = true;
-        /**
-         * Custom class for the backdrop,
-         */
-        this.backdropClass = '';
-        /**
-         * Whether the user can use escape or clicking outside to close a modal.
-         */
-        this.disableClose = false;
-        /**
-         * Width of the dialog.
-         */
-        this.width = '';
-        /**
-         * Height of the dialog.
-         */
-        this.height = '';
-        /**
-         * Data being injected into the child component.
-         */
-        this.data = null;
-        // TODO(jelbourn): add configuration for lifecycle hooks, ARIA labelling.
-    }
-}
-
-/**
- * Exception thrown when a ComponentPortal is attached to a DomPortalHost without an origin.
+ * Throws an exception for the case when a ComponentPortal is
+ * attached to a DomPortalHost without an origin.
  * \@docs-private
+ * @return {?}
  */
-class MdDialogContentAlreadyAttachedError extends MdError {
-    constructor() {
-        super('Attempting to attach dialog content after content is already attached');
-    }
+function throwMdDialogContentAlreadyAttachedError() {
+    throw Error('Attempting to attach dialog content after content is already attached');
 }
-
 /**
  * Internal component that wraps user-provided dialog content.
  * Animation is based on https://material.io/guidelines/motion/choreography.html.
@@ -17791,16 +17913,19 @@ class MdDialogContentAlreadyAttachedError extends MdError {
  */
 class MdDialogContainer extends BasePortalHost {
     /**
-     * @param {?} _renderer
+     * @param {?} _ngZone
      * @param {?} _elementRef
      * @param {?} _focusTrapFactory
+     * @param {?} _changeDetectorRef
      * @param {?} _document
      */
-    constructor(_renderer, _elementRef, _focusTrapFactory, _document) {
+    constructor(_ngZone, _elementRef, _focusTrapFactory, _changeDetectorRef, _document) {
         super();
-        this._renderer = _renderer;
+        this._ngZone = _ngZone;
         this._elementRef = _elementRef;
         this._focusTrapFactory = _focusTrapFactory;
+        this._changeDetectorRef = _changeDetectorRef;
+        this._document = _document;
         /**
          * Element that was focused before the dialog was opened. Save this to restore upon close.
          */
@@ -17810,10 +17935,17 @@ class MdDialogContainer extends BasePortalHost {
          */
         this._state = 'enter';
         /**
-         * Emits the current animation state whenever it changes.
+         * Emits when an animation state changes.
          */
-        this._onAnimationStateChange = new EventEmitter();
-        this._document = _document;
+        this._animationStateChanged = new EventEmitter();
+        /**
+         * ID of the element that should be considered as the dialog's label.
+         */
+        this._ariaLabelledBy = null;
+        /**
+         * Whether the container is currently mid-animation.
+         */
+        this._isAnimating = false;
     }
     /**
      * Attach a ComponentPortal as content to this dialog container.
@@ -17823,7 +17955,7 @@ class MdDialogContainer extends BasePortalHost {
      */
     attachComponentPortal(portal) {
         if (this._portalHost.hasAttached()) {
-            throw new MdDialogContentAlreadyAttachedError();
+            throwMdDialogContentAlreadyAttachedError();
         }
         this._savePreviouslyFocusedElement();
         return this._portalHost.attachComponentPortal(portal);
@@ -17835,7 +17967,7 @@ class MdDialogContainer extends BasePortalHost {
      */
     attachTemplatePortal(portal) {
         if (this._portalHost.hasAttached()) {
-            throw new MdDialogContentAlreadyAttachedError();
+            throwMdDialogContentAlreadyAttachedError();
         }
         this._savePreviouslyFocusedElement();
         return this._portalHost.attachTemplatePortal(portal);
@@ -17851,7 +17983,21 @@ class MdDialogContainer extends BasePortalHost {
         // If were to attempt to focus immediately, then the content of the dialog would not yet be
         // ready in instances where change detection has to run first. To deal with this, we simply
         // wait for the microtask queue to be empty.
-        this._focusTrap.focusFirstTabbableElementWhenReady();
+        this._focusTrap.focusInitialElementWhenReady();
+    }
+    /**
+     * Restores focus to the element that was focused before the dialog opened.
+     * @return {?}
+     */
+    _restoreFocus() {
+        const /** @type {?} */ toFocus = this._elementFocusedBeforeDialogWasOpened;
+        // We need the extra check, because IE can set the `activeElement` to null in some cases.
+        if (toFocus && 'focus' in toFocus) {
+            toFocus.focus();
+        }
+        if (this._focusTrap) {
+            this._focusTrap.destroy();
+        }
     }
     /**
      * Saves a reference to the element that was focused before the dialog was opened.
@@ -17864,53 +18010,63 @@ class MdDialogContainer extends BasePortalHost {
     }
     /**
      * Callback, invoked whenever an animation on the host completes.
-     * \@docs-private
      * @param {?} event
      * @return {?}
      */
     _onAnimationDone(event) {
-        this._onAnimationStateChange.emit(event);
         if (event.toState === 'enter') {
             this._trapFocus();
         }
         else if (event.toState === 'exit') {
-            this._onAnimationStateChange.complete();
+            this._restoreFocus();
         }
+        this._animationStateChanged.emit(event);
+        this._isAnimating = false;
     }
     /**
-     * Kicks off the leave animation and restores focus to the previously-focused element.
-     * \@docs-private
+     * Callback, invoked when an animation on the host starts.
+     * @param {?} event
      * @return {?}
      */
-    _exit() {
-        // We need the extra check, because IE can set the `activeElement` to null in some cases.
-        let /** @type {?} */ toFocus = this._elementFocusedBeforeDialogWasOpened;
-        if (toFocus && 'focus' in toFocus) {
-            toFocus.focus();
-        }
-        if (this._focusTrap) {
-            this._focusTrap.destroy();
-        }
+    _onAnimationStart(event) {
+        this._isAnimating = true;
+        this._animationStateChanged.emit(event);
+    }
+    /**
+     * Starts the dialog exit animation.
+     * @return {?}
+     */
+    _startExitAnimation() {
         this._state = 'exit';
+        // Mark the container for check so it can react if the
+        // view container is using OnPush change detection.
+        this._changeDetectorRef.markForCheck();
     }
 }
 MdDialogContainer.decorators = [
     { type: Component, args: [{selector: 'md-dialog-container, mat-dialog-container',
-                template: "<ng-template cdkPortalHost></ng-template> ",
-                styles: [".mat-dialog-container{box-shadow:0 11px 15px -7px rgba(0,0,0,.2),0 24px 38px 3px rgba(0,0,0,.14),0 9px 46px 8px rgba(0,0,0,.12);display:block;padding:24px;border-radius:2px;box-sizing:border-box;overflow:auto;max-width:80vw;width:100%;height:100%}@media screen and (-ms-high-contrast:active){.mat-dialog-container{outline:solid 1px}}.mat-dialog-content{display:block;margin:0 -24px;padding:0 24px;max-height:65vh;overflow:auto}.mat-dialog-title{font-size:20px;font-weight:700;margin:0 0 20px;display:block}.mat-dialog-actions{padding:12px 0;display:flex}.mat-dialog-actions:last-child{margin-bottom:-24px}.mat-dialog-actions[align=end]{justify-content:flex-end}.mat-dialog-actions[align=center]{justify-content:center} /*# sourceMappingURL=dialog.css.map */ "],
+                template: "<ng-template cdkPortalHost></ng-template>",
+                styles: [".mat-dialog-container{box-shadow:0 11px 15px -7px rgba(0,0,0,.2),0 24px 38px 3px rgba(0,0,0,.14),0 9px 46px 8px rgba(0,0,0,.12);display:block;padding:24px;border-radius:2px;box-sizing:border-box;overflow:auto;max-width:80vw;width:100%;height:100%}@media screen and (-ms-high-contrast:active){.mat-dialog-container{outline:solid 1px}}.mat-dialog-content{display:block;margin:0 -24px;padding:0 24px;max-height:65vh;overflow:auto;-webkit-overflow-scrolling:touch}.mat-dialog-title{margin:0 0 20px;display:block}.mat-dialog-actions{padding:12px 0;display:flex;flex-wrap:wrap}.mat-dialog-actions:last-child{margin-bottom:-24px}.mat-dialog-actions[align=end]{justify-content:flex-end}.mat-dialog-actions[align=center]{justify-content:center}.mat-dialog-actions .mat-button+.mat-button,.mat-dialog-actions .mat-button+.mat-raised-button,.mat-dialog-actions .mat-raised-button+.mat-button,.mat-dialog-actions .mat-raised-button+.mat-raised-button{margin-left:8px}[dir=rtl] .mat-dialog-actions .mat-button+.mat-button,[dir=rtl] .mat-dialog-actions .mat-button+.mat-raised-button,[dir=rtl] .mat-dialog-actions .mat-raised-button+.mat-button,[dir=rtl] .mat-dialog-actions .mat-raised-button+.mat-raised-button{margin-left:0;margin-right:8px}"],
                 encapsulation: ViewEncapsulation.None,
                 animations: [
                     trigger('slideDialog', [
+                        // Note: The `enter` animation doesn't transition to something like `translate3d(0, 0, 0)
+                        // scale(1)`, because for some reason specifying the transform explicitly, causes IE both
+                        // to blur the dialog content and decimate the animation performance. Leaving it as `none`
+                        // solves both issues.
+                        state('enter', style({ transform: 'none', opacity: 1 })),
                         state('void', style({ transform: 'translate3d(0, 25%, 0) scale(0.9)', opacity: 0 })),
-                        state('enter', style({ transform: 'translate3d(0, 0, 0) scale(1)', opacity: 1 })),
                         state('exit', style({ transform: 'translate3d(0, 25%, 0)', opacity: 0 })),
                         transition('* => *', animate('400ms cubic-bezier(0.25, 0.8, 0.25, 1)')),
                     ])
                 ],
                 host: {
-                    '[class.mat-dialog-container]': 'true',
-                    '[attr.role]': 'dialogConfig?.role',
+                    'class': 'mat-dialog-container',
+                    '[attr.role]': '_config?.role',
+                    '[attr.aria-labelledby]': '_ariaLabelledBy',
+                    '[attr.aria-describedby]': '_config?.ariaDescribedBy || null',
                     '[@slideDialog]': '_state',
+                    '(@slideDialog.start)': '_onAnimationStart($event)',
                     '(@slideDialog.done)': '_onAnimationDone($event)',
                 },
             },] },
@@ -17919,15 +18075,37 @@ MdDialogContainer.decorators = [
  * @nocollapse
  */
 MdDialogContainer.ctorParameters = () => [
-    { type: Renderer, },
+    { type: NgZone, },
     { type: ElementRef, },
     { type: FocusTrapFactory, },
+    { type: ChangeDetectorRef, },
     { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [DOCUMENT,] },] },
 ];
 MdDialogContainer.propDecorators = {
     '_portalHost': [{ type: ViewChild, args: [PortalHostDirective,] },],
 };
 
+const MD_DIALOG_DATA = new InjectionToken('MdDialogData');
+/**
+ * Injection token that determines the scroll handling while the dialog is open.
+ */
+const MD_DIALOG_SCROLL_STRATEGY = new InjectionToken('md-dialog-scroll-strategy');
+/**
+ * \@docs-private
+ * @param {?} overlay
+ * @return {?}
+ */
+function MD_DIALOG_SCROLL_STRATEGY_PROVIDER_FACTORY(overlay) {
+    return () => overlay.scrollStrategies.block();
+}
+/**
+ * \@docs-private
+ */
+const MD_DIALOG_SCROLL_STRATEGY_PROVIDER = {
+    provide: MD_DIALOG_SCROLL_STRATEGY,
+    deps: [Overlay],
+    useFactory: MD_DIALOG_SCROLL_STRATEGY_PROVIDER_FACTORY,
+};
 /**
  * Service to open Material Design modal dialogs.
  */
@@ -17935,12 +18113,14 @@ class MdDialog {
     /**
      * @param {?} _overlay
      * @param {?} _injector
+     * @param {?} _scrollStrategy
      * @param {?} _location
      * @param {?} _parentDialog
      */
-    constructor(_overlay, _injector, _location, _parentDialog) {
+    constructor(_overlay, _injector, _scrollStrategy, _location, _parentDialog) {
         this._overlay = _overlay;
         this._injector = _injector;
+        this._scrollStrategy = _scrollStrategy;
         this._location = _location;
         this._parentDialog = _parentDialog;
         this._openDialogsAtThisLevel = [];
@@ -17948,13 +18128,12 @@ class MdDialog {
         this._afterOpenAtThisLevel = new Subject();
         this._boundKeydown = this._handleKeydown.bind(this);
         /**
-         * Gets an observable that is notified when a dialog has been opened.
+         * Stream that emits when all open dialog have finished closing.
+         * Will emit on subscribe if there are no open dialogs to begin with.
          */
-        this.afterOpen = this._afterOpen.asObservable();
-        /**
-         * Gets an observable that is notified when all open dialog have finished closing.
-         */
-        this.afterAllClosed = this._afterAllClosed.asObservable();
+        this.afterAllClosed = defer(() => this.openDialogs.length ?
+            this._afterAllClosed :
+            startWith.call(this._afterAllClosed, undefined));
         // Close all of the dialogs when the user goes forwards/backwards in history or when the
         // location hash changes. Note that this usually doesn't include clicking on links (unless
         // the user is using the `HashLocationStrategy`).
@@ -17966,23 +18145,22 @@ class MdDialog {
      * Keeps track of the currently-open dialogs.
      * @return {?}
      */
-    get _openDialogs() {
-        return this._parentDialog ? this._parentDialog._openDialogs : this._openDialogsAtThisLevel;
+    get openDialogs() {
+        return this._parentDialog ? this._parentDialog.openDialogs : this._openDialogsAtThisLevel;
     }
     /**
-     * Subject for notifying the user that a dialog has opened.
+     * Stream that emits when a dialog has been opened.
      * @return {?}
      */
-    get _afterOpen() {
-        return this._parentDialog ? this._parentDialog._afterOpen : this._afterOpenAtThisLevel;
+    get afterOpen() {
+        return this._parentDialog ? this._parentDialog.afterOpen : this._afterOpenAtThisLevel;
     }
     /**
-     * Subject for notifying the user that all open dialogs have finished closing.
      * @return {?}
      */
     get _afterAllClosed() {
-        return this._parentDialog ?
-            this._parentDialog._afterAllClosed : this._afterAllClosedAtThisLevel;
+        const /** @type {?} */ parent = this._parentDialog;
+        return parent ? parent._afterAllClosed : this._afterAllClosedAtThisLevel;
     }
     /**
      * Opens a modal dialog containing the given component.
@@ -17993,16 +18171,24 @@ class MdDialog {
      * @return {?} Reference to the newly-opened dialog.
      */
     open(componentOrTemplateRef, config) {
+        const /** @type {?} */ inProgressDialog = this.openDialogs.find(dialog => dialog._isAnimating());
+        // If there's a dialog that is in the process of being opened, return it instead.
+        if (inProgressDialog) {
+            return inProgressDialog;
+        }
         config = _applyConfigDefaults$1(config);
-        let /** @type {?} */ overlayRef = this._createOverlay(config);
-        let /** @type {?} */ dialogContainer = this._attachDialogContainer(overlayRef, config);
-        let /** @type {?} */ dialogRef = this._attachDialogContent(componentOrTemplateRef, dialogContainer, overlayRef, config);
-        if (!this._openDialogs.length) {
+        if (config.id && this.getDialogById(config.id)) {
+            throw Error(`Dialog with id "${config.id}" exists already. The dialog id must be unique.`);
+        }
+        const /** @type {?} */ overlayRef = this._createOverlay(config);
+        const /** @type {?} */ dialogContainer = this._attachDialogContainer(overlayRef, config);
+        const /** @type {?} */ dialogRef = this._attachDialogContent(componentOrTemplateRef, dialogContainer, overlayRef, config);
+        if (!this.openDialogs.length) {
             document.addEventListener('keydown', this._boundKeydown);
         }
-        this._openDialogs.push(dialogRef);
+        this.openDialogs.push(dialogRef);
         dialogRef.afterClosed().subscribe(() => this._removeOpenDialog(dialogRef));
-        this._afterOpen.next(dialogRef);
+        this.afterOpen.next(dialogRef);
         return dialogRef;
     }
     /**
@@ -18010,14 +18196,22 @@ class MdDialog {
      * @return {?}
      */
     closeAll() {
-        let /** @type {?} */ i = this._openDialogs.length;
+        let /** @type {?} */ i = this.openDialogs.length;
         while (i--) {
             // The `_openDialogs` property isn't updated after close until the rxjs subscription
             // runs on the next microtask, in addition to modifying the array as we're going
             // through it. We loop through all of them and call close without assuming that
             // they'll be removed from the list instantaneously.
-            this._openDialogs[i].close();
+            this.openDialogs[i].close();
         }
+    }
+    /**
+     * Finds an open dialog by its id.
+     * @param {?} id ID to use when looking up the dialog.
+     * @return {?}
+     */
+    getDialogById(id) {
+        return this.openDialogs.find(dialog => dialog.id === id);
     }
     /**
      * Creates the overlay into which the dialog will be loaded.
@@ -18025,7 +18219,7 @@ class MdDialog {
      * @return {?} A promise resolving to the OverlayRef for the created overlay.
      */
     _createOverlay(config) {
-        let /** @type {?} */ overlayState = this._getOverlayState(config);
+        const /** @type {?} */ overlayState = this._getOverlayState(config);
         return this._overlay.create(overlayState);
     }
     /**
@@ -18034,8 +18228,11 @@ class MdDialog {
      * @return {?} The overlay configuration.
      */
     _getOverlayState(dialogConfig) {
-        let /** @type {?} */ overlayState = new OverlayState();
+        const /** @type {?} */ overlayState = new OverlayState();
+        overlayState.panelClass = dialogConfig.panelClass;
         overlayState.hasBackdrop = dialogConfig.hasBackdrop;
+        overlayState.scrollStrategy = this._scrollStrategy();
+        overlayState.direction = dialogConfig.direction;
         if (dialogConfig.backdropClass) {
             overlayState.backdropClass = dialogConfig.backdropClass;
         }
@@ -18049,10 +18246,9 @@ class MdDialog {
      * @return {?} A promise resolving to a ComponentRef for the attached container.
      */
     _attachDialogContainer(overlay, config) {
-        let /** @type {?} */ viewContainer = config ? config.viewContainerRef : null;
-        let /** @type {?} */ containerPortal = new ComponentPortal(MdDialogContainer, viewContainer);
+        let /** @type {?} */ containerPortal = new ComponentPortal(MdDialogContainer, config.viewContainerRef);
         let /** @type {?} */ containerRef = overlay.attach(containerPortal);
-        containerRef.instance.dialogConfig = config;
+        containerRef.instance._config = config;
         return containerRef.instance;
     }
     /**
@@ -18068,21 +18264,21 @@ class MdDialog {
     _attachDialogContent(componentOrTemplateRef, dialogContainer, overlayRef, config) {
         // Create a reference to the dialog we're creating in order to give the user a handle
         // to modify and close it.
-        let /** @type {?} */ dialogRef = new MdDialogRef(overlayRef, dialogContainer);
-        if (!config.disableClose) {
-            // When the dialog backdrop is clicked, we want to close it.
-            overlayRef.backdropClick().first().subscribe(() => dialogRef.close());
+        const /** @type {?} */ dialogRef = new MdDialogRef(overlayRef, dialogContainer, config.id);
+        // When the dialog backdrop is clicked, we want to close it.
+        if (config.hasBackdrop) {
+            overlayRef.backdropClick().subscribe(() => {
+                if (!dialogRef.disableClose) {
+                    dialogRef.close();
+                }
+            });
         }
-        // We create an injector specifically for the component we're instantiating so that it can
-        // inject the MdDialogRef. This allows a component loaded inside of a dialog to close itself
-        // and, optionally, to return a value.
-        let /** @type {?} */ userInjector = config && config.viewContainerRef && config.viewContainerRef.injector;
-        let /** @type {?} */ dialogInjector = new DialogInjector(userInjector || this._injector, dialogRef, config.data);
         if (componentOrTemplateRef instanceof TemplateRef) {
-            dialogContainer.attachTemplatePortal(new TemplatePortal(componentOrTemplateRef, null));
+            dialogContainer.attachTemplatePortal(new TemplatePortal(componentOrTemplateRef, /** @type {?} */ ((null))));
         }
         else {
-            let /** @type {?} */ contentRef = dialogContainer.attachComponentPortal(new ComponentPortal(componentOrTemplateRef, null, dialogInjector));
+            const /** @type {?} */ injector = this._createInjector(config, dialogRef, dialogContainer);
+            const /** @type {?} */ contentRef = dialogContainer.attachComponentPortal(new ComponentPortal(componentOrTemplateRef, undefined, injector));
             dialogRef.componentInstance = contentRef.instance;
         }
         dialogRef
@@ -18091,16 +18287,33 @@ class MdDialog {
         return dialogRef;
     }
     /**
+     * Creates a custom injector to be used inside the dialog. This allows a component loaded inside
+     * of a dialog to close itself and, optionally, to return a value.
+     * @template T
+     * @param {?} config Config object that is used to construct the dialog.
+     * @param {?} dialogRef Reference to the dialog.
+     * @param {?} dialogContainer
+     * @return {?} The custom injector that can be used inside the dialog.
+     */
+    _createInjector(config, dialogRef, dialogContainer) {
+        const /** @type {?} */ userInjector = config && config.viewContainerRef && config.viewContainerRef.injector;
+        const /** @type {?} */ injectionTokens = new WeakMap();
+        injectionTokens.set(MdDialogRef, dialogRef);
+        injectionTokens.set(MdDialogContainer, dialogContainer);
+        injectionTokens.set(MD_DIALOG_DATA, config.data);
+        return new PortalInjector(userInjector || this._injector, injectionTokens);
+    }
+    /**
      * Removes a dialog from the array of open dialogs.
      * @param {?} dialogRef Dialog to be removed.
      * @return {?}
      */
     _removeOpenDialog(dialogRef) {
-        let /** @type {?} */ index = this._openDialogs.indexOf(dialogRef);
+        const /** @type {?} */ index = this.openDialogs.indexOf(dialogRef);
         if (index > -1) {
-            this._openDialogs.splice(index, 1);
+            this.openDialogs.splice(index, 1);
             // no open dialogs are left, call next on afterAllClosed Subject
-            if (!this._openDialogs.length) {
+            if (!this.openDialogs.length) {
                 this._afterAllClosed.next();
                 document.removeEventListener('keydown', this._boundKeydown);
             }
@@ -18113,8 +18326,8 @@ class MdDialog {
      * @return {?}
      */
     _handleKeydown(event) {
-        let /** @type {?} */ topDialog = this._openDialogs[this._openDialogs.length - 1];
-        let /** @type {?} */ canClose = topDialog ? !topDialog._containerInstance.dialogConfig.disableClose : false;
+        const /** @type {?} */ topDialog = this.openDialogs[this.openDialogs.length - 1];
+        const /** @type {?} */ canClose = topDialog ? !topDialog.disableClose : false;
         if (event.keyCode === ESCAPE && canClose) {
             topDialog.close();
         }
@@ -18129,18 +18342,23 @@ MdDialog.decorators = [
 MdDialog.ctorParameters = () => [
     { type: Overlay, },
     { type: Injector, },
+    { type: undefined, decorators: [{ type: Inject, args: [MD_DIALOG_SCROLL_STRATEGY,] },] },
     { type: Location, decorators: [{ type: Optional },] },
     { type: MdDialog, decorators: [{ type: Optional }, { type: SkipSelf },] },
 ];
 /**
  * Applies default options to the dialog config.
- * @param {?} config Config to be modified.
+ * @param {?=} config Config to be modified.
  * @return {?} The new configuration object.
  */
 function _applyConfigDefaults$1(config) {
     return extendObject(new MdDialogConfig(), config);
 }
 
+/**
+ * Counter used to generate unique IDs for dialog elements.
+ */
+let dialogElementUid = 0;
 /**
  * Button that will close the current dialog.
  */
@@ -18155,12 +18373,24 @@ class MdDialogClose {
          */
         this.ariaLabel = 'Close dialog';
     }
+    /**
+     * @param {?} changes
+     * @return {?}
+     */
+    ngOnChanges(changes) {
+        const /** @type {?} */ proxiedChange = changes._matDialogClose || changes._mdDialogClose ||
+            changes._matDialogCloseResult;
+        if (proxiedChange) {
+            this.dialogResult = proxiedChange.currentValue;
+        }
+    }
 }
 MdDialogClose.decorators = [
     { type: Directive, args: [{
-                selector: 'button[md-dialog-close], button[mat-dialog-close]',
+                selector: 'button[md-dialog-close], button[mat-dialog-close],' +
+                    'button[mdDialogClose], button[matDialogClose]',
                 host: {
-                    '(click)': 'dialogRef.close()',
+                    '(click)': 'dialogRef.close(dialogResult)',
                     '[attr.aria-label]': 'ariaLabel',
                     'type': 'button',
                 }
@@ -18174,24 +18404,49 @@ MdDialogClose.ctorParameters = () => [
 ];
 MdDialogClose.propDecorators = {
     'ariaLabel': [{ type: Input, args: ['aria-label',] },],
+    'dialogResult': [{ type: Input, args: ['md-dialog-close',] },],
+    '_matDialogClose': [{ type: Input, args: ['matDialogClose',] },],
+    '_mdDialogClose': [{ type: Input, args: ['mdDialogClose',] },],
+    '_matDialogCloseResult': [{ type: Input, args: ['mat-dialog-close',] },],
 };
 /**
  * Title of a dialog element. Stays fixed to the top of the dialog when scrolling.
  */
 class MdDialogTitle {
+    /**
+     * @param {?} _container
+     */
+    constructor(_container) {
+        this._container = _container;
+        this.id = `md-dialog-title-${dialogElementUid++}`;
+    }
+    /**
+     * @return {?}
+     */
+    ngOnInit() {
+        if (this._container && !this._container._ariaLabelledBy) {
+            Promise.resolve().then(() => this._container._ariaLabelledBy = this.id);
+        }
+    }
 }
 MdDialogTitle.decorators = [
     { type: Directive, args: [{
-                selector: '[md-dialog-title], [mat-dialog-title]',
+                selector: '[md-dialog-title], [mat-dialog-title], [mdDialogTitle], [matDialogTitle]',
                 host: {
-                    '[class.mat-dialog-title]': 'true'
-                }
+                    'class': 'mat-dialog-title',
+                    '[id]': 'id',
+                },
             },] },
 ];
 /**
  * @nocollapse
  */
-MdDialogTitle.ctorParameters = () => [];
+MdDialogTitle.ctorParameters = () => [
+    { type: MdDialogContainer, decorators: [{ type: Optional },] },
+];
+MdDialogTitle.propDecorators = {
+    'id': [{ type: Input },],
+};
 /**
  * Scrollable content container of a dialog.
  */
@@ -18199,10 +18454,9 @@ class MdDialogContent {
 }
 MdDialogContent.decorators = [
     { type: Directive, args: [{
-                selector: '[md-dialog-content], md-dialog-content, [mat-dialog-content], mat-dialog-content',
-                host: {
-                    '[class.mat-dialog-content]': 'true'
-                }
+                selector: '[md-dialog-content], md-dialog-content, [mat-dialog-content], mat-dialog-content,' +
+                    '[mdDialogContent], [matDialogContent]',
+                host: { 'class': 'mat-dialog-content' }
             },] },
 ];
 /**
@@ -18217,10 +18471,9 @@ class MdDialogActions {
 }
 MdDialogActions.decorators = [
     { type: Directive, args: [{
-                selector: '[md-dialog-actions], md-dialog-actions, [mat-dialog-actions], mat-dialog-actions',
-                host: {
-                    '[class.mat-dialog-actions]': 'true'
-                }
+                selector: '[md-dialog-actions], md-dialog-actions, [mat-dialog-actions], mat-dialog-actions,' +
+                    '[mdDialogActions], [matDialogActions]',
+                host: { 'class': 'mat-dialog-actions' }
             },] },
 ];
 /**
@@ -18229,16 +18482,6 @@ MdDialogActions.decorators = [
 MdDialogActions.ctorParameters = () => [];
 
 class MdDialogModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdDialogModule,
-            providers: [],
-        };
-    }
 }
 MdDialogModule.decorators = [
     { type: NgModule, args: [{
@@ -18247,7 +18490,7 @@ MdDialogModule.decorators = [
                     OverlayModule,
                     PortalModule,
                     A11yModule,
-                    CompatibilityModule,
+                    MdCommonModule,
                 ],
                 exports: [
                     MdDialogContainer,
@@ -18255,7 +18498,7 @@ MdDialogModule.decorators = [
                     MdDialogTitle,
                     MdDialogContent,
                     MdDialogActions,
-                    CompatibilityModule,
+                    MdCommonModule,
                 ],
                 declarations: [
                     MdDialogContainer,
@@ -18266,6 +18509,7 @@ MdDialogModule.decorators = [
                 ],
                 providers: [
                     MdDialog,
+                    MD_DIALOG_SCROLL_STRATEGY_PROVIDER,
                 ],
                 entryComponents: [MdDialogContainer],
             },] },
@@ -18276,12 +18520,6 @@ MdDialogModule.decorators = [
 MdDialogModule.ctorParameters = () => [];
 
 class ActiveDescendantKeyManager extends ListKeyManager {
-    /**
-     * @param {?} items
-     */
-    constructor(items) {
-        super(items);
-    }
     /**
      * This method sets the active item to the item at the specified index.
      * It also adds active styles to the newly active item and removes active
@@ -18314,13 +18552,13 @@ class MdAutocomplete {
     constructor(_changeDetectorRef) {
         this._changeDetectorRef = _changeDetectorRef;
         /**
-         * Whether the autocomplete panel displays above or below its trigger.
-         */
-        this.positionY = 'below';
-        /**
          * Whether the autocomplete panel should be visible, depending on option length.
          */
         this.showPanel = false;
+        /**
+         * Function that maps an option's control value to its display value in the trigger.
+         */
+        this.displayWith = null;
         /**
          * Unique ID to be used by autocomplete trigger's "aria-owns" property.
          */
@@ -18333,8 +18571,8 @@ class MdAutocomplete {
         this._keyManager = new ActiveDescendantKeyManager(this.options).withWrap();
     }
     /**
-     * Sets the panel scrollTop. This allows us to manually scroll to display
-     * options below the fold, as they are not actually being focused when active.
+     * Sets the panel scrollTop. This allows us to manually scroll to display options
+     * above or below the fold, as they are not actually being focused when active.
      * @param {?} scrollTop
      * @return {?}
      */
@@ -18342,6 +18580,13 @@ class MdAutocomplete {
         if (this.panel) {
             this.panel.nativeElement.scrollTop = scrollTop;
         }
+    }
+    /**
+     * Returns the panel's scrollTop.
+     * @return {?}
+     */
+    _getScrollTop() {
+        return this.panel ? this.panel.nativeElement.scrollTop : 0;
     }
     /**
      * Panel should hide itself when the option list is empty.
@@ -18354,13 +18599,11 @@ class MdAutocomplete {
         });
     }
     /**
-     * Sets a class on the panel based on its position (used to set y-offset).
+     * Sets a class on the panel based on whether it is visible.
      * @return {?}
      */
     _getClassList() {
         return {
-            'mat-autocomplete-panel-below': this.positionY === 'below',
-            'mat-autocomplete-panel-above': this.positionY === 'above',
             'mat-autocomplete-visible': this.showPanel,
             'mat-autocomplete-hidden': !this.showPanel
         };
@@ -18368,12 +18611,13 @@ class MdAutocomplete {
 }
 MdAutocomplete.decorators = [
     { type: Component, args: [{selector: 'md-autocomplete, mat-autocomplete',
-                template: "<ng-template> <div class=\"mat-autocomplete-panel\" role=\"listbox\" [id]=\"id\" [ngClass]=\"_getClassList()\" #panel> <ng-content></ng-content> </div> </ng-template> ",
-                styles: [".mat-autocomplete-panel{box-shadow:0 5px 5px -3px rgba(0,0,0,.2),0 8px 10px 1px rgba(0,0,0,.14),0 3px 14px 2px rgba(0,0,0,.12);min-width:112px;max-width:280px;overflow:auto;-webkit-overflow-scrolling:touch;visibility:hidden;max-width:none;max-height:256px;position:relative}.mat-autocomplete-panel.mat-autocomplete-panel-below{top:6px}.mat-autocomplete-panel.mat-autocomplete-panel-above{top:-24px}.mat-autocomplete-panel.mat-autocomplete-visible{visibility:visible}.mat-autocomplete-panel.mat-autocomplete-hidden{visibility:hidden} /*# sourceMappingURL=autocomplete.css.map */ "],
+                template: "<ng-template><div class=\"mat-autocomplete-panel\" role=\"listbox\" [id]=\"id\" [ngClass]=\"_getClassList()\" #panel><ng-content></ng-content></div></ng-template>",
+                styles: [".mat-autocomplete-panel{min-width:112px;max-width:280px;overflow:auto;-webkit-overflow-scrolling:touch;visibility:hidden;max-width:none;max-height:256px;position:relative}.mat-autocomplete-panel:not([class*=mat-elevation-z]){box-shadow:0 5px 5px -3px rgba(0,0,0,.2),0 8px 10px 1px rgba(0,0,0,.14),0 3px 14px 2px rgba(0,0,0,.12)}.mat-autocomplete-panel.mat-autocomplete-visible{visibility:visible}.mat-autocomplete-panel.mat-autocomplete-hidden{visibility:hidden}"],
                 encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
                 exportAs: 'mdAutocomplete',
                 host: {
-                    '[class.mat-autocomplete]': 'true'
+                    'class': 'mat-autocomplete'
                 }
             },] },
 ];
@@ -18399,6 +18643,26 @@ const AUTOCOMPLETE_OPTION_HEIGHT = 48;
  */
 const AUTOCOMPLETE_PANEL_HEIGHT = 256;
 /**
+ * Injection token that determines the scroll handling while the autocomplete panel is open.
+ */
+const MD_AUTOCOMPLETE_SCROLL_STRATEGY = new InjectionToken('md-autocomplete-scroll-strategy');
+/**
+ * \@docs-private
+ * @param {?} overlay
+ * @return {?}
+ */
+function MD_AUTOCOMPLETE_SCROLL_STRATEGY_PROVIDER_FACTORY(overlay) {
+    return () => overlay.scrollStrategies.reposition();
+}
+/**
+ * \@docs-private
+ */
+const MD_AUTOCOMPLETE_SCROLL_STRATEGY_PROVIDER = {
+    provide: MD_AUTOCOMPLETE_SCROLL_STRATEGY,
+    deps: [Overlay],
+    useFactory: MD_AUTOCOMPLETE_SCROLL_STRATEGY_PROVIDER_FACTORY,
+};
+/**
  * Provider that allows the autocomplete to register as a ControlValueAccessor.
  * \@docs-private
  */
@@ -18407,26 +18671,35 @@ const MD_AUTOCOMPLETE_VALUE_ACCESSOR = {
     useExisting: forwardRef(() => MdAutocompleteTrigger),
     multi: true
 };
+/**
+ * Creates an error to be thrown when attempting to use an autocomplete trigger without a panel.
+ * @return {?}
+ */
+function getMdAutocompleteMissingPanelError() {
+    return Error('Attempting to open an undefined instance of `md-autocomplete`. ' +
+        'Make sure that the id passed to the `mdAutocomplete` is correct and that ' +
+        'you\'re attempting to open it after the ngAfterContentInit hook.');
+}
 class MdAutocompleteTrigger {
     /**
      * @param {?} _element
      * @param {?} _overlay
      * @param {?} _viewContainerRef
-     * @param {?} _changeDetectorRef
-     * @param {?} _scrollDispatcher
-     * @param {?} _dir
      * @param {?} _zone
+     * @param {?} _changeDetectorRef
+     * @param {?} _scrollStrategy
+     * @param {?} _dir
      * @param {?} _inputContainer
      * @param {?} _document
      */
-    constructor(_element, _overlay, _viewContainerRef, _changeDetectorRef, _scrollDispatcher, _dir, _zone, _inputContainer, _document) {
+    constructor(_element, _overlay, _viewContainerRef, _zone, _changeDetectorRef, _scrollStrategy, _dir, _inputContainer, _document) {
         this._element = _element;
         this._overlay = _overlay;
         this._viewContainerRef = _viewContainerRef;
-        this._changeDetectorRef = _changeDetectorRef;
-        this._scrollDispatcher = _scrollDispatcher;
-        this._dir = _dir;
         this._zone = _zone;
+        this._changeDetectorRef = _changeDetectorRef;
+        this._scrollStrategy = _scrollStrategy;
+        this._dir = _dir;
         this._inputContainer = _inputContainer;
         this._document = _document;
         this._panelOpen = false;
@@ -18437,7 +18710,7 @@ class MdAutocompleteTrigger {
         /**
          * View -> model callback called when value changes
          */
-        this._onChange = (value) => { };
+        this._onChange = () => { };
         /**
          * View -> model callback called when autocomplete has been touched
          */
@@ -18461,9 +18734,6 @@ class MdAutocompleteTrigger {
      * @return {?}
      */
     ngOnDestroy() {
-        if (this._panelPositionSubscription) {
-            this._panelPositionSubscription.unsubscribe();
-        }
         this._destroyPanel();
     }
     /**
@@ -18477,21 +18747,20 @@ class MdAutocompleteTrigger {
      * @return {?}
      */
     openPanel() {
+        if (!this.autocomplete) {
+            throw getMdAutocompleteMissingPanelError();
+        }
         if (!this._overlayRef) {
             this._createOverlay();
         }
         else {
             /** Update the panel width, in case the host width has changed */
             this._overlayRef.getState().width = this._getHostWidth();
+            this._overlayRef.updateSize();
         }
-        if (!this._overlayRef.hasAttached()) {
+        if (this._overlayRef && !this._overlayRef.hasAttached()) {
             this._overlayRef.attach(this._portal);
-            this._subscribeToClosingActions();
-        }
-        if (!this._scrollSubscription) {
-            this._scrollSubscription = this._scrollDispatcher.scrolled(0, () => {
-                this._overlayRef.updatePosition();
-            });
+            this._closingActionsSubscription = this._subscribeToClosingActions();
         }
         this.autocomplete._setVisibility();
         this._floatPlaceholder();
@@ -18504,18 +18773,17 @@ class MdAutocompleteTrigger {
     closePanel() {
         if (this._overlayRef && this._overlayRef.hasAttached()) {
             this._overlayRef.detach();
+            this._closingActionsSubscription.unsubscribe();
         }
-        if (this._scrollSubscription) {
-            this._scrollSubscription.unsubscribe();
-            this._scrollSubscription = null;
-        }
-        this._panelOpen = false;
         this._resetPlaceholder();
-        // We need to trigger change detection manually, because
-        // `fromEvent` doesn't seem to do it at the proper time.
-        // This ensures that the placeholder is reset when the
-        // user clicks outside.
-        this._changeDetectorRef.detectChanges();
+        if (this._panelOpen) {
+            this._panelOpen = false;
+            // We need to trigger change detection manually, because
+            // `fromEvent` doesn't seem to do it at the proper time.
+            // This ensures that the placeholder is reset when the
+            // user clicks outside.
+            this._changeDetectorRef.detectChanges();
+        }
     }
     /**
      * A stream of actions that should close the autocomplete panel, including
@@ -18523,37 +18791,42 @@ class MdAutocompleteTrigger {
      * @return {?}
      */
     get panelClosingActions() {
-        return Observable.merge(this.optionSelections, this.autocomplete._keyManager.tabOut, this._outsideClickStream);
+        return merge(this.optionSelections, this.autocomplete._keyManager.tabOut, this._outsideClickStream);
     }
     /**
      * Stream of autocomplete option selections.
      * @return {?}
      */
     get optionSelections() {
-        return Observable.merge(...this.autocomplete.options.map(option => option.onSelectionChange));
+        return merge(...this.autocomplete.options.map(option => option.onSelectionChange));
     }
     /**
      * The currently active option, coerced to MdOption type.
      * @return {?}
      */
     get activeOption() {
-        if (this.autocomplete._keyManager) {
+        if (this.autocomplete && this.autocomplete._keyManager) {
             return (this.autocomplete._keyManager.activeItem);
         }
+        return null;
     }
     /**
      * Stream of clicks outside of the autocomplete panel.
      * @return {?}
      */
     get _outsideClickStream() {
-        if (this._document) {
-            return Observable.fromEvent(this._document, 'click').filter((event) => {
-                let /** @type {?} */ clickTarget = (event.target);
-                return this._panelOpen &&
-                    !this._inputContainer._elementRef.nativeElement.contains(clickTarget) &&
-                    !this._overlayRef.overlayElement.contains(clickTarget);
-            });
+        if (!this._document) {
+            return of(null);
         }
+        return RxChain.from(merge(fromEvent(this._document, 'click'), fromEvent(this._document, 'touchend'))).call(filter, (event) => {
+            const /** @type {?} */ clickTarget = (event.target);
+            const /** @type {?} */ inputContainer = this._inputContainer ?
+                this._inputContainer._elementRef.nativeElement : null;
+            return this._panelOpen &&
+                clickTarget !== this._element.nativeElement &&
+                (!inputContainer || !inputContainer.contains(clickTarget)) &&
+                (!!this._overlayRef && !this._overlayRef.overlayElement.contains(clickTarget));
+        }).result();
     }
     /**
      * Sets the autocomplete's value. Part of the ControlValueAccessor interface
@@ -18592,7 +18865,11 @@ class MdAutocompleteTrigger {
      * @return {?}
      */
     _handleKeydown(event) {
-        if (this.activeOption && event.keyCode === ENTER) {
+        if (event.keyCode === ESCAPE && this.panelOpen) {
+            this.closePanel();
+            event.stopPropagation();
+        }
+        else if (this.activeOption && event.keyCode === ENTER && this.panelOpen) {
             this.activeOption._selectViaInteraction();
             event.preventDefault();
         }
@@ -18648,14 +18925,26 @@ class MdAutocompleteTrigger {
     /**
      * Given that we are not actually focusing active options, we must manually adjust scroll
      * to reveal options below the fold. First, we find the offset of the option from the top
-     * of the panel. The new scrollTop will be that offset - the panel height + the option
-     * height, so the active option will be just visible at the bottom of the panel.
+     * of the panel. If that offset is below the fold, the new scrollTop will be the offset -
+     * the panel height + the option height, so the active option will be just visible at the
+     * bottom of the panel. If that offset is above the top of the visible panel, the new scrollTop
+     * will become the offset. If that offset is visible within the panel already, the scrollTop is
+     * not adjusted.
      * @return {?}
      */
     _scrollToOption() {
-        const /** @type {?} */ optionOffset = this.autocomplete._keyManager.activeItemIndex * AUTOCOMPLETE_OPTION_HEIGHT;
-        const /** @type {?} */ newScrollTop = Math.max(0, optionOffset - AUTOCOMPLETE_PANEL_HEIGHT + AUTOCOMPLETE_OPTION_HEIGHT);
-        this.autocomplete._setScrollTop(newScrollTop);
+        const /** @type {?} */ optionOffset = this.autocomplete._keyManager.activeItemIndex ?
+            this.autocomplete._keyManager.activeItemIndex * AUTOCOMPLETE_OPTION_HEIGHT : 0;
+        const /** @type {?} */ panelTop = this.autocomplete._getScrollTop();
+        if (optionOffset < panelTop) {
+            // Scroll up to reveal selected option scrolled above the panel top
+            this.autocomplete._setScrollTop(optionOffset);
+        }
+        else if (optionOffset + AUTOCOMPLETE_OPTION_HEIGHT > panelTop + AUTOCOMPLETE_PANEL_HEIGHT) {
+            // Scroll down to reveal selected option scrolled below the panel bottom
+            const /** @type {?} */ newScrollTop = Math.max(0, optionOffset - AUTOCOMPLETE_PANEL_HEIGHT + AUTOCOMPLETE_OPTION_HEIGHT);
+            this.autocomplete._setScrollTop(newScrollTop);
+        }
     }
     /**
      * This method listens to a stream of panel closing actions and resets the
@@ -18663,13 +18952,16 @@ class MdAutocompleteTrigger {
      * @return {?}
      */
     _subscribeToClosingActions() {
+        const /** @type {?} */ firstStable = first.call(this._zone.onStable);
+        const /** @type {?} */ optionChanges = map.call(this.autocomplete.options.changes, () => this._positionStrategy.recalculateLastPosition());
         // When the zone is stable initially, and when the option list changes...
-        Observable.merge(this._zone.onStable.first(), this.autocomplete.options.changes)
-            .switchMap(() => {
-            this._resetPanel();
+        return RxChain.from(merge(firstStable, optionChanges))
+            .call(switchMap, () => {
+            this._resetActiveItem();
+            this.autocomplete._setVisibility();
             return this.panelClosingActions;
         })
-            .first()
+            .call(first)
             .subscribe(event => this._setValueAndClose(event));
     }
     /**
@@ -18689,7 +18981,17 @@ class MdAutocompleteTrigger {
      */
     _setTriggerValue(value) {
         const /** @type {?} */ toDisplay = this.autocomplete.displayWith ? this.autocomplete.displayWith(value) : value;
-        this._element.nativeElement.value = toDisplay || '';
+        // Simply falling back to an empty string if the display value is falsy does not work properly.
+        // The display value can also be the number zero and shouldn't fall back to an empty string.
+        const /** @type {?} */ inputValue = toDisplay != null ? toDisplay : '';
+        // If it's used in a Material container, we should set it through
+        // the property so it can go through the change detection.
+        if (this._inputContainer) {
+            this._inputContainer._mdInputChild.value = inputValue;
+        }
+        else {
+            this._element.nativeElement.value = inputValue;
+        }
     }
     /**
      * This method closes the panel, and if a value is specified, also sets the associated
@@ -18703,6 +19005,7 @@ class MdAutocompleteTrigger {
             this._clearPreviousSelectedOption(event.source);
             this._setTriggerValue(event.source.value);
             this._onChange(event.source.value);
+            this._element.nativeElement.focus();
         }
         this.closePanel();
     }
@@ -18733,56 +19036,42 @@ class MdAutocompleteTrigger {
         overlayState.positionStrategy = this._getOverlayPosition();
         overlayState.width = this._getHostWidth();
         overlayState.direction = this._dir ? this._dir.value : 'ltr';
+        overlayState.scrollStrategy = this._scrollStrategy();
         return overlayState;
     }
     /**
      * @return {?}
      */
     _getOverlayPosition() {
-        this._positionStrategy = this._overlay.position().connectedTo(this._element, { originX: 'start', originY: 'bottom' }, { overlayX: 'start', overlayY: 'top' })
+        this._positionStrategy = this._overlay.position().connectedTo(this._getConnectedElement(), { originX: 'start', originY: 'bottom' }, { overlayX: 'start', overlayY: 'top' })
             .withFallbackPosition({ originX: 'start', originY: 'top' }, { overlayX: 'start', overlayY: 'bottom' });
-        this._subscribeToPositionChanges(this._positionStrategy);
         return this._positionStrategy;
     }
     /**
-     * This method subscribes to position changes in the autocomplete panel, so the panel's
-     * y-offset can be adjusted to match the new position.
-     * @param {?} strategy
      * @return {?}
      */
-    _subscribeToPositionChanges(strategy) {
-        this._panelPositionSubscription = strategy.onPositionChange.subscribe(change => {
-            this.autocomplete.positionY = change.connectionPair.originY === 'top' ? 'above' : 'below';
-        });
+    _getConnectedElement() {
+        return this._inputContainer ? this._inputContainer._connectionContainerRef : this._element;
     }
     /**
      * Returns the width of the input element, so the panel width can match it.
      * @return {?}
      */
     _getHostWidth() {
-        return this._element.nativeElement.getBoundingClientRect().width;
+        return this._getConnectedElement().nativeElement.getBoundingClientRect().width;
     }
     /**
-     * Reset active item to null so arrow events will activate the correct options.
+     * Reset active item to -1 so arrow events will activate the correct options.
      * @return {?}
      */
     _resetActiveItem() {
-        this.autocomplete._keyManager.setActiveItem(null);
-    }
-    /**
-     * Resets the active item and re-calculates alignment of the panel in case its size
-     * has changed due to fewer or greater number of options.
-     * @return {?}
-     */
-    _resetPanel() {
-        this._resetActiveItem();
-        this._positionStrategy.recalculateLastPosition();
-        this.autocomplete._setVisibility();
+        this.autocomplete._keyManager.setActiveItem(-1);
     }
 }
 MdAutocompleteTrigger.decorators = [
     { type: Directive, args: [{
-                selector: 'input[mdAutocomplete], input[matAutocomplete]',
+                selector: 'input[mdAutocomplete], input[matAutocomplete],' +
+                    'textarea[mdAutocomplete], textarea[matAutocomplete]',
                 host: {
                     'role': 'combobox',
                     'autocomplete': 'off',
@@ -18791,7 +19080,9 @@ MdAutocompleteTrigger.decorators = [
                     '[attr.aria-activedescendant]': 'activeOption?.id',
                     '[attr.aria-expanded]': 'panelOpen.toString()',
                     '[attr.aria-owns]': 'autocomplete?.id',
-                    '(focus)': 'openPanel()',
+                    // Note: we use `focusin`, as opposed to `focus`, in order to open the panel
+                    // a little earlier. This avoids issues where IE delays the focusing of the input.
+                    '(focusin)': 'openPanel()',
                     '(input)': '_handleInput($event)',
                     '(blur)': '_onTouched()',
                     '(keydown)': '_handleKeydown($event)',
@@ -18806,10 +19097,10 @@ MdAutocompleteTrigger.ctorParameters = () => [
     { type: ElementRef, },
     { type: Overlay, },
     { type: ViewContainerRef, },
-    { type: ChangeDetectorRef, },
-    { type: ScrollDispatcher, },
-    { type: Dir, decorators: [{ type: Optional },] },
     { type: NgZone, },
+    { type: ChangeDetectorRef, },
+    { type: undefined, decorators: [{ type: Inject, args: [MD_AUTOCOMPLETE_SCROLL_STRATEGY,] },] },
+    { type: Directionality, decorators: [{ type: Optional },] },
     { type: MdInputContainer, decorators: [{ type: Optional }, { type: Host },] },
     { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [DOCUMENT,] },] },
 ];
@@ -18819,28 +19110,3039 @@ MdAutocompleteTrigger.propDecorators = {
 };
 
 class MdAutocompleteModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return {
-            ngModule: MdAutocompleteModule,
-            providers: [OVERLAY_PROVIDERS]
-        };
-    }
 }
 MdAutocompleteModule.decorators = [
     { type: NgModule, args: [{
-                imports: [MdOptionModule, OverlayModule, CompatibilityModule, CommonModule],
-                exports: [MdAutocomplete, MdOptionModule, MdAutocompleteTrigger, CompatibilityModule],
+                imports: [MdOptionModule, OverlayModule, MdCommonModule, CommonModule],
+                exports: [MdAutocomplete, MdOptionModule, MdAutocompleteTrigger, MdCommonModule],
                 declarations: [MdAutocomplete, MdAutocompleteTrigger],
+                providers: [MD_AUTOCOMPLETE_SCROLL_STRATEGY_PROVIDER],
             },] },
 ];
 /**
  * @nocollapse
  */
 MdAutocompleteModule.ctorParameters = () => [];
+
+/**
+ * An internal class that represents the data corresponding to a single calendar cell.
+ * \@docs-private
+ */
+class MdCalendarCell {
+    /**
+     * @param {?} value
+     * @param {?} displayValue
+     * @param {?} ariaLabel
+     * @param {?} enabled
+     */
+    constructor(value, displayValue, ariaLabel, enabled) {
+        this.value = value;
+        this.displayValue = displayValue;
+        this.ariaLabel = ariaLabel;
+        this.enabled = enabled;
+    }
+}
+/**
+ * An internal component used to display calendar data in a table.
+ * \@docs-private
+ */
+class MdCalendarBody {
+    constructor() {
+        /**
+         * The number of columns in the table.
+         */
+        this.numCols = 7;
+        /**
+         * Whether to allow selection of disabled cells.
+         */
+        this.allowDisabledSelection = false;
+        /**
+         * The cell number of the active cell in the table.
+         */
+        this.activeCell = 0;
+        /**
+         * The aspect ratio (width / height) to use for the cells in the table. This aspect ratio will be
+         * maintained even as the table resizes.
+         */
+        this.cellAspectRatio = 1;
+        /**
+         * Emits when a new value is selected.
+         */
+        this.selectedValueChange = new EventEmitter();
+    }
+    /**
+     * @param {?} cell
+     * @return {?}
+     */
+    _cellClicked(cell) {
+        if (!this.allowDisabledSelection && !cell.enabled) {
+            return;
+        }
+        this.selectedValueChange.emit(cell.value);
+    }
+    /**
+     * The number of blank cells to put at the beginning for the first row.
+     * @return {?}
+     */
+    get _firstRowOffset() {
+        return this.rows && this.rows.length && this.rows[0].length ?
+            this.numCols - this.rows[0].length : 0;
+    }
+    /**
+     * @param {?} rowIndex
+     * @param {?} colIndex
+     * @return {?}
+     */
+    _isActiveCell(rowIndex, colIndex) {
+        let /** @type {?} */ cellNumber = rowIndex * this.numCols + colIndex;
+        // Account for the fact that the first row may not have as many cells.
+        if (rowIndex) {
+            cellNumber -= this._firstRowOffset;
+        }
+        return cellNumber == this.activeCell;
+    }
+}
+MdCalendarBody.decorators = [
+    { type: Component, args: [{selector: '[md-calendar-body]',
+                template: "<tr *ngIf=\"_firstRowOffset < labelMinRequiredCells\" aria-hidden=\"true\"><td class=\"mat-calendar-body-label\" [attr.colspan]=\"numCols\" [style.paddingTop.%]=\"50 * cellAspectRatio / numCols\" [style.paddingBottom.%]=\"50 * cellAspectRatio / numCols\">{{label}}</td></tr><tr *ngFor=\"let row of rows; let rowIndex = index\" role=\"row\"><td *ngIf=\"rowIndex === 0 && _firstRowOffset\" aria-hidden=\"true\" class=\"mat-calendar-body-label\" [attr.colspan]=\"_firstRowOffset\" [style.paddingTop.%]=\"50 * cellAspectRatio / numCols\" [style.paddingBottom.%]=\"50 * cellAspectRatio / numCols\">{{_firstRowOffset >= labelMinRequiredCells ? label : ''}}</td><td *ngFor=\"let item of row; let colIndex = index\" role=\"gridcell\" class=\"mat-calendar-body-cell\" [tabindex]=\"_isActiveCell(rowIndex, colIndex) ? 0 : -1\" [class.mat-calendar-body-disabled]=\"!item.enabled\" [class.mat-calendar-body-active]=\"_isActiveCell(rowIndex, colIndex)\" [attr.aria-label]=\"item.ariaLabel\" [attr.aria-disabled]=\"!item.enabled || null\" (click)=\"_cellClicked(item)\" [style.width.%]=\"100 / numCols\" [style.paddingTop.%]=\"50 * cellAspectRatio / numCols\" [style.paddingBottom.%]=\"50 * cellAspectRatio / numCols\"><div class=\"mat-calendar-body-cell-content\" [class.mat-calendar-body-selected]=\"selectedValue === item.value\" [class.mat-calendar-body-today]=\"todayValue === item.value\">{{item.displayValue}}</div></td></tr>",
+                styles: [".mat-calendar-body{min-width:224px}.mat-calendar-body-label{height:0;line-height:0;text-align:left;padding-left:4.71429%;padding-right:4.71429%}.mat-calendar-body-cell{position:relative;height:0;line-height:0;text-align:center;outline:0;cursor:pointer}.mat-calendar-body-disabled{cursor:default}.mat-calendar-body-cell-content{position:absolute;top:5%;left:5%;display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:90%;height:90%;line-height:1;border-width:1px;border-style:solid;border-radius:999px}[dir=rtl] .mat-calendar-body-label{text-align:right}"],
+                host: {
+                    'class': 'mat-calendar-body',
+                },
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdCalendarBody.ctorParameters = () => [];
+MdCalendarBody.propDecorators = {
+    'label': [{ type: Input },],
+    'rows': [{ type: Input },],
+    'todayValue': [{ type: Input },],
+    'selectedValue': [{ type: Input },],
+    'labelMinRequiredCells': [{ type: Input },],
+    'numCols': [{ type: Input },],
+    'allowDisabledSelection': [{ type: Input },],
+    'activeCell': [{ type: Input },],
+    'cellAspectRatio': [{ type: Input },],
+    'selectedValueChange': [{ type: Output },],
+};
+
+/**
+ * \@docs-private
+ * @param {?} provider
+ * @return {?}
+ */
+function createMissingDateImplError(provider) {
+    return Error(`MdDatepicker: No provider found for ${provider}. You must import one of the following ` +
+        `modules at your application root: MdNativeDateModule, or provide a custom implementation.`);
+}
+
+const DAYS_PER_WEEK = 7;
+/**
+ * An internal component used to display a single month in the datepicker.
+ * \@docs-private
+ */
+class MdMonthView {
+    /**
+     * @param {?} _dateAdapter
+     * @param {?} _dateFormats
+     */
+    constructor(_dateAdapter, _dateFormats) {
+        this._dateAdapter = _dateAdapter;
+        this._dateFormats = _dateFormats;
+        /**
+         * Emits when a new date is selected.
+         */
+        this.selectedChange = new EventEmitter();
+        if (!this._dateAdapter) {
+            throw createMissingDateImplError('DateAdapter');
+        }
+        if (!this._dateFormats) {
+            throw createMissingDateImplError('MD_DATE_FORMATS');
+        }
+        const firstDayOfWeek = this._dateAdapter.getFirstDayOfWeek();
+        const narrowWeekdays = this._dateAdapter.getDayOfWeekNames('narrow');
+        const longWeekdays = this._dateAdapter.getDayOfWeekNames('long');
+        // Rotate the labels for days of the week based on the configured first day of the week.
+        let weekdays = longWeekdays.map((long, i) => {
+            return { long, narrow: narrowWeekdays[i] };
+        });
+        this._weekdays = weekdays.slice(firstDayOfWeek).concat(weekdays.slice(0, firstDayOfWeek));
+        this._activeDate = this._dateAdapter.today();
+    }
+    /**
+     * The date to display in this month view (everything other than the month and year is ignored).
+     * @return {?}
+     */
+    get activeDate() { return this._activeDate; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set activeDate(value) {
+        let /** @type {?} */ oldActiveDate = this._activeDate;
+        this._activeDate = value || this._dateAdapter.today();
+        if (!this._hasSameMonthAndYear(oldActiveDate, this._activeDate)) {
+            this._init();
+        }
+    }
+    /**
+     * The currently selected date.
+     * @return {?}
+     */
+    get selected() { return this._selected; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set selected(value) {
+        this._selected = value;
+        this._selectedDate = this._getDateInCurrentMonth(this.selected);
+    }
+    /**
+     * @return {?}
+     */
+    ngAfterContentInit() {
+        this._init();
+    }
+    /**
+     * Handles when a new date is selected.
+     * @param {?} date
+     * @return {?}
+     */
+    _dateSelected(date) {
+        if (this._selectedDate == date) {
+            return;
+        }
+        this.selectedChange.emit(this._dateAdapter.createDate(this._dateAdapter.getYear(this.activeDate), this._dateAdapter.getMonth(this.activeDate), date));
+    }
+    /**
+     * Initializes this month view.
+     * @return {?}
+     */
+    _init() {
+        this._selectedDate = this._getDateInCurrentMonth(this.selected);
+        this._todayDate = this._getDateInCurrentMonth(this._dateAdapter.today());
+        this._monthLabel =
+            this._dateAdapter.getMonthNames('short')[this._dateAdapter.getMonth(this.activeDate)]
+                .toLocaleUpperCase();
+        let /** @type {?} */ firstOfMonth = this._dateAdapter.createDate(this._dateAdapter.getYear(this.activeDate), this._dateAdapter.getMonth(this.activeDate), 1);
+        this._firstWeekOffset =
+            (DAYS_PER_WEEK + this._dateAdapter.getDayOfWeek(firstOfMonth) -
+                this._dateAdapter.getFirstDayOfWeek()) % DAYS_PER_WEEK;
+        this._createWeekCells();
+    }
+    /**
+     * Creates MdCalendarCells for the dates in this month.
+     * @return {?}
+     */
+    _createWeekCells() {
+        let /** @type {?} */ daysInMonth = this._dateAdapter.getNumDaysInMonth(this.activeDate);
+        let /** @type {?} */ dateNames = this._dateAdapter.getDateNames();
+        this._weeks = [[]];
+        for (let /** @type {?} */ i = 0, /** @type {?} */ cell = this._firstWeekOffset; i < daysInMonth; i++, cell++) {
+            if (cell == DAYS_PER_WEEK) {
+                this._weeks.push([]);
+                cell = 0;
+            }
+            let /** @type {?} */ date = this._dateAdapter.createDate(this._dateAdapter.getYear(this.activeDate), this._dateAdapter.getMonth(this.activeDate), i + 1);
+            let /** @type {?} */ enabled = !this.dateFilter ||
+                this.dateFilter(date);
+            let /** @type {?} */ ariaLabel = this._dateAdapter.format(date, this._dateFormats.display.dateA11yLabel);
+            this._weeks[this._weeks.length - 1]
+                .push(new MdCalendarCell(i + 1, dateNames[i], ariaLabel, enabled));
+        }
+    }
+    /**
+     * Gets the date in this month that the given Date falls on.
+     * Returns null if the given Date is in another month.
+     * @param {?} date
+     * @return {?}
+     */
+    _getDateInCurrentMonth(date) {
+        return this._hasSameMonthAndYear(date, this.activeDate) ?
+            this._dateAdapter.getDate(date) : null;
+    }
+    /**
+     * Checks whether the 2 dates are non-null and fall within the same month of the same year.
+     * @param {?} d1
+     * @param {?} d2
+     * @return {?}
+     */
+    _hasSameMonthAndYear(d1, d2) {
+        return !!(d1 && d2 && this._dateAdapter.getMonth(d1) == this._dateAdapter.getMonth(d2) &&
+            this._dateAdapter.getYear(d1) == this._dateAdapter.getYear(d2));
+    }
+}
+MdMonthView.decorators = [
+    { type: Component, args: [{selector: 'md-month-view',
+                template: "<table class=\"mat-calendar-table\"><thead class=\"mat-calendar-table-header\"><tr><th *ngFor=\"let day of _weekdays\" [attr.aria-label]=\"day.long\">{{day.narrow}}</th></tr><tr><th class=\"mat-calendar-table-header-divider\" colspan=\"7\" aria-hidden=\"true\"></th></tr></thead><tbody md-calendar-body role=\"grid\" [label]=\"_monthLabel\" [rows]=\"_weeks\" [todayValue]=\"_todayDate\" [selectedValue]=\"_selectedDate\" [labelMinRequiredCells]=\"3\" [activeCell]=\"_dateAdapter.getDate(activeDate) - 1\" (selectedValueChange)=\"_dateSelected($event)\"></tbody></table>",
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdMonthView.ctorParameters = () => [
+    { type: DateAdapter, decorators: [{ type: Optional },] },
+    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [MD_DATE_FORMATS,] },] },
+];
+MdMonthView.propDecorators = {
+    'activeDate': [{ type: Input },],
+    'selected': [{ type: Input },],
+    'dateFilter': [{ type: Input },],
+    'selectedChange': [{ type: Output },],
+};
+
+/**
+ * An internal component used to display a single year in the datepicker.
+ * \@docs-private
+ */
+class MdYearView {
+    /**
+     * @param {?} _dateAdapter
+     * @param {?} _dateFormats
+     */
+    constructor(_dateAdapter, _dateFormats) {
+        this._dateAdapter = _dateAdapter;
+        this._dateFormats = _dateFormats;
+        /**
+         * Emits when a new month is selected.
+         */
+        this.selectedChange = new EventEmitter();
+        if (!this._dateAdapter) {
+            throw createMissingDateImplError('DateAdapter');
+        }
+        if (!this._dateFormats) {
+            throw createMissingDateImplError('MD_DATE_FORMATS');
+        }
+        this._activeDate = this._dateAdapter.today();
+    }
+    /**
+     * The date to display in this year view (everything other than the year is ignored).
+     * @return {?}
+     */
+    get activeDate() { return this._activeDate; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set activeDate(value) {
+        let /** @type {?} */ oldActiveDate = this._activeDate;
+        this._activeDate = value || this._dateAdapter.today();
+        if (this._dateAdapter.getYear(oldActiveDate) != this._dateAdapter.getYear(this._activeDate)) {
+            this._init();
+        }
+    }
+    /**
+     * The currently selected date.
+     * @return {?}
+     */
+    get selected() { return this._selected; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set selected(value) {
+        this._selected = value;
+        this._selectedMonth = this._getMonthInCurrentYear(this.selected);
+    }
+    /**
+     * @return {?}
+     */
+    ngAfterContentInit() {
+        this._init();
+    }
+    /**
+     * Handles when a new month is selected.
+     * @param {?} month
+     * @return {?}
+     */
+    _monthSelected(month) {
+        let /** @type {?} */ daysInMonth = this._dateAdapter.getNumDaysInMonth(this._dateAdapter.createDate(this._dateAdapter.getYear(this.activeDate), month, 1));
+        this.selectedChange.emit(this._dateAdapter.createDate(this._dateAdapter.getYear(this.activeDate), month, Math.min(this._dateAdapter.getDate(this.activeDate), daysInMonth)));
+    }
+    /**
+     * Initializes this month view.
+     * @return {?}
+     */
+    _init() {
+        this._selectedMonth = this._getMonthInCurrentYear(this.selected);
+        this._todayMonth = this._getMonthInCurrentYear(this._dateAdapter.today());
+        this._yearLabel = this._dateAdapter.getYearName(this.activeDate);
+        let /** @type {?} */ monthNames = this._dateAdapter.getMonthNames('short');
+        // First row of months only contains 5 elements so we can fit the year label on the same row.
+        this._months = [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]].map(row => row.map(month => this._createCellForMonth(month, monthNames[month])));
+    }
+    /**
+     * Gets the month in this year that the given Date falls on.
+     * Returns null if the given Date is in another year.
+     * @param {?} date
+     * @return {?}
+     */
+    _getMonthInCurrentYear(date) {
+        return date && this._dateAdapter.getYear(date) == this._dateAdapter.getYear(this.activeDate) ?
+            this._dateAdapter.getMonth(date) : null;
+    }
+    /**
+     * Creates an MdCalendarCell for the given month.
+     * @param {?} month
+     * @param {?} monthName
+     * @return {?}
+     */
+    _createCellForMonth(month, monthName) {
+        let /** @type {?} */ ariaLabel = this._dateAdapter.format(this._dateAdapter.createDate(this._dateAdapter.getYear(this.activeDate), month, 1), this._dateFormats.display.monthYearA11yLabel);
+        return new MdCalendarCell(month, monthName.toLocaleUpperCase(), ariaLabel, this._isMonthEnabled(month));
+    }
+    /**
+     * Whether the given month is enabled.
+     * @param {?} month
+     * @return {?}
+     */
+    _isMonthEnabled(month) {
+        if (!this.dateFilter) {
+            return true;
+        }
+        let /** @type {?} */ firstOfMonth = this._dateAdapter.createDate(this._dateAdapter.getYear(this.activeDate), month, 1);
+        // If any date in the month is enabled count the month as enabled.
+        for (let /** @type {?} */ date = firstOfMonth; this._dateAdapter.getMonth(date) == month; date = this._dateAdapter.addCalendarDays(date, 1)) {
+            if (this.dateFilter(date)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+MdYearView.decorators = [
+    { type: Component, args: [{selector: 'md-year-view',
+                template: "<table class=\"mat-calendar-table\"><thead class=\"mat-calendar-table-header\"><tr><th class=\"mat-calendar-table-header-divider\" colspan=\"4\"></th></tr></thead><tbody md-calendar-body role=\"grid\" allowDisabledSelection=\"true\" [label]=\"_yearLabel\" [rows]=\"_months\" [todayValue]=\"_todayMonth\" [selectedValue]=\"_selectedMonth\" [labelMinRequiredCells]=\"2\" [numCols]=\"4\" [cellAspectRatio]=\"4 / 7\" [activeCell]=\"_dateAdapter.getMonth(activeDate)\" (selectedValueChange)=\"_monthSelected($event)\"></tbody></table>",
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdYearView.ctorParameters = () => [
+    { type: DateAdapter, decorators: [{ type: Optional },] },
+    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [MD_DATE_FORMATS,] },] },
+];
+MdYearView.propDecorators = {
+    'activeDate': [{ type: Input },],
+    'selected': [{ type: Input },],
+    'dateFilter': [{ type: Input },],
+    'selectedChange': [{ type: Output },],
+};
+
+/**
+ * Datepicker data that requires internationalization.
+ */
+class MdDatepickerIntl {
+    constructor() {
+        /**
+         * Stream that emits whenever the labels here are changed. Use this to notify
+         * components if the labels have changed after initialization.
+         */
+        this.changes = new Subject();
+        /**
+         * A label for the calendar popup (used by screen readers).
+         */
+        this.calendarLabel = 'Calendar';
+        /**
+         * A label for the button used to open the calendar popup (used by screen readers).
+         */
+        this.openCalendarLabel = 'Open calendar';
+        /**
+         * A label for the previous month button (used by screen readers).
+         */
+        this.prevMonthLabel = 'Previous month';
+        /**
+         * A label for the next month button (used by screen readers).
+         */
+        this.nextMonthLabel = 'Next month';
+        /**
+         * A label for the previous year button (used by screen readers).
+         */
+        this.prevYearLabel = 'Previous year';
+        /**
+         * A label for the next year button (used by screen readers).
+         */
+        this.nextYearLabel = 'Next year';
+        /**
+         * A label for the 'switch to month view' button (used by screen readers).
+         */
+        this.switchToMonthViewLabel = 'Change to month view';
+        /**
+         * A label for the 'switch to year view' button (used by screen readers).
+         */
+        this.switchToYearViewLabel = 'Change to year view';
+    }
+}
+MdDatepickerIntl.decorators = [
+    { type: Injectable },
+];
+/**
+ * @nocollapse
+ */
+MdDatepickerIntl.ctorParameters = () => [];
+
+/**
+ * A calendar that is used as part of the datepicker.
+ * \@docs-private
+ */
+class MdCalendar {
+    /**
+     * @param {?} _elementRef
+     * @param {?} _intl
+     * @param {?} _ngZone
+     * @param {?} _isCompatibilityMode
+     * @param {?} _dateAdapter
+     * @param {?} _dateFormats
+     * @param {?} changeDetectorRef
+     */
+    constructor(_elementRef, _intl, _ngZone, _isCompatibilityMode, _dateAdapter, _dateFormats, changeDetectorRef) {
+        this._elementRef = _elementRef;
+        this._intl = _intl;
+        this._ngZone = _ngZone;
+        this._isCompatibilityMode = _isCompatibilityMode;
+        this._dateAdapter = _dateAdapter;
+        this._dateFormats = _dateFormats;
+        /**
+         * Whether the calendar should be started in month or year view.
+         */
+        this.startView = 'month';
+        /**
+         * Emits when the currently selected date changes.
+         */
+        this.selectedChange = new EventEmitter();
+        /**
+         * Date filter for the month and year views.
+         */
+        this._dateFilterForViews = (date) => {
+            return !!date &&
+                (!this.dateFilter || this.dateFilter(date)) &&
+                (!this.minDate || this._dateAdapter.compareDate(date, this.minDate) >= 0) &&
+                (!this.maxDate || this._dateAdapter.compareDate(date, this.maxDate) <= 0);
+        };
+        if (!this._dateAdapter) {
+            throw createMissingDateImplError('DateAdapter');
+        }
+        if (!this._dateFormats) {
+            throw createMissingDateImplError('MD_DATE_FORMATS');
+        }
+        this._intlChanges = _intl.changes.subscribe(() => changeDetectorRef.markForCheck());
+    }
+    /**
+     * The current active date. This determines which time period is shown and which date is
+     * highlighted when using keyboard navigation.
+     * @return {?}
+     */
+    get _activeDate() { return this._clampedActiveDate; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set _activeDate(value) {
+        this._clampedActiveDate = this._dateAdapter.clampDate(value, this.minDate, this.maxDate);
+    }
+    /**
+     * The label for the current calendar view.
+     * @return {?}
+     */
+    get _periodButtonText() {
+        return this._monthView ?
+            this._dateAdapter.format(this._activeDate, this._dateFormats.display.monthYearLabel)
+                .toLocaleUpperCase() :
+            this._dateAdapter.getYearName(this._activeDate);
+    }
+    /**
+     * @return {?}
+     */
+    get _periodButtonLabel() {
+        return this._monthView ? this._intl.switchToYearViewLabel : this._intl.switchToMonthViewLabel;
+    }
+    /**
+     * The label for the the previous button.
+     * @return {?}
+     */
+    get _prevButtonLabel() {
+        return this._monthView ? this._intl.prevMonthLabel : this._intl.prevYearLabel;
+    }
+    /**
+     * The label for the the next button.
+     * @return {?}
+     */
+    get _nextButtonLabel() {
+        return this._monthView ? this._intl.nextMonthLabel : this._intl.nextYearLabel;
+    }
+    /**
+     * @return {?}
+     */
+    ngAfterContentInit() {
+        this._activeDate = this.startAt || this._dateAdapter.today();
+        this._focusActiveCell();
+        this._monthView = this.startView != 'year';
+    }
+    /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        this._intlChanges.unsubscribe();
+    }
+    /**
+     * Handles date selection in the month view.
+     * @param {?} date
+     * @return {?}
+     */
+    _dateSelected(date) {
+        if (!this._dateAdapter.sameDate(date, this.selected)) {
+            this.selectedChange.emit(date);
+        }
+    }
+    /**
+     * Handles month selection in the year view.
+     * @param {?} month
+     * @return {?}
+     */
+    _monthSelected(month) {
+        this._activeDate = month;
+        this._monthView = true;
+    }
+    /**
+     * Handles user clicks on the period label.
+     * @return {?}
+     */
+    _currentPeriodClicked() {
+        this._monthView = !this._monthView;
+    }
+    /**
+     * Handles user clicks on the previous button.
+     * @return {?}
+     */
+    _previousClicked() {
+        this._activeDate = this._monthView ?
+            this._dateAdapter.addCalendarMonths(this._activeDate, -1) :
+            this._dateAdapter.addCalendarYears(this._activeDate, -1);
+    }
+    /**
+     * Handles user clicks on the next button.
+     * @return {?}
+     */
+    _nextClicked() {
+        this._activeDate = this._monthView ?
+            this._dateAdapter.addCalendarMonths(this._activeDate, 1) :
+            this._dateAdapter.addCalendarYears(this._activeDate, 1);
+    }
+    /**
+     * Whether the previous period button is enabled.
+     * @return {?}
+     */
+    _previousEnabled() {
+        if (!this.minDate) {
+            return true;
+        }
+        return !this.minDate || !this._isSameView(this._activeDate, this.minDate);
+    }
+    /**
+     * Whether the next period button is enabled.
+     * @return {?}
+     */
+    _nextEnabled() {
+        return !this.maxDate || !this._isSameView(this._activeDate, this.maxDate);
+    }
+    /**
+     * Handles keydown events on the calendar body.
+     * @param {?} event
+     * @return {?}
+     */
+    _handleCalendarBodyKeydown(event) {
+        // TODO(mmalerba): We currently allow keyboard navigation to disabled dates, but just prevent
+        // disabled ones from being selected. This may not be ideal, we should look into whether
+        // navigation should skip over disabled dates, and if so, how to implement that efficiently.
+        if (this._monthView) {
+            this._handleCalendarBodyKeydownInMonthView(event);
+        }
+        else {
+            this._handleCalendarBodyKeydownInYearView(event);
+        }
+    }
+    /**
+     * Focuses the active cell after the microtask queue is empty.
+     * @return {?}
+     */
+    _focusActiveCell() {
+        this._ngZone.runOutsideAngular(() => first.call(this._ngZone.onStable).subscribe(() => {
+            this._elementRef.nativeElement.querySelector('.mat-calendar-body-active').focus();
+        }));
+    }
+    /**
+     * Whether the two dates represent the same view in the current view mode (month or year).
+     * @param {?} date1
+     * @param {?} date2
+     * @return {?}
+     */
+    _isSameView(date1, date2) {
+        return this._monthView ?
+            this._dateAdapter.getYear(date1) == this._dateAdapter.getYear(date2) &&
+                this._dateAdapter.getMonth(date1) == this._dateAdapter.getMonth(date2) :
+            this._dateAdapter.getYear(date1) == this._dateAdapter.getYear(date2);
+    }
+    /**
+     * Handles keydown events on the calendar body when calendar is in month view.
+     * @param {?} event
+     * @return {?}
+     */
+    _handleCalendarBodyKeydownInMonthView(event) {
+        switch (event.keyCode) {
+            case LEFT_ARROW:
+                this._activeDate = this._dateAdapter.addCalendarDays(this._activeDate, -1);
+                break;
+            case RIGHT_ARROW:
+                this._activeDate = this._dateAdapter.addCalendarDays(this._activeDate, 1);
+                break;
+            case UP_ARROW:
+                this._activeDate = this._dateAdapter.addCalendarDays(this._activeDate, -7);
+                break;
+            case DOWN_ARROW:
+                this._activeDate = this._dateAdapter.addCalendarDays(this._activeDate, 7);
+                break;
+            case HOME:
+                this._activeDate = this._dateAdapter.addCalendarDays(this._activeDate, 1 - this._dateAdapter.getDate(this._activeDate));
+                break;
+            case END:
+                this._activeDate = this._dateAdapter.addCalendarDays(this._activeDate, (this._dateAdapter.getNumDaysInMonth(this._activeDate) -
+                    this._dateAdapter.getDate(this._activeDate)));
+                break;
+            case PAGE_UP:
+                this._activeDate = event.altKey ?
+                    this._dateAdapter.addCalendarYears(this._activeDate, -1) :
+                    this._dateAdapter.addCalendarMonths(this._activeDate, -1);
+                break;
+            case PAGE_DOWN:
+                this._activeDate = event.altKey ?
+                    this._dateAdapter.addCalendarYears(this._activeDate, 1) :
+                    this._dateAdapter.addCalendarMonths(this._activeDate, 1);
+                break;
+            case ENTER:
+                if (this._dateFilterForViews(this._activeDate)) {
+                    this._dateSelected(this._activeDate);
+                    // Prevent unexpected default actions such as form submission.
+                    event.preventDefault();
+                }
+                return;
+            default:
+                // Don't prevent default or focus active cell on keys that we don't explicitly handle.
+                return;
+        }
+        this._focusActiveCell();
+        // Prevent unexpected default actions such as form submission.
+        event.preventDefault();
+    }
+    /**
+     * Handles keydown events on the calendar body when calendar is in year view.
+     * @param {?} event
+     * @return {?}
+     */
+    _handleCalendarBodyKeydownInYearView(event) {
+        switch (event.keyCode) {
+            case LEFT_ARROW:
+                this._activeDate = this._dateAdapter.addCalendarMonths(this._activeDate, -1);
+                break;
+            case RIGHT_ARROW:
+                this._activeDate = this._dateAdapter.addCalendarMonths(this._activeDate, 1);
+                break;
+            case UP_ARROW:
+                this._activeDate = this._prevMonthInSameCol(this._activeDate);
+                break;
+            case DOWN_ARROW:
+                this._activeDate = this._nextMonthInSameCol(this._activeDate);
+                break;
+            case HOME:
+                this._activeDate = this._dateAdapter.addCalendarMonths(this._activeDate, -this._dateAdapter.getMonth(this._activeDate));
+                break;
+            case END:
+                this._activeDate = this._dateAdapter.addCalendarMonths(this._activeDate, 11 - this._dateAdapter.getMonth(this._activeDate));
+                break;
+            case PAGE_UP:
+                this._activeDate =
+                    this._dateAdapter.addCalendarYears(this._activeDate, event.altKey ? -10 : -1);
+                break;
+            case PAGE_DOWN:
+                this._activeDate =
+                    this._dateAdapter.addCalendarYears(this._activeDate, event.altKey ? 10 : 1);
+                break;
+            case ENTER:
+                this._monthSelected(this._activeDate);
+                break;
+            default:
+                // Don't prevent default or focus active cell on keys that we don't explicitly handle.
+                return;
+        }
+        this._focusActiveCell();
+        // Prevent unexpected default actions such as form submission.
+        event.preventDefault();
+    }
+    /**
+     * Determine the date for the month that comes before the given month in the same column in the
+     * calendar table.
+     * @param {?} date
+     * @return {?}
+     */
+    _prevMonthInSameCol(date) {
+        // Determine how many months to jump forward given that there are 2 empty slots at the beginning
+        // of each year.
+        let /** @type {?} */ increment = this._dateAdapter.getMonth(date) <= 4 ? -5 :
+            (this._dateAdapter.getMonth(date) >= 7 ? -7 : -12);
+        return this._dateAdapter.addCalendarMonths(date, increment);
+    }
+    /**
+     * Determine the date for the month that comes after the given month in the same column in the
+     * calendar table.
+     * @param {?} date
+     * @return {?}
+     */
+    _nextMonthInSameCol(date) {
+        // Determine how many months to jump forward given that there are 2 empty slots at the beginning
+        // of each year.
+        let /** @type {?} */ increment = this._dateAdapter.getMonth(date) <= 4 ? 7 :
+            (this._dateAdapter.getMonth(date) >= 7 ? 5 : 12);
+        return this._dateAdapter.addCalendarMonths(date, increment);
+    }
+}
+MdCalendar.decorators = [
+    { type: Component, args: [{selector: 'md-calendar',
+                template: "<div class=\"mat-calendar-header\"><div class=\"mat-calendar-controls\"><button *ngIf=\"!_isCompatibilityMode\" md-button class=\"mat-calendar-period-button\" (click)=\"_currentPeriodClicked()\" [attr.aria-label]=\"_periodButtonLabel\">{{_periodButtonText}}<div class=\"mat-calendar-arrow\" [class.mat-calendar-invert]=\"!_monthView\"></div></button> <button *ngIf=\"_isCompatibilityMode\" mat-button class=\"mat-calendar-period-button\" (click)=\"_currentPeriodClicked()\" [attr.aria-label]=\"_periodButtonLabel\">{{_periodButtonText}}<div class=\"mat-calendar-arrow\" [class.mat-calendar-invert]=\"!_monthView\"></div></button><div class=\"mat-calendar-spacer\"></div><button *ngIf=\"!_isCompatibilityMode\" md-icon-button class=\"mat-calendar-previous-button\" [disabled]=\"!_previousEnabled()\" (click)=\"_previousClicked()\" [attr.aria-label]=\"_prevButtonLabel\"></button> <button *ngIf=\"_isCompatibilityMode\" mat-icon-button class=\"mat-calendar-previous-button\" [disabled]=\"!_previousEnabled()\" (click)=\"_previousClicked()\" [attr.aria-label]=\"_prevButtonLabel\"></button> <button *ngIf=\"!_isCompatibilityMode\" md-icon-button class=\"mat-calendar-next-button\" [disabled]=\"!_nextEnabled()\" (click)=\"_nextClicked()\" [attr.aria-label]=\"_nextButtonLabel\"></button> <button *ngIf=\"_isCompatibilityMode\" mat-icon-button class=\"mat-calendar-next-button\" [disabled]=\"!_nextEnabled()\" (click)=\"_nextClicked()\" [attr.aria-label]=\"_nextButtonLabel\"></button></div></div><div class=\"mat-calendar-content\" (keydown)=\"_handleCalendarBodyKeydown($event)\" [ngSwitch]=\"_monthView\" cdkMonitorSubtreeFocus><md-month-view *ngSwitchCase=\"true\" [activeDate]=\"_activeDate\" [selected]=\"selected\" [dateFilter]=\"_dateFilterForViews\" (selectedChange)=\"_dateSelected($event)\"></md-month-view><md-year-view *ngSwitchDefault [activeDate]=\"_activeDate\" [selected]=\"selected\" [dateFilter]=\"_dateFilterForViews\" (selectedChange)=\"_monthSelected($event)\"></md-year-view></div>",
+                styles: [".mat-calendar{display:block}.mat-calendar-header{padding:8px 8px 0 8px}.mat-calendar-content{padding:0 8px 8px 8px;outline:0}.mat-calendar-controls{display:flex;margin:5% calc(33% / 7 - 16px)}.mat-calendar-spacer{flex:1 1 auto}.mat-calendar-period-button{min-width:0}.mat-calendar-arrow{display:inline-block;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top-width:5px;border-top-style:solid;margin:0 0 0 5px;vertical-align:middle}.mat-calendar-arrow.mat-calendar-invert{transform:rotate(180deg)}[dir=rtl] .mat-calendar-arrow{margin:0 5px 0 0}.mat-calendar-next-button,.mat-calendar-previous-button{position:relative}.mat-calendar-next-button::after,.mat-calendar-previous-button::after{content:'';position:absolute;top:0;left:0;bottom:0;right:0;margin:15.5px;border:0 solid currentColor;border-top-width:2px}[dir=rtl] .mat-calendar-next-button,[dir=rtl] .mat-calendar-previous-button{transform:rotate(180deg)}.mat-calendar-previous-button::after{border-left-width:2px;transform:translateX(2px) rotate(-45deg)}.mat-calendar-next-button::after{border-right-width:2px;transform:translateX(-2px) rotate(45deg)}.mat-calendar-table{border-spacing:0;border-collapse:collapse;width:100%}.mat-calendar-table-header th{text-align:center;padding:0 0 8px 0}.mat-calendar-table-header-divider{position:relative;height:1px}.mat-calendar-table-header-divider::after{content:'';position:absolute;top:0;left:-8px;right:-8px;height:1px}"],
+                host: {
+                    'class': 'mat-calendar',
+                },
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdCalendar.ctorParameters = () => [
+    { type: ElementRef, },
+    { type: MdDatepickerIntl, },
+    { type: NgZone, },
+    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [MATERIAL_COMPATIBILITY_MODE,] },] },
+    { type: DateAdapter, decorators: [{ type: Optional },] },
+    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [MD_DATE_FORMATS,] },] },
+    { type: ChangeDetectorRef, },
+];
+MdCalendar.propDecorators = {
+    'startAt': [{ type: Input },],
+    'startView': [{ type: Input },],
+    'selected': [{ type: Input },],
+    'minDate': [{ type: Input },],
+    'maxDate': [{ type: Input },],
+    'dateFilter': [{ type: Input },],
+    'selectedChange': [{ type: Output },],
+};
+
+/**
+ * Used to generate a unique ID for each datepicker instance.
+ */
+let datepickerUid = 0;
+/**
+ * Injection token that determines the scroll handling while the calendar is open.
+ */
+const MD_DATEPICKER_SCROLL_STRATEGY = new InjectionToken('md-datepicker-scroll-strategy');
+/**
+ * \@docs-private
+ * @param {?} overlay
+ * @return {?}
+ */
+function MD_DATEPICKER_SCROLL_STRATEGY_PROVIDER_FACTORY(overlay) {
+    return () => overlay.scrollStrategies.reposition();
+}
+/**
+ * \@docs-private
+ */
+const MD_DATEPICKER_SCROLL_STRATEGY_PROVIDER = {
+    provide: MD_DATEPICKER_SCROLL_STRATEGY,
+    deps: [Overlay],
+    useFactory: MD_DATEPICKER_SCROLL_STRATEGY_PROVIDER_FACTORY,
+};
+/**
+ * Component used as the content for the datepicker dialog and popup. We use this instead of using
+ * MdCalendar directly as the content so we can control the initial focus. This also gives us a
+ * place to put additional features of the popup that are not part of the calendar itself in the
+ * future. (e.g. confirmation buttons).
+ * \@docs-private
+ */
+class MdDatepickerContent {
+    /**
+     * @return {?}
+     */
+    ngAfterContentInit() {
+        this._calendar._focusActiveCell();
+    }
+    /**
+     * Handles keydown event on datepicker content.
+     * @param {?} event The event.
+     * @return {?}
+     */
+    _handleKeydown(event) {
+        if (event.keyCode === ESCAPE) {
+            this.datepicker.close();
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    }
+}
+MdDatepickerContent.decorators = [
+    { type: Component, args: [{selector: 'md-datepicker-content',
+                template: "<md-calendar cdkTrapFocus [id]=\"datepicker.id\" [startAt]=\"datepicker.startAt\" [startView]=\"datepicker.startView\" [minDate]=\"datepicker._minDate\" [maxDate]=\"datepicker._maxDate\" [dateFilter]=\"datepicker._dateFilter\" [selected]=\"datepicker._selected\" (selectedChange)=\"datepicker._selectAndClose($event)\"></md-calendar>",
+                styles: [".mat-datepicker-content{box-shadow:0 5px 5px -3px rgba(0,0,0,.2),0 8px 10px 1px rgba(0,0,0,.14),0 3px 14px 2px rgba(0,0,0,.12);display:block}.mat-calendar{width:296px;height:354px}.mat-datepicker-content-touch{box-shadow:0 0 0 0 rgba(0,0,0,.2),0 0 0 0 rgba(0,0,0,.14),0 0 0 0 rgba(0,0,0,.12);display:block;max-height:80vh;overflow:auto;margin:-24px}.mat-datepicker-content-touch .mat-calendar{min-width:250px;min-height:312px;max-width:750px;max-height:788px}@media all and (orientation:landscape){.mat-datepicker-content-touch .mat-calendar{width:64vh;height:80vh}}@media all and (orientation:portrait){.mat-datepicker-content-touch .mat-calendar{width:80vw;height:100vw}}"],
+                host: {
+                    'class': 'mat-datepicker-content',
+                    '[class.mat-datepicker-content-touch]': 'datepicker.touchUi',
+                    '(keydown)': '_handleKeydown($event)',
+                },
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdDatepickerContent.ctorParameters = () => [];
+MdDatepickerContent.propDecorators = {
+    '_calendar': [{ type: ViewChild, args: [MdCalendar,] },],
+};
+/**
+ * Component responsible for managing the datepicker popup/dialog.
+ */
+class MdDatepicker {
+    /**
+     * @param {?} _dialog
+     * @param {?} _overlay
+     * @param {?} _ngZone
+     * @param {?} _viewContainerRef
+     * @param {?} _scrollStrategy
+     * @param {?} _dateAdapter
+     * @param {?} _dir
+     * @param {?} _document
+     */
+    constructor(_dialog, _overlay, _ngZone, _viewContainerRef, _scrollStrategy, _dateAdapter, _dir, _document) {
+        this._dialog = _dialog;
+        this._overlay = _overlay;
+        this._ngZone = _ngZone;
+        this._viewContainerRef = _viewContainerRef;
+        this._scrollStrategy = _scrollStrategy;
+        this._dateAdapter = _dateAdapter;
+        this._dir = _dir;
+        this._document = _document;
+        /**
+         * The view that the calendar should start in.
+         */
+        this.startView = 'month';
+        /**
+         * Whether the calendar UI is in touch mode. In touch mode the calendar opens in a dialog rather
+         * than a popup and elements have more padding to allow for bigger touch targets.
+         */
+        this.touchUi = false;
+        /**
+         * Emits new selected date when selected date changes.
+         * @deprecated Switch to the `dateChange` and `dateInput` binding on the input element.
+         */
+        this.selectedChanged = new EventEmitter();
+        /**
+         * Whether the calendar is open.
+         */
+        this.opened = false;
+        /**
+         * The id for the datepicker calendar.
+         */
+        this.id = `md-datepicker-${datepickerUid++}`;
+        this._validSelected = null;
+        /**
+         * The element that was focused before the datepicker was opened.
+         */
+        this._focusedElementBeforeOpen = null;
+        if (!this._dateAdapter) {
+            throw createMissingDateImplError('DateAdapter');
+        }
+    }
+    /**
+     * The date to open the calendar to initially.
+     * @return {?}
+     */
+    get startAt() {
+        // If an explicit startAt is set we start there, otherwise we start at whatever the currently
+        // selected value is.
+        return this._startAt || (this._datepickerInput ? this._datepickerInput.value : null);
+    }
+    /**
+     * @param {?} date
+     * @return {?}
+     */
+    set startAt(date) { this._startAt = date; }
+    /**
+     * Whether the datepicker pop-up should be disabled.
+     * @return {?}
+     */
+    get disabled() {
+        return this._disabled === undefined ? this._datepickerInput.disabled : this._disabled;
+    }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set disabled(value) {
+        this._disabled = coerceBooleanProperty(value);
+    }
+    /**
+     * The currently selected date.
+     * @return {?}
+     */
+    get _selected() { return this._validSelected; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set _selected(value) { this._validSelected = value; }
+    /**
+     * The minimum selectable date.
+     * @return {?}
+     */
+    get _minDate() {
+        return this._datepickerInput && this._datepickerInput.min;
+    }
+    /**
+     * The maximum selectable date.
+     * @return {?}
+     */
+    get _maxDate() {
+        return this._datepickerInput && this._datepickerInput.max;
+    }
+    /**
+     * @return {?}
+     */
+    get _dateFilter() {
+        return this._datepickerInput && this._datepickerInput._dateFilter;
+    }
+    /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        this.close();
+        if (this._popupRef) {
+            this._popupRef.dispose();
+        }
+        if (this._inputSubscription) {
+            this._inputSubscription.unsubscribe();
+        }
+    }
+    /**
+     * Selects the given date and closes the currently open popup or dialog.
+     * @param {?} date
+     * @return {?}
+     */
+    _selectAndClose(date) {
+        let /** @type {?} */ oldValue = this._selected;
+        this._selected = date;
+        if (!this._dateAdapter.sameDate(oldValue, this._selected)) {
+            this.selectedChanged.emit(date);
+        }
+        this.close();
+    }
+    /**
+     * Register an input with this datepicker.
+     * @param {?} input The datepicker input to register with this datepicker.
+     * @return {?}
+     */
+    _registerInput(input) {
+        if (this._datepickerInput) {
+            throw Error('An MdDatepicker can only be associated with a single input.');
+        }
+        this._datepickerInput = input;
+        this._inputSubscription =
+            this._datepickerInput._valueChange.subscribe((value) => this._selected = value);
+    }
+    /**
+     * Open the calendar.
+     * @return {?}
+     */
+    open() {
+        if (this.opened || this.disabled) {
+            return;
+        }
+        if (!this._datepickerInput) {
+            throw Error('Attempted to open an MdDatepicker with no associated input.');
+        }
+        if (this._document) {
+            this._focusedElementBeforeOpen = this._document.activeElement;
+        }
+        this.touchUi ? this._openAsDialog() : this._openAsPopup();
+        this.opened = true;
+    }
+    /**
+     * Close the calendar.
+     * @return {?}
+     */
+    close() {
+        if (!this.opened) {
+            return;
+        }
+        if (this._popupRef && this._popupRef.hasAttached()) {
+            this._popupRef.detach();
+        }
+        if (this._dialogRef) {
+            this._dialogRef.close();
+            this._dialogRef = null;
+        }
+        if (this._calendarPortal && this._calendarPortal.isAttached) {
+            this._calendarPortal.detach();
+        }
+        if (this._focusedElementBeforeOpen && 'focus' in this._focusedElementBeforeOpen) {
+            this._focusedElementBeforeOpen.focus();
+            this._focusedElementBeforeOpen = null;
+        }
+        this.opened = false;
+    }
+    /**
+     * Open the calendar as a dialog.
+     * @return {?}
+     */
+    _openAsDialog() {
+        this._dialogRef = this._dialog.open(MdDatepickerContent, {
+            direction: this._dir ? this._dir.value : 'ltr',
+            viewContainerRef: this._viewContainerRef,
+        });
+        this._dialogRef.afterClosed().subscribe(() => this.close());
+        this._dialogRef.componentInstance.datepicker = this;
+    }
+    /**
+     * Open the calendar as a popup.
+     * @return {?}
+     */
+    _openAsPopup() {
+        if (!this._calendarPortal) {
+            this._calendarPortal = new ComponentPortal(MdDatepickerContent, this._viewContainerRef);
+        }
+        if (!this._popupRef) {
+            this._createPopup();
+        }
+        if (!this._popupRef.hasAttached()) {
+            let /** @type {?} */ componentRef = this._popupRef.attach(this._calendarPortal);
+            componentRef.instance.datepicker = this;
+            // Update the position once the calendar has rendered.
+            first.call(this._ngZone.onStable).subscribe(() => this._popupRef.updatePosition());
+        }
+        this._popupRef.backdropClick().subscribe(() => this.close());
+    }
+    /**
+     * Create the popup.
+     * @return {?}
+     */
+    _createPopup() {
+        const /** @type {?} */ overlayState = new OverlayState();
+        overlayState.positionStrategy = this._createPopupPositionStrategy();
+        overlayState.hasBackdrop = true;
+        overlayState.backdropClass = 'md-overlay-transparent-backdrop';
+        overlayState.direction = this._dir ? this._dir.value : 'ltr';
+        overlayState.scrollStrategy = this._scrollStrategy();
+        this._popupRef = this._overlay.create(overlayState);
+    }
+    /**
+     * Create the popup PositionStrategy.
+     * @return {?}
+     */
+    _createPopupPositionStrategy() {
+        return this._overlay.position()
+            .connectedTo(this._datepickerInput.getPopupConnectionElementRef(), { originX: 'start', originY: 'bottom' }, { overlayX: 'start', overlayY: 'top' })
+            .withFallbackPosition({ originX: 'start', originY: 'top' }, { overlayX: 'start', overlayY: 'bottom' })
+            .withFallbackPosition({ originX: 'end', originY: 'bottom' }, { overlayX: 'end', overlayY: 'top' })
+            .withFallbackPosition({ originX: 'end', originY: 'top' }, { overlayX: 'end', overlayY: 'bottom' });
+    }
+}
+MdDatepicker.decorators = [
+    { type: Component, args: [{selector: 'md-datepicker, mat-datepicker',
+                template: '',
+                changeDetection: ChangeDetectionStrategy.OnPush,
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdDatepicker.ctorParameters = () => [
+    { type: MdDialog, },
+    { type: Overlay, },
+    { type: NgZone, },
+    { type: ViewContainerRef, },
+    { type: undefined, decorators: [{ type: Inject, args: [MD_DATEPICKER_SCROLL_STRATEGY,] },] },
+    { type: DateAdapter, decorators: [{ type: Optional },] },
+    { type: Directionality, decorators: [{ type: Optional },] },
+    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [DOCUMENT,] },] },
+];
+MdDatepicker.propDecorators = {
+    'startAt': [{ type: Input },],
+    'startView': [{ type: Input },],
+    'touchUi': [{ type: Input },],
+    'disabled': [{ type: Input },],
+    'selectedChanged': [{ type: Output },],
+};
+
+const MD_DATEPICKER_VALUE_ACCESSOR = {
+    provide: NG_VALUE_ACCESSOR,
+    useExisting: forwardRef(() => MdDatepickerInput),
+    multi: true
+};
+const MD_DATEPICKER_VALIDATORS = {
+    provide: NG_VALIDATORS,
+    useExisting: forwardRef(() => MdDatepickerInput),
+    multi: true
+};
+/**
+ * An event used for datepicker input and change events. We don't always have access to a native
+ * input or change event because the event may have been triggered by the user clicking on the
+ * calendar popup. For consistency, we always use MdDatepickerInputEvent instead.
+ */
+class MdDatepickerInputEvent {
+    /**
+     * @param {?} target
+     * @param {?} targetElement
+     */
+    constructor(target, targetElement) {
+        this.target = target;
+        this.targetElement = targetElement;
+        this.value = this.target.value;
+    }
+}
+/**
+ * Directive used to connect an input to a MdDatepicker.
+ */
+class MdDatepickerInput {
+    /**
+     * @param {?} _elementRef
+     * @param {?} _renderer
+     * @param {?} _dateAdapter
+     * @param {?} _dateFormats
+     * @param {?} _mdInputContainer
+     */
+    constructor(_elementRef, _renderer, _dateAdapter, _dateFormats, _mdInputContainer) {
+        this._elementRef = _elementRef;
+        this._renderer = _renderer;
+        this._dateAdapter = _dateAdapter;
+        this._dateFormats = _dateFormats;
+        this._mdInputContainer = _mdInputContainer;
+        /**
+         * Emits when a `change` event is fired on this `<input>`.
+         */
+        this.dateChange = new EventEmitter();
+        /**
+         * Emits when an `input` event is fired on this `<input>`.
+         */
+        this.dateInput = new EventEmitter();
+        /**
+         * Emits when the value changes (either due to user input or programmatic change).
+         */
+        this._valueChange = new EventEmitter();
+        this._onTouched = () => { };
+        this._cvaOnChange = () => { };
+        this._validatorOnChange = () => { };
+        /**
+         * The form control validator for whether the input parses.
+         */
+        this._parseValidator = () => {
+            return this._lastValueValid ?
+                null : { 'mdDatepickerParse': { 'text': this._elementRef.nativeElement.value } };
+        };
+        /**
+         * The form control validator for the min date.
+         */
+        this._minValidator = (control) => {
+            return (!this.min || !control.value ||
+                this._dateAdapter.compareDate(this.min, control.value) <= 0) ?
+                null : { 'mdDatepickerMin': { 'min': this.min, 'actual': control.value } };
+        };
+        /**
+         * The form control validator for the max date.
+         */
+        this._maxValidator = (control) => {
+            return (!this.max || !control.value ||
+                this._dateAdapter.compareDate(this.max, control.value) >= 0) ?
+                null : { 'mdDatepickerMax': { 'max': this.max, 'actual': control.value } };
+        };
+        /**
+         * The form control validator for the date filter.
+         */
+        this._filterValidator = (control) => {
+            return !this._dateFilter || !control.value || this._dateFilter(control.value) ?
+                null : { 'mdDatepickerFilter': true };
+        };
+        /**
+         * The combined form control validator for this input.
+         */
+        this._validator = Validators.compose([this._parseValidator, this._minValidator, this._maxValidator, this._filterValidator]);
+        /**
+         * Whether the last value set on the input was valid.
+         */
+        this._lastValueValid = false;
+        if (!this._dateAdapter) {
+            throw createMissingDateImplError('DateAdapter');
+        }
+        if (!this._dateFormats) {
+            throw createMissingDateImplError('MD_DATE_FORMATS');
+        }
+    }
+    /**
+     * The datepicker that this input is associated with.
+     * @param {?} value
+     * @return {?}
+     */
+    set mdDatepicker(value) {
+        if (value) {
+            this._datepicker = value;
+            this._datepicker._registerInput(this);
+        }
+    }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set matDatepicker(value) { this.mdDatepicker = value; }
+    /**
+     * @param {?} filter
+     * @return {?}
+     */
+    set mdDatepickerFilter(filter$$1) {
+        this._dateFilter = filter$$1;
+        this._validatorOnChange();
+    }
+    /**
+     * @param {?} filter
+     * @return {?}
+     */
+    set matDatepickerFilter(filter$$1) {
+        this.mdDatepickerFilter = filter$$1;
+    }
+    /**
+     * The value of the input.
+     * @return {?}
+     */
+    get value() {
+        return this._getValidDateOrNull(this._dateAdapter.parse(this._elementRef.nativeElement.value, this._dateFormats.parse.dateInput));
+    }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set value(value) {
+        if (value != null && !this._dateAdapter.isDateInstance(value)) {
+            throw Error('Datepicker: value not recognized as a date object by DateAdapter.');
+        }
+        this._lastValueValid = !value || this._dateAdapter.isValid(value);
+        value = this._getValidDateOrNull(value);
+        let /** @type {?} */ oldDate = this.value;
+        this._renderer.setProperty(this._elementRef.nativeElement, 'value', value ? this._dateAdapter.format(value, this._dateFormats.display.dateInput) : '');
+        if (!this._dateAdapter.sameDate(oldDate, value)) {
+            this._valueChange.emit(value);
+        }
+    }
+    /**
+     * The minimum valid date.
+     * @return {?}
+     */
+    get min() { return this._min; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set min(value) {
+        this._min = value;
+        this._validatorOnChange();
+    }
+    /**
+     * The maximum valid date.
+     * @return {?}
+     */
+    get max() { return this._max; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set max(value) {
+        this._max = value;
+        this._validatorOnChange();
+    }
+    /**
+     * Whether the datepicker-input is disabled.
+     * @return {?}
+     */
+    get disabled() { return this._disabled; }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set disabled(value) {
+        this._disabled = coerceBooleanProperty(value);
+    }
+    /**
+     * @return {?}
+     */
+    ngAfterContentInit() {
+        if (this._datepicker) {
+            this._datepickerSubscription =
+                this._datepicker.selectedChanged.subscribe((selected) => {
+                    this.value = selected;
+                    this._cvaOnChange(selected);
+                    this._onTouched();
+                    this.dateInput.emit(new MdDatepickerInputEvent(this, this._elementRef.nativeElement));
+                    this.dateChange.emit(new MdDatepickerInputEvent(this, this._elementRef.nativeElement));
+                });
+        }
+    }
+    /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        if (this._datepickerSubscription) {
+            this._datepickerSubscription.unsubscribe();
+        }
+    }
+    /**
+     * @param {?} fn
+     * @return {?}
+     */
+    registerOnValidatorChange(fn) {
+        this._validatorOnChange = fn;
+    }
+    /**
+     * @param {?} c
+     * @return {?}
+     */
+    validate(c) {
+        return this._validator ? this._validator(c) : null;
+    }
+    /**
+     * Gets the element that the datepicker popup should be connected to.
+     * @return {?} The element to connect the popup to.
+     */
+    getPopupConnectionElementRef() {
+        return this._mdInputContainer ? this._mdInputContainer.underlineRef : this._elementRef;
+    }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    writeValue(value) {
+        this.value = value;
+    }
+    /**
+     * @param {?} fn
+     * @return {?}
+     */
+    registerOnChange(fn) {
+        this._cvaOnChange = fn;
+    }
+    /**
+     * @param {?} fn
+     * @return {?}
+     */
+    registerOnTouched(fn) {
+        this._onTouched = fn;
+    }
+    /**
+     * @param {?} disabled
+     * @return {?}
+     */
+    setDisabledState(disabled) {
+        this._renderer.setProperty(this._elementRef.nativeElement, 'disabled', disabled);
+    }
+    /**
+     * @param {?} event
+     * @return {?}
+     */
+    _onKeydown(event) {
+        if (event.altKey && event.keyCode === DOWN_ARROW) {
+            this._datepicker.open();
+            event.preventDefault();
+        }
+    }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    _onInput(value) {
+        let /** @type {?} */ date = this._dateAdapter.parse(value, this._dateFormats.parse.dateInput);
+        this._lastValueValid = !date || this._dateAdapter.isValid(date);
+        date = this._getValidDateOrNull(date);
+        this._cvaOnChange(date);
+        this._valueChange.emit(date);
+        this.dateInput.emit(new MdDatepickerInputEvent(this, this._elementRef.nativeElement));
+    }
+    /**
+     * @return {?}
+     */
+    _onChange() {
+        this.dateChange.emit(new MdDatepickerInputEvent(this, this._elementRef.nativeElement));
+    }
+    /**
+     * @param {?} obj The object to check.
+     * @return {?} The given object if it is both a date instance and valid, otherwise null.
+     */
+    _getValidDateOrNull(obj) {
+        return (this._dateAdapter.isDateInstance(obj) && this._dateAdapter.isValid(obj)) ? obj : null;
+    }
+}
+MdDatepickerInput.decorators = [
+    { type: Directive, args: [{
+                selector: 'input[mdDatepicker], input[matDatepicker]',
+                providers: [MD_DATEPICKER_VALUE_ACCESSOR, MD_DATEPICKER_VALIDATORS],
+                host: {
+                    '[attr.aria-haspopup]': 'true',
+                    '[attr.aria-owns]': '(_datepicker?.opened && _datepicker.id) || null',
+                    '[attr.min]': 'min ? _dateAdapter.getISODateString(min) : null',
+                    '[attr.max]': 'max ? _dateAdapter.getISODateString(max) : null',
+                    '[disabled]': 'disabled',
+                    '(input)': '_onInput($event.target.value)',
+                    '(change)': '_onChange()',
+                    '(blur)': '_onTouched()',
+                    '(keydown)': '_onKeydown($event)',
+                },
+                exportAs: 'mdDatepickerInput',
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdDatepickerInput.ctorParameters = () => [
+    { type: ElementRef, },
+    { type: Renderer2, },
+    { type: DateAdapter, decorators: [{ type: Optional },] },
+    { type: undefined, decorators: [{ type: Optional }, { type: Inject, args: [MD_DATE_FORMATS,] },] },
+    { type: MdInputContainer, decorators: [{ type: Optional },] },
+];
+MdDatepickerInput.propDecorators = {
+    'mdDatepicker': [{ type: Input },],
+    'matDatepicker': [{ type: Input },],
+    'mdDatepickerFilter': [{ type: Input },],
+    'matDatepickerFilter': [{ type: Input },],
+    'value': [{ type: Input },],
+    'min': [{ type: Input },],
+    'max': [{ type: Input },],
+    'disabled': [{ type: Input },],
+    'dateChange': [{ type: Output },],
+    'dateInput': [{ type: Output },],
+};
+
+class MdDatepickerToggle {
+    /**
+     * @param {?} _intl
+     * @param {?} changeDetectorRef
+     */
+    constructor(_intl, changeDetectorRef) {
+        this._intl = _intl;
+        this._intlChanges = _intl.changes.subscribe(() => changeDetectorRef.markForCheck());
+    }
+    /**
+     * Whether the toggle button is disabled.
+     * @return {?}
+     */
+    get disabled() {
+        return this._disabled === undefined ? this.datepicker.disabled : this._disabled;
+    }
+    /**
+     * @param {?} value
+     * @return {?}
+     */
+    set disabled(value) {
+        this._disabled = coerceBooleanProperty(value);
+    }
+    /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        this._intlChanges.unsubscribe();
+    }
+    /**
+     * @param {?} event
+     * @return {?}
+     */
+    _open(event) {
+        if (this.datepicker && !this.disabled) {
+            this.datepicker.open();
+            event.stopPropagation();
+        }
+    }
+}
+MdDatepickerToggle.decorators = [
+    { type: Component, args: [{selector: 'md-datepicker-toggle, mat-datepicker-toggle',
+                template: "<button md-icon-button type=\"button\" [attr.aria-label]=\"_intl.openCalendarLabel\" [disabled]=\"disabled\" (click)=\"_open($event)\"><md-icon><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"100%\" height=\"100%\" fill=\"currentColor\" style=\"vertical-align: top\"><path d=\"M0 0h24v24H0z\" fill=\"none\"/><path d=\"M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z\"/></svg></md-icon></button>",
+                host: {
+                    'class': 'mat-datepicker-toggle',
+                },
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdDatepickerToggle.ctorParameters = () => [
+    { type: MdDatepickerIntl, },
+    { type: ChangeDetectorRef, },
+];
+MdDatepickerToggle.propDecorators = {
+    'datepicker': [{ type: Input, args: ['for',] },],
+    'disabled': [{ type: Input },],
+};
+
+class MdDatepickerModule {
+}
+MdDatepickerModule.decorators = [
+    { type: NgModule, args: [{
+                imports: [
+                    CommonModule,
+                    MdButtonModule,
+                    MdDialogModule,
+                    MdIconModule,
+                    OverlayModule,
+                    StyleModule,
+                    A11yModule,
+                ],
+                exports: [
+                    MdCalendar,
+                    MdCalendarBody,
+                    MdDatepicker,
+                    MdDatepickerContent,
+                    MdDatepickerInput,
+                    MdDatepickerToggle,
+                    MdMonthView,
+                    MdYearView,
+                ],
+                declarations: [
+                    MdCalendar,
+                    MdCalendarBody,
+                    MdDatepicker,
+                    MdDatepickerContent,
+                    MdDatepickerInput,
+                    MdDatepickerToggle,
+                    MdMonthView,
+                    MdYearView,
+                ],
+                providers: [
+                    MdDatepickerIntl,
+                    MD_DATEPICKER_SCROLL_STRATEGY_PROVIDER,
+                ],
+                entryComponents: [
+                    MdDatepickerContent,
+                ]
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdDatepickerModule.ctorParameters = () => [];
+
+/**
+ * Unique ID counter
+ */
+let nextId$1 = 0;
+/**
+ * Directive whose purpose is to manage the expanded state of CdkAccordionItem children.
+ */
+class CdkAccordion {
+    constructor() {
+        /**
+         * A readonly id value to use for unique selection coordination.
+         */
+        this.id = `cdk-accordion-${nextId$1++}`;
+        this._multi = false;
+        this._hideToggle = false;
+        /**
+         * The display mode used for all expansion panels in the accordion. Currently two display
+         * modes exist:
+         *   default - a gutter-like spacing is placed around any expanded panel, placing the expanded
+         *     panel at a different elevation from the reset of the accordion.
+         *  flat - no spacing is placed around expanded panels, showing all panels at the same
+         *     elevation.
+         */
+        this.displayMode = 'default';
+    }
+    /**
+     * Whether the accordion should allow multiple expanded accordion items simulateously.
+     * @return {?}
+     */
+    get multi() { return this._multi; }
+    /**
+     * @param {?} multi
+     * @return {?}
+     */
+    set multi(multi) { this._multi = coerceBooleanProperty(multi); }
+    /**
+     * Whether the expansion indicator should be hidden.
+     * @return {?}
+     */
+    get hideToggle() { return this._hideToggle; }
+    /**
+     * @param {?} show
+     * @return {?}
+     */
+    set hideToggle(show) { this._hideToggle = coerceBooleanProperty(show); }
+}
+CdkAccordion.decorators = [
+    { type: Directive, args: [{
+                selector: 'cdk-accordion, [cdk-accordion]',
+            },] },
+];
+/**
+ * @nocollapse
+ */
+CdkAccordion.ctorParameters = () => [];
+CdkAccordion.propDecorators = {
+    'multi': [{ type: Input },],
+    'hideToggle': [{ type: Input },],
+    'displayMode': [{ type: Input },],
+};
+/**
+ * Directive for a Material Design Accordion.
+ */
+class MdAccordion extends CdkAccordion {
+}
+MdAccordion.decorators = [
+    { type: Directive, args: [{
+                selector: 'mat-accordion, md-accordion',
+                host: {
+                    class: 'mat-accordion'
+                }
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdAccordion.ctorParameters = () => [];
+
+/**
+ * Used to generate unique ID for each expansion panel.
+ */
+let nextId$2 = 0;
+/**
+ * An abstract class to be extended and decorated as a component.  Sets up all
+ * events and attributes needed to be managed by a CdkAccordion parent.
+ */
+class AccordionItem {
+    /**
+     * @param {?} accordion
+     * @param {?} _changeDetectorRef
+     * @param {?} _expansionDispatcher
+     */
+    constructor(accordion, _changeDetectorRef, _expansionDispatcher) {
+        this.accordion = accordion;
+        this._changeDetectorRef = _changeDetectorRef;
+        this._expansionDispatcher = _expansionDispatcher;
+        /**
+         * Event emitted every time the MdAccordionChild is closed.
+         */
+        this.closed = new EventEmitter();
+        /**
+         * Event emitted every time the MdAccordionChild is opened.
+         */
+        this.opened = new EventEmitter();
+        /**
+         * Event emitted when the MdAccordionChild is destroyed.
+         */
+        this.destroyed = new EventEmitter();
+        /**
+         * The unique MdAccordionChild id.
+         */
+        this.id = `cdk-accordion-child-${nextId$2++}`;
+        /**
+         * Unregister function for _expansionDispatcher *
+         */
+        this._removeUniqueSelectionListener = () => { };
+        this._removeUniqueSelectionListener =
+            _expansionDispatcher.listen((id, accordionId) => {
+                if (this.accordion && !this.accordion.multi &&
+                    this.accordion.id === accordionId && this.id !== id) {
+                    this.expanded = false;
+                }
+            });
+    }
+    /**
+     * Whether the MdAccordionChild is expanded.
+     * @return {?}
+     */
+    get expanded() { return this._expanded; }
+    /**
+     * @param {?} expanded
+     * @return {?}
+     */
+    set expanded(expanded) {
+        // Only emit events and update the internal value if the value changes.
+        if (this._expanded !== expanded) {
+            this._expanded = expanded;
+            if (expanded) {
+                this.opened.emit();
+                /**
+                 * In the unique selection dispatcher, the id parameter is the id of the CdkAccordionItem,
+                 * the name value is the id of the accordion.
+                 */
+                const accordionId = this.accordion ? this.accordion.id : this.id;
+                this._expansionDispatcher.notify(this.id, accordionId);
+            }
+            else {
+                this.closed.emit();
+            }
+            // Ensures that the animation will run when the value is set outside of an `@Input`.
+            // This includes cases like the open, close and toggle methods.
+            this._changeDetectorRef.markForCheck();
+        }
+    }
+    /**
+     * Emits an event for the accordion item being destroyed.
+     * @return {?}
+     */
+    ngOnDestroy() {
+        this.destroyed.emit();
+        this._removeUniqueSelectionListener();
+    }
+    /**
+     * Toggles the expanded state of the accordion item.
+     * @return {?}
+     */
+    toggle() {
+        this.expanded = !this.expanded;
+    }
+    /**
+     * Sets the expanded state of the accordion item to false.
+     * @return {?}
+     */
+    close() {
+        this.expanded = false;
+    }
+    /**
+     * Sets the expanded state of the accordion item to true.
+     * @return {?}
+     */
+    open() {
+        this.expanded = true;
+    }
+}
+AccordionItem.decorators = [
+    { type: Injectable },
+];
+/**
+ * @nocollapse
+ */
+AccordionItem.ctorParameters = () => [
+    { type: CdkAccordion, decorators: [{ type: Optional },] },
+    { type: ChangeDetectorRef, },
+    { type: UniqueSelectionDispatcher, },
+];
+AccordionItem.propDecorators = {
+    'closed': [{ type: Output },],
+    'opened': [{ type: Output },],
+    'destroyed': [{ type: Output },],
+    'expanded': [{ type: Input },],
+};
+
+/**
+ * Time and timing curve for expansion panel animations.
+ */
+const EXPANSION_PANEL_ANIMATION_TIMING = '225ms cubic-bezier(0.4,0.0,0.2,1)';
+/**
+ * <md-expansion-panel> component.
+ *
+ * This component can be used as a single element to show expandable content, or as one of
+ * multiple children of an element with the CdkAccordion directive attached.
+ *
+ * Please refer to README.md for examples on how to use it.
+ */
+class MdExpansionPanel extends AccordionItem {
+    /**
+     * @param {?} accordion
+     * @param {?} _changeDetectorRef
+     * @param {?} _uniqueSelectionDispatcher
+     */
+    constructor(accordion, _changeDetectorRef, _uniqueSelectionDispatcher) {
+        super(accordion, _changeDetectorRef, _uniqueSelectionDispatcher);
+        /**
+         * Whether the toggle indicator should be hidden.
+         */
+        this.hideToggle = false;
+        /**
+         * Stream that emits for changes in `\@Input` properties.
+         */
+        this._inputChanges = new Subject();
+        this.accordion = accordion;
+    }
+    /**
+     * Whether the expansion indicator should be hidden.
+     * @return {?}
+     */
+    _getHideToggle() {
+        if (this.accordion) {
+            return this.accordion.hideToggle;
+        }
+        return this.hideToggle;
+    }
+    /**
+     * Gets the panel's display mode.
+     * @return {?}
+     */
+    _getDisplayMode() {
+        if (this.accordion) {
+            return this.expanded ? this.accordion.displayMode : this._getExpandedState();
+        }
+        return 'void';
+    }
+    /**
+     * Gets the expanded state string.
+     * @return {?}
+     */
+    _getExpandedState() {
+        return this.expanded ? 'expanded' : 'collapsed';
+    }
+    /**
+     * @param {?} changes
+     * @return {?}
+     */
+    ngOnChanges(changes) {
+        this._inputChanges.next(changes);
+    }
+    /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        this._inputChanges.complete();
+    }
+}
+MdExpansionPanel.decorators = [
+    { type: Component, args: [{styles: [".mat-expansion-panel{transition:box-shadow 280ms cubic-bezier(.4,0,.2,1);box-sizing:content-box;display:block}.mat-expansion-panel:not([class*=mat-elevation-z]){box-shadow:0 3px 1px -2px rgba(0,0,0,.2),0 2px 2px 0 rgba(0,0,0,.14),0 1px 5px 0 rgba(0,0,0,.12)}.mat-expansion-panel-content{overflow:hidden}.mat-expansion-panel-body{padding:0 24px 16px}.mat-action-row{border-top-style:solid;border-top-width:1px;display:flex;flex-direction:row;justify-content:flex-end;padding:16px 8px 16px 24px}.mat-action-row button.mat-button{margin-left:8px}[dir=rtl] .mat-action-row button.mat-button{margin-left:0;margin-right:8px}"],
+                selector: 'md-expansion-panel, mat-expansion-panel',
+                template: "<ng-content select=\"mat-expansion-panel-header, md-expansion-panel-header\"></ng-content><div [class.mat-expanded]=\"expanded\" class=\"mat-expansion-panel-content\" [@bodyExpansion]=\"_getExpandedState()\" [id]=\"id\"><div class=\"mat-expansion-panel-body\"><ng-content></ng-content></div><ng-content select=\"mat-action-row, md-action-row\"></ng-content></div>",
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
+                host: {
+                    'class': 'mat-expansion-panel',
+                    '[class.mat-expanded]': 'expanded',
+                    '[@displayMode]': '_getDisplayMode()',
+                },
+                providers: [
+                    { provide: AccordionItem, useExisting: forwardRef(() => MdExpansionPanel) }
+                ],
+                animations: [
+                    trigger('bodyExpansion', [
+                        state('collapsed', style({ height: '0px', visibility: 'hidden' })),
+                        state('expanded', style({ height: '*', visibility: 'visible' })),
+                        transition('expanded <=> collapsed', animate(EXPANSION_PANEL_ANIMATION_TIMING)),
+                    ]),
+                    trigger('displayMode', [
+                        state('flat, collapsed', style({ margin: '0' })),
+                        state('default', style({ margin: '16px 0' })),
+                        transition('flat <=> collapsed, default <=> collapsed, flat <=> default', animate(EXPANSION_PANEL_ANIMATION_TIMING)),
+                    ]),
+                ],
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdExpansionPanel.ctorParameters = () => [
+    { type: MdAccordion, decorators: [{ type: Optional }, { type: Host },] },
+    { type: ChangeDetectorRef, },
+    { type: UniqueSelectionDispatcher, },
+];
+MdExpansionPanel.propDecorators = {
+    'hideToggle': [{ type: Input },],
+};
+class MdExpansionPanelActionRow {
+}
+MdExpansionPanelActionRow.decorators = [
+    { type: Directive, args: [{
+                selector: 'mat-action-row, md-action-row',
+                host: {
+                    class: 'mat-action-row'
+                }
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdExpansionPanelActionRow.ctorParameters = () => [];
+
+/**
+ * <md-expansion-panel-header> component.
+ *
+ * This component corresponds to the header element of an <md-expansion-panel>.
+ *
+ * Please refer to README.md for examples on how to use it.
+ */
+class MdExpansionPanelHeader {
+    /**
+     * @param {?} panel
+     * @param {?} _renderer
+     * @param {?} _element
+     * @param {?} _focusOriginMonitor
+     * @param {?} _changeDetectorRef
+     */
+    constructor(panel, _renderer, _element, _focusOriginMonitor, _changeDetectorRef) {
+        this.panel = panel;
+        this._renderer = _renderer;
+        this._element = _element;
+        this._focusOriginMonitor = _focusOriginMonitor;
+        this._changeDetectorRef = _changeDetectorRef;
+        this._parentChangeSubscription = null;
+        // Since the toggle state depends on an @Input on the panel, we
+        // need to  subscribe and trigger change detection manually.
+        this._parentChangeSubscription = merge(panel.opened, panel.closed, filter.call(panel._inputChanges, changes => !!changes.hideToggle))
+            .subscribe(() => this._changeDetectorRef.markForCheck());
+        _focusOriginMonitor.monitor(_element.nativeElement, _renderer, false);
+    }
+    /**
+     * Toggles the expanded state of the panel.
+     * @return {?}
+     */
+    _toggle() {
+        this.panel.toggle();
+    }
+    /**
+     * Gets whether the panel is expanded.
+     * @return {?}
+     */
+    _isExpanded() {
+        return this.panel.expanded;
+    }
+    /**
+     * Gets the expanded state string of the panel.
+     * @return {?}
+     */
+    _getExpandedState() {
+        return this.panel._getExpandedState();
+    }
+    /**
+     * Gets the panel id.
+     * @return {?}
+     */
+    _getPanelId() {
+        return this.panel.id;
+    }
+    /**
+     * Gets whether the expand indicator is hidden.
+     * @return {?}
+     */
+    _getHideToggle() {
+        return this.panel.hideToggle;
+    }
+    /**
+     * Handle keyup event calling to toggle() if appropriate.
+     * @param {?} event
+     * @return {?}
+     */
+    _keyup(event) {
+        switch (event.keyCode) {
+            // Toggle for space and enter keys.
+            case SPACE:
+            case ENTER:
+                event.preventDefault();
+                this._toggle();
+                break;
+            default:
+                return;
+        }
+    }
+    /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        if (this._parentChangeSubscription) {
+            this._parentChangeSubscription.unsubscribe();
+            this._parentChangeSubscription = null;
+        }
+        this._focusOriginMonitor.stopMonitoring(this._element.nativeElement);
+    }
+}
+MdExpansionPanelHeader.decorators = [
+    { type: Component, args: [{selector: 'md-expansion-panel-header, mat-expansion-panel-header',
+                styles: [".mat-expansion-panel-header{cursor:pointer;display:flex;flex-direction:row;align-items:center;padding:0 24px}.mat-expansion-panel-header:focus,.mat-expansion-panel-header:hover{outline:0}.mat-expansion-panel-header.mat-expanded:focus,.mat-expansion-panel-header.mat-expanded:hover{background:inherit}.mat-content{display:flex;flex:1;flex-direction:row;overflow:hidden}.mat-expansion-panel-header-description,.mat-expansion-panel-header-title{display:flex;flex-grow:1;margin-right:16px}[dir=rtl] .mat-expansion-panel-header-description,[dir=rtl] .mat-expansion-panel-header-title{margin-right:0;margin-left:16px}.mat-expansion-panel-header-description{flex-grow:2}.mat-expansion-indicator::after{border-style:solid;border-width:0 2px 2px 0;content:'';display:inline-block;padding:3px;transform:rotate(45deg);vertical-align:middle}"],
+                template: "<span class=\"mat-content\"><ng-content select=\"md-panel-title, mat-panel-title\"></ng-content><ng-content select=\"md-panel-description, mat-panel-description\"></ng-content><ng-content></ng-content></span><span [@indicatorRotate]=\"_getExpandedState()\" *ngIf=\"!_getHideToggle()\" class=\"mat-expansion-indicator\"></span>",
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
+                host: {
+                    'class': 'mat-expansion-panel-header',
+                    'role': 'button',
+                    'tabindex': '0',
+                    '[attr.aria-controls]': '_getPanelId()',
+                    '[attr.aria-expanded]': '_isExpanded()',
+                    '[class.mat-expanded]': '_isExpanded()',
+                    '(click)': '_toggle()',
+                    '(keyup)': '_keyup($event)',
+                    '[@expansionHeight]': '_getExpandedState()',
+                },
+                animations: [
+                    trigger('indicatorRotate', [
+                        state('collapsed', style({ transform: 'rotate(0deg)' })),
+                        state('expanded', style({ transform: 'rotate(180deg)' })),
+                        transition('expanded <=> collapsed', animate(EXPANSION_PANEL_ANIMATION_TIMING)),
+                    ]),
+                    trigger('expansionHeight', [
+                        state('collapsed', style({ height: '48px' })),
+                        state('expanded', style({ height: '64px' })),
+                        transition('expanded <=> collapsed', animate(EXPANSION_PANEL_ANIMATION_TIMING)),
+                    ]),
+                ],
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdExpansionPanelHeader.ctorParameters = () => [
+    { type: MdExpansionPanel, decorators: [{ type: Host },] },
+    { type: Renderer2, },
+    { type: ElementRef, },
+    { type: FocusOriginMonitor, },
+    { type: ChangeDetectorRef, },
+];
+/**
+ * <md-panel-description> directive.
+ *
+ * This direction is to be used inside of the MdExpansionPanelHeader component.
+ */
+class MdExpansionPanelDescription {
+}
+MdExpansionPanelDescription.decorators = [
+    { type: Directive, args: [{
+                selector: 'md-panel-description, mat-panel-description',
+                host: {
+                    class: 'mat-expansion-panel-header-description'
+                }
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdExpansionPanelDescription.ctorParameters = () => [];
+/**
+ * <md-panel-title> directive.
+ *
+ * This direction is to be used inside of the MdExpansionPanelHeader component.
+ */
+class MdExpansionPanelTitle {
+}
+MdExpansionPanelTitle.decorators = [
+    { type: Directive, args: [{
+                selector: 'md-panel-title, mat-panel-title',
+                host: {
+                    class: 'mat-expansion-panel-header-title'
+                }
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdExpansionPanelTitle.ctorParameters = () => [];
+
+class MdExpansionModule {
+}
+MdExpansionModule.decorators = [
+    { type: NgModule, args: [{
+                imports: [CompatibilityModule, CommonModule, StyleModule],
+                exports: [
+                    CdkAccordion,
+                    MdAccordion,
+                    MdExpansionPanel,
+                    MdExpansionPanelActionRow,
+                    MdExpansionPanelHeader,
+                    MdExpansionPanelTitle,
+                    MdExpansionPanelDescription
+                ],
+                declarations: [
+                    CdkAccordion,
+                    MdAccordion,
+                    MdExpansionPanel,
+                    MdExpansionPanelActionRow,
+                    MdExpansionPanelHeader,
+                    MdExpansionPanelTitle,
+                    MdExpansionPanelDescription
+                ],
+                providers: [UNIQUE_SELECTION_DISPATCHER_PROVIDER]
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdExpansionModule.ctorParameters = () => [];
+
+/**
+ * Workaround for https://github.com/angular/angular/issues/17849
+ */
+const _MdTable = CdkTable;
+/**
+ * Wrapper for the CdkTable with Material design styles.
+ */
+class MdTable extends _MdTable {
+}
+MdTable.decorators = [
+    { type: Component, args: [{selector: 'md-table, mat-table',
+                template: CDK_TABLE_TEMPLATE,
+                styles: [".mat-table{display:block}.mat-header-row,.mat-row{display:flex;border-bottom-width:1px;border-bottom-style:solid;align-items:center;min-height:48px;padding:0 24px}.mat-cell,.mat-header-cell{flex:1}"],
+                host: {
+                    'class': 'mat-table',
+                },
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdTable.ctorParameters = () => [];
+
+/**
+ * Workaround for https://github.com/angular/angular/issues/17849
+ */
+const _MdCellDef = CdkCellDef;
+const _MdHeaderCellDef = CdkHeaderCellDef;
+const _MdColumnDef = CdkColumnDef;
+const _MdHeaderCell = CdkHeaderCell;
+const _MdCell = CdkCell;
+/**
+ * Cell definition for the md-table.
+ * Captures the template of a column's data row cell as well as cell-specific properties.
+ */
+class MdCellDef extends _MdCellDef {
+}
+MdCellDef.decorators = [
+    { type: Directive, args: [{
+                selector: '[mdCellDef], [matCellDef]',
+                providers: [{ provide: CdkCellDef, useExisting: MdCellDef }]
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdCellDef.ctorParameters = () => [];
+/**
+ * Header cell definition for the md-table.
+ * Captures the template of a column's header cell and as well as cell-specific properties.
+ */
+class MdHeaderCellDef extends _MdHeaderCellDef {
+}
+MdHeaderCellDef.decorators = [
+    { type: Directive, args: [{
+                selector: '[mdHeaderCellDef], [matHeaderCellDef]',
+                providers: [{ provide: CdkHeaderCellDef, useExisting: MdHeaderCellDef }]
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdHeaderCellDef.ctorParameters = () => [];
+/**
+ * Column definition for the md-table.
+ * Defines a set of cells available for a table column.
+ */
+class MdColumnDef extends _MdColumnDef {
+}
+MdColumnDef.decorators = [
+    { type: Directive, args: [{
+                selector: '[mdColumnDef], [matColumnDef]',
+                providers: [{ provide: CdkColumnDef, useExisting: MdColumnDef }],
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdColumnDef.ctorParameters = () => [];
+MdColumnDef.propDecorators = {
+    'name': [{ type: Input, args: ['mdColumnDef',] },],
+};
+/**
+ * Header cell template container that adds the right classes and role.
+ */
+class MdHeaderCell extends _MdHeaderCell {
+    /**
+     * @param {?} columnDef
+     * @param {?} elementRef
+     * @param {?} renderer
+     */
+    constructor(columnDef, elementRef, renderer) {
+        super(columnDef, elementRef, renderer);
+        renderer.addClass(elementRef.nativeElement, `mat-column-${columnDef.cssClassFriendlyName}`);
+    }
+}
+MdHeaderCell.decorators = [
+    { type: Directive, args: [{
+                selector: 'md-header-cell, mat-header-cell',
+                host: {
+                    'class': 'mat-header-cell',
+                    'role': 'columnheader',
+                },
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdHeaderCell.ctorParameters = () => [
+    { type: CdkColumnDef, },
+    { type: ElementRef, },
+    { type: Renderer2, },
+];
+/**
+ * Cell template container that adds the right classes and role.
+ */
+class MdCell extends _MdCell {
+    /**
+     * @param {?} columnDef
+     * @param {?} elementRef
+     * @param {?} renderer
+     */
+    constructor(columnDef, elementRef, renderer) {
+        super(columnDef, elementRef, renderer);
+        renderer.addClass(elementRef.nativeElement, `mat-column-${columnDef.cssClassFriendlyName}`);
+    }
+}
+MdCell.decorators = [
+    { type: Directive, args: [{
+                selector: 'md-cell, mat-cell',
+                host: {
+                    'class': 'mat-cell',
+                    'role': 'gridcell',
+                },
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdCell.ctorParameters = () => [
+    { type: CdkColumnDef, },
+    { type: ElementRef, },
+    { type: Renderer2, },
+];
+
+/**
+ * Workaround for https://github.com/angular/angular/issues/17849
+ */
+const _MdHeaderRowDef = CdkHeaderRowDef;
+const _MdCdkRowDef = CdkRowDef;
+const _MdHeaderRow = CdkHeaderRow;
+const _MdRow = CdkRow;
+/**
+ * Header row definition for the md-table.
+ * Captures the header row's template and other header properties such as the columns to display.
+ */
+class MdHeaderRowDef extends _MdHeaderRowDef {
+}
+MdHeaderRowDef.decorators = [
+    { type: Directive, args: [{
+                selector: '[mdHeaderRowDef], [matHeaderRowDef]',
+                providers: [{ provide: CdkHeaderRowDef, useExisting: MdHeaderRowDef }],
+                inputs: ['columns: mdHeaderRowDef'],
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdHeaderRowDef.ctorParameters = () => [];
+/**
+ * Data row definition for the md-table.
+ * Captures the header row's template and other row properties such as the columns to display.
+ */
+class MdRowDef extends _MdCdkRowDef {
+}
+MdRowDef.decorators = [
+    { type: Directive, args: [{
+                selector: '[mdRowDef], [matRowDef]',
+                providers: [{ provide: CdkRowDef, useExisting: MdRowDef }],
+                inputs: ['columns: mdRowDefColumns'],
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdRowDef.ctorParameters = () => [];
+/**
+ * Header template container that contains the cell outlet. Adds the right class and role.
+ */
+class MdHeaderRow extends _MdHeaderRow {
+}
+MdHeaderRow.decorators = [
+    { type: Component, args: [{
+                selector: 'md-header-row, mat-header-row',
+                template: CDK_ROW_TEMPLATE,
+                host: {
+                    'class': 'mat-header-row',
+                    'role': 'row',
+                },
+                changeDetection: ChangeDetectionStrategy.OnPush,
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdHeaderRow.ctorParameters = () => [];
+/**
+ * Data row template container that contains the cell outlet. Adds the right class and role.
+ */
+class MdRow extends _MdRow {
+}
+MdRow.decorators = [
+    { type: Component, args: [{
+                selector: 'md-row, mat-row',
+                template: CDK_ROW_TEMPLATE,
+                host: {
+                    'class': 'mat-row',
+                    'role': 'row',
+                },
+                changeDetection: ChangeDetectionStrategy.OnPush,
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdRow.ctorParameters = () => [];
+
+class MdTableModule {
+}
+MdTableModule.decorators = [
+    { type: NgModule, args: [{
+                imports: [CdkTableModule, CommonModule, MdCommonModule],
+                exports: [MdTable, MdCellDef, MdHeaderCellDef, MdColumnDef,
+                    MdHeaderRowDef, MdRowDef,
+                    MdHeaderCell, MdCell, MdHeaderRow, MdRow],
+                declarations: [MdTable, MdCellDef, MdHeaderCellDef, MdColumnDef,
+                    MdHeaderRowDef, MdRowDef,
+                    MdHeaderCell, MdCell, MdHeaderRow, MdRow],
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdTableModule.ctorParameters = () => [];
+
+/**
+ * \@docs-private
+ * @param {?} id
+ * @return {?}
+ */
+function getMdSortDuplicateMdSortableIdError(id) {
+    return Error(`Cannot have two MdSortables with the same id (${id}).`);
+}
+/**
+ * \@docs-private
+ * @return {?}
+ */
+function getMdSortHeaderNotContainedWithinMdSortError() {
+    return Error(`MdSortHeader must be placed within a parent element with the MdSort directive.`);
+}
+/**
+ * \@docs-private
+ * @return {?}
+ */
+function getMdSortHeaderMissingIdError() {
+    return Error(`MdSortHeader must be provided with a unique id.`);
+}
+
+/**
+ * Container for MdSortables to manage the sort state and provide default sort parameters.
+ */
+class MdSort {
+    constructor() {
+        /**
+         * Collection of all registered sortables that this directive manages.
+         */
+        this.sortables = new Map();
+        /**
+         * The direction to set when an MdSortable is initially sorted.
+         * May be overriden by the MdSortable's sort start.
+         */
+        this.start = 'asc';
+        /**
+         * The sort direction of the currently active MdSortable.
+         */
+        this.direction = '';
+        /**
+         * Event emitted when the user changes either the active sort or sort direction.
+         */
+        this.mdSortChange = new EventEmitter();
+    }
+    /**
+     * Whether to disable the user from clearing the sort by finishing the sort direction cycle.
+     * May be overriden by the MdSortable's disable clear input.
+     * @return {?}
+     */
+    get disableClear() { return this._disableClear; }
+    /**
+     * @param {?} v
+     * @return {?}
+     */
+    set disableClear(v) { this._disableClear = coerceBooleanProperty(v); }
+    /**
+     * @return {?}
+     */
+    get _matSortActive() { return this.active; }
+    /**
+     * @param {?} v
+     * @return {?}
+     */
+    set _matSortActive(v) { this.active = v; }
+    /**
+     * @return {?}
+     */
+    get _matSortStart() { return this.start; }
+    /**
+     * @param {?} v
+     * @return {?}
+     */
+    set _matSortStart(v) { this.start = v; }
+    /**
+     * @return {?}
+     */
+    get _matSortDirection() { return this.direction; }
+    /**
+     * @param {?} v
+     * @return {?}
+     */
+    set _matSortDirection(v) { this.direction = v; }
+    /**
+     * @return {?}
+     */
+    get _matSortDisableClear() { return this.disableClear; }
+    /**
+     * @param {?} v
+     * @return {?}
+     */
+    set _matSortDisableClear(v) { this.disableClear = v; }
+    /**
+     * Register function to be used by the contained MdSortables. Adds the MdSortable to the
+     * collection of MdSortables.
+     * @param {?} sortable
+     * @return {?}
+     */
+    register(sortable) {
+        if (!sortable.id) {
+            throw getMdSortHeaderMissingIdError();
+        }
+        if (this.sortables.has(sortable.id)) {
+            throw getMdSortDuplicateMdSortableIdError(sortable.id);
+        }
+        this.sortables.set(sortable.id, sortable);
+    }
+    /**
+     * Unregister function to be used by the contained MdSortables. Removes the MdSortable from the
+     * collection of contained MdSortables.
+     * @param {?} sortable
+     * @return {?}
+     */
+    deregister(sortable) {
+        this.sortables.delete(sortable.id);
+    }
+    /**
+     * Sets the active sort id and determines the new sort direction.
+     * @param {?} sortable
+     * @return {?}
+     */
+    sort(sortable) {
+        if (this.active != sortable.id) {
+            this.active = sortable.id;
+            this.direction = sortable.start ? sortable.start : this.start;
+        }
+        else {
+            this.direction = this.getNextSortDirection(sortable);
+        }
+        this.mdSortChange.next({ active: this.active, direction: this.direction });
+    }
+    /**
+     * Returns the next sort direction of the active sortable, checking for potential overrides.
+     * @param {?} sortable
+     * @return {?}
+     */
+    getNextSortDirection(sortable) {
+        if (!sortable) {
+            return '';
+        }
+        // Get the sort direction cycle with the potential sortable overrides.
+        const /** @type {?} */ disableClear = sortable.disableClear != null ? sortable.disableClear : this.disableClear;
+        let /** @type {?} */ sortDirectionCycle = getSortDirectionCycle(sortable.start || this.start, disableClear);
+        // Get and return the next direction in the cycle
+        let /** @type {?} */ nextDirectionIndex = sortDirectionCycle.indexOf(this.direction) + 1;
+        if (nextDirectionIndex >= sortDirectionCycle.length) {
+            nextDirectionIndex = 0;
+        }
+        return sortDirectionCycle[nextDirectionIndex];
+    }
+}
+MdSort.decorators = [
+    { type: Directive, args: [{
+                selector: '[mdSort], [matSort]',
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdSort.ctorParameters = () => [];
+MdSort.propDecorators = {
+    'active': [{ type: Input, args: ['mdSortActive',] },],
+    'start': [{ type: Input, args: ['mdSortStart',] },],
+    'direction': [{ type: Input, args: ['mdSortDirection',] },],
+    'disableClear': [{ type: Input, args: ['mdSortDisableClear',] },],
+    '_matSortActive': [{ type: Input, args: ['matSortActive',] },],
+    '_matSortStart': [{ type: Input, args: ['matSortStart',] },],
+    '_matSortDirection': [{ type: Input, args: ['matSortDirection',] },],
+    '_matSortDisableClear': [{ type: Input, args: ['matSortDisableClear',] },],
+    'mdSortChange': [{ type: Output },],
+};
+/**
+ * Returns the sort direction cycle to use given the provided parameters of order and clear.
+ * @param {?} start
+ * @param {?} disableClear
+ * @return {?}
+ */
+function getSortDirectionCycle(start, disableClear) {
+    let /** @type {?} */ sortOrder = ['asc', 'desc'];
+    if (start == 'desc') {
+        sortOrder.reverse();
+    }
+    if (!disableClear) {
+        sortOrder.push('');
+    }
+    return sortOrder;
+}
+
+/**
+ * To modify the labels and text displayed, create a new instance of MdSortHeaderIntl and
+ * include it in a custom provider.
+ */
+class MdSortHeaderIntl {
+    constructor() {
+        /**
+         * Stream that emits whenever the labels here are changed. Use this to notify
+         * components if the labels have changed after initialization.
+         */
+        this.changes = new Subject();
+        /**
+         * ARIA label for the sorting button.
+         */
+        this.sortButtonLabel = (id) => {
+            return `Change sorting for ${id}`;
+        };
+        /**
+         * A label to describe the current sort (visible only to screenreaders).
+         */
+        this.sortDescriptionLabel = (id, direction) => {
+            return `Sorted by ${id} ${direction == 'asc' ? 'ascending' : 'descending'}`;
+        };
+    }
+}
+MdSortHeaderIntl.decorators = [
+    { type: Injectable },
+];
+/**
+ * @nocollapse
+ */
+MdSortHeaderIntl.ctorParameters = () => [];
+
+/**
+ * Applies sorting behavior (click to change sort) and styles to an element, including an
+ * arrow to display the current sort direction.
+ *
+ * Must be provided with an id and contained within a parent MdSort directive.
+ *
+ * If used on header cells in a CdkTable, it will automatically default its id from its containing
+ * column definition.
+ */
+class MdSortHeader {
+    /**
+     * @param {?} _intl
+     * @param {?} changeDetectorRef
+     * @param {?} _sort
+     * @param {?} _cdkColumnDef
+     */
+    constructor(_intl, changeDetectorRef, _sort, _cdkColumnDef) {
+        this._intl = _intl;
+        this._sort = _sort;
+        this._cdkColumnDef = _cdkColumnDef;
+        /**
+         * Sets the position of the arrow that displays when sorted.
+         */
+        this.arrowPosition = 'after';
+        if (!_sort) {
+            throw getMdSortHeaderNotContainedWithinMdSortError();
+        }
+        this._rerenderSubscription = merge(_sort.mdSortChange, _intl.changes).subscribe(() => {
+            changeDetectorRef.markForCheck();
+        });
+    }
+    /**
+     * Overrides the disable clear value of the containing MdSort for this MdSortable.
+     * @return {?}
+     */
+    get disableClear() { return this._disableClear; }
+    /**
+     * @param {?} v
+     * @return {?}
+     */
+    set disableClear(v) { this._disableClear = coerceBooleanProperty(v); }
+    /**
+     * @return {?}
+     */
+    get _id() { return this.id; }
+    /**
+     * @param {?} v
+     * @return {?}
+     */
+    set _id(v) { this.id = v; }
+    /**
+     * @return {?}
+     */
+    ngOnInit() {
+        if (!this.id && this._cdkColumnDef) {
+            this.id = this._cdkColumnDef.name;
+        }
+        this._sort.register(this);
+    }
+    /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        this._sort.deregister(this);
+        this._rerenderSubscription.unsubscribe();
+    }
+    /**
+     * Whether this MdSortHeader is currently sorted in either ascending or descending order.
+     * @return {?}
+     */
+    _isSorted() {
+        return this._sort.active == this.id && this._sort.direction;
+    }
+}
+MdSortHeader.decorators = [
+    { type: Component, args: [{selector: '[md-sort-header], [mat-sort-header]',
+                template: "<div class=\"mat-sort-header-container\" [class.mat-sort-header-position-before]=\"arrowPosition == 'before'\"><button class=\"mat-sort-header-button\" type=\"button\" [attr.aria-label]=\"_intl.sortButtonLabel(id)\"><ng-content></ng-content></button><div *ngIf=\"_isSorted()\" class=\"mat-sort-header-arrow\" [class.mat-sort-header-asc]=\"_sort.direction == 'asc'\" [class.mat-sort-header-desc]=\"_sort.direction == 'desc'\"><div class=\"mat-sort-header-stem\"></div><div class=\"mat-sort-header-pointer-left\"></div><div class=\"mat-sort-header-pointer-right\"></div></div></div><span class=\"cdk-visually-hidden\" *ngIf=\"_isSorted()\">{{_intl.sortDescriptionLabel(id, _sort.direction)}}</span>",
+                styles: [".mat-sort-header-container{display:flex;cursor:pointer}.mat-sort-header-position-before{flex-direction:row-reverse}.mat-sort-header-button{border:none;background:0 0;display:flex;align-items:center;padding:0;cursor:pointer;outline:0;font:inherit;color:currentColor}.mat-sort-header-arrow{display:none;height:10px;width:10px;position:relative;margin:0 0 0 6px}.mat-sort-header-position-before .mat-sort-header-arrow{margin:0 6px 0 0}.mat-sort-header-asc{display:block;transform:rotate(45deg)}.mat-sort-header-desc{display:block;transform:rotate(225deg);top:2px}.mat-sort-header-stem{background:currentColor;transform:rotate(135deg);height:10px;width:2px;margin:auto}.mat-sort-header-pointer-left{background:currentColor;width:2px;height:8px;position:absolute;bottom:0;right:0}.mat-sort-header-pointer-right{background:currentColor;width:8px;height:2px;position:absolute;bottom:0;right:0}"],
+                host: {
+                    '(click)': '_sort.sort(this)',
+                    '[class.mat-sort-header-sorted]': '_isSorted()',
+                },
+                encapsulation: ViewEncapsulation.None,
+                changeDetection: ChangeDetectionStrategy.OnPush,
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdSortHeader.ctorParameters = () => [
+    { type: MdSortHeaderIntl, },
+    { type: ChangeDetectorRef, },
+    { type: MdSort, decorators: [{ type: Optional },] },
+    { type: CdkColumnDef, decorators: [{ type: Optional },] },
+];
+MdSortHeader.propDecorators = {
+    'id': [{ type: Input, args: ['md-sort-header',] },],
+    'arrowPosition': [{ type: Input },],
+    'start': [{ type: Input, args: ['start',] },],
+    'disableClear': [{ type: Input },],
+    '_id': [{ type: Input, args: ['mat-sort-header',] },],
+};
+
+class MdSortModule {
+}
+MdSortModule.decorators = [
+    { type: NgModule, args: [{
+                imports: [CommonModule],
+                exports: [MdSort, MdSortHeader],
+                declarations: [MdSort, MdSortHeader],
+                providers: [MdSortHeaderIntl]
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdSortModule.ctorParameters = () => [];
+
+/**
+ * To modify the labels and text displayed, create a new instance of MdPaginatorIntl and
+ * include it in a custom provider
+ */
+class MdPaginatorIntl {
+    constructor() {
+        /**
+         * Stream that emits whenever the labels here are changed. Use this to notify
+         * components if the labels have changed after initialization.
+         */
+        this.changes = new Subject();
+        /**
+         * A label for the page size selector.
+         */
+        this.itemsPerPageLabel = 'Items per page:';
+        /**
+         * A label for the button that increments the current page.
+         */
+        this.nextPageLabel = 'Next page';
+        /**
+         * A label for the button that decrements the current page.
+         */
+        this.previousPageLabel = 'Previous page';
+        /**
+         * A label for the range of items within the current page and the length of the whole list.
+         */
+        this.getRangeLabel = (page, pageSize, length) => {
+            if (length == 0 || pageSize == 0) {
+                return `0 of ${length}`;
+            }
+            length = Math.max(length, 0);
+            const startIndex = page * pageSize;
+            // If the start index exceeds the list length, do not try and fix the end index to the end.
+            const endIndex = startIndex < length ?
+                Math.min(startIndex + pageSize, length) :
+                startIndex + pageSize;
+            return `${startIndex + 1} - ${endIndex} of ${length}`;
+        };
+    }
+}
+MdPaginatorIntl.decorators = [
+    { type: Injectable },
+];
+/**
+ * @nocollapse
+ */
+MdPaginatorIntl.ctorParameters = () => [];
+
+/**
+ * The default page size if there is no page size and there are no provided page size options.
+ */
+const DEFAULT_PAGE_SIZE = 50;
+/**
+ * Change event object that is emitted when the user selects a
+ * different page size or navigates to another page.
+ */
+class PageEvent {
+}
+/**
+ * Component to provide navigation between paged information. Displays the size of the current
+ * page, user-selectable options to change that size, what items are being shown, and
+ * navigational button to go to the previous or next page.
+ */
+class MdPaginator {
+    /**
+     * @param {?} _intl
+     * @param {?} _changeDetectorRef
+     */
+    constructor(_intl, _changeDetectorRef) {
+        this._intl = _intl;
+        this._changeDetectorRef = _changeDetectorRef;
+        this._pageIndex = 0;
+        this._length = 0;
+        this._pageSizeOptions = [];
+        /**
+         * Event emitted when the paginator changes the page size or page index.
+         */
+        this.page = new EventEmitter();
+        this._intlChanges = _intl.changes.subscribe(() => this._changeDetectorRef.markForCheck());
+    }
+    /**
+     * The zero-based page index of the displayed list of items. Defaulted to 0.
+     * @return {?}
+     */
+    get pageIndex() { return this._pageIndex; }
+    /**
+     * @param {?} pageIndex
+     * @return {?}
+     */
+    set pageIndex(pageIndex) {
+        this._pageIndex = pageIndex;
+        this._changeDetectorRef.markForCheck();
+    }
+    /**
+     * The length of the total number of items that are being paginated. Defaulted to 0.
+     * @return {?}
+     */
+    get length() { return this._length; }
+    /**
+     * @param {?} length
+     * @return {?}
+     */
+    set length(length) {
+        this._length = length;
+        this._changeDetectorRef.markForCheck();
+    }
+    /**
+     * Number of items to display on a page. By default set to 50.
+     * @return {?}
+     */
+    get pageSize() { return this._pageSize; }
+    /**
+     * @param {?} pageSize
+     * @return {?}
+     */
+    set pageSize(pageSize) {
+        this._pageSize = pageSize;
+        this._updateDisplayedPageSizeOptions();
+    }
+    /**
+     * The set of provided page size options to display to the user.
+     * @return {?}
+     */
+    get pageSizeOptions() { return this._pageSizeOptions; }
+    /**
+     * @param {?} pageSizeOptions
+     * @return {?}
+     */
+    set pageSizeOptions(pageSizeOptions) {
+        this._pageSizeOptions = pageSizeOptions;
+        this._updateDisplayedPageSizeOptions();
+    }
+    /**
+     * @return {?}
+     */
+    ngOnInit() {
+        this._initialized = true;
+        this._updateDisplayedPageSizeOptions();
+    }
+    /**
+     * @return {?}
+     */
+    ngOnDestroy() {
+        this._intlChanges.unsubscribe();
+    }
+    /**
+     * Advances to the next page if it exists.
+     * @return {?}
+     */
+    nextPage() {
+        if (!this.hasNextPage()) {
+            return;
+        }
+        this.pageIndex++;
+        this._emitPageEvent();
+    }
+    /**
+     * Move back to the previous page if it exists.
+     * @return {?}
+     */
+    previousPage() {
+        if (!this.hasPreviousPage()) {
+            return;
+        }
+        this.pageIndex--;
+        this._emitPageEvent();
+    }
+    /**
+     * Whether there is a previous page.
+     * @return {?}
+     */
+    hasPreviousPage() {
+        return this.pageIndex >= 1 && this.pageSize != 0;
+    }
+    /**
+     * Whether there is a next page.
+     * @return {?}
+     */
+    hasNextPage() {
+        const /** @type {?} */ numberOfPages = Math.ceil(this.length / this.pageSize) - 1;
+        return this.pageIndex < numberOfPages && this.pageSize != 0;
+    }
+    /**
+     * Changes the page size so that the first item displayed on the page will still be
+     * displayed using the new page size.
+     *
+     * For example, if the page size is 10 and on the second page (items indexed 10-19) then
+     * switching so that the page size is 5 will set the third page as the current page so
+     * that the 10th item will still be displayed.
+     * @param {?} pageSize
+     * @return {?}
+     */
+    _changePageSize(pageSize) {
+        // Current page needs to be updated to reflect the new page size. Navigate to the page
+        // containing the previous page's first item.
+        const /** @type {?} */ startIndex = this.pageIndex * this.pageSize;
+        this.pageIndex = Math.floor(startIndex / pageSize) || 0;
+        this.pageSize = pageSize;
+        this._emitPageEvent();
+    }
+    /**
+     * Updates the list of page size options to display to the user. Includes making sure that
+     * the page size is an option and that the list is sorted.
+     * @return {?}
+     */
+    _updateDisplayedPageSizeOptions() {
+        if (!this._initialized) {
+            return;
+        }
+        // If no page size is provided, use the first page size option or the default page size.
+        if (!this.pageSize) {
+            this._pageSize = this.pageSizeOptions.length != 0 ?
+                this.pageSizeOptions[0] :
+                DEFAULT_PAGE_SIZE;
+        }
+        this._displayedPageSizeOptions = this.pageSizeOptions.slice();
+        if (this._displayedPageSizeOptions.indexOf(this.pageSize) == -1) {
+            this._displayedPageSizeOptions.push(this.pageSize);
+        }
+        // Sort the numbers using a number-specific sort function.
+        this._displayedPageSizeOptions.sort((a, b) => a - b);
+        this._changeDetectorRef.markForCheck();
+    }
+    /**
+     * Emits an event notifying that a change of the paginator's properties has been triggered.
+     * @return {?}
+     */
+    _emitPageEvent() {
+        this.page.next({
+            pageIndex: this.pageIndex,
+            pageSize: this.pageSize,
+            length: this.length
+        });
+    }
+}
+MdPaginator.decorators = [
+    { type: Component, args: [{selector: 'md-paginator, mat-paginator',
+                template: "<div class=\"mat-paginator-page-size\"><div class=\"mat-paginator-page-size-label\">{{_intl.itemsPerPageLabel}}</div><md-select *ngIf=\"_displayedPageSizeOptions.length > 1\" class=\"mat-paginator-page-size-select\" [value]=\"pageSize\" [aria-label]=\"_intl.itemsPerPageLabel\" (change)=\"_changePageSize($event.value)\"><md-option *ngFor=\"let pageSizeOption of _displayedPageSizeOptions\" [value]=\"pageSizeOption\">{{pageSizeOption}}</md-option></md-select><div *ngIf=\"_displayedPageSizeOptions.length <= 1\">{{pageSize}}</div></div><div class=\"mat-paginator-range-label\">{{_intl.getRangeLabel(pageIndex, pageSize, length)}}</div><button md-icon-button class=\"mat-paginator-navigation-previous\" (click)=\"previousPage()\" [attr.aria-label]=\"_intl.previousPageLabel\" [mdTooltip]=\"_intl.previousPageLabel\" [mdTooltipPosition]=\"'above'\" [disabled]=\"!hasPreviousPage()\"><div class=\"mat-paginator-increment\"></div></button> <button md-icon-button class=\"mat-paginator-navigation-next\" (click)=\"nextPage()\" [attr.aria-label]=\"_intl.nextPageLabel\" [mdTooltip]=\"_intl.nextPageLabel\" [mdTooltipPosition]=\"'above'\" [disabled]=\"!hasNextPage()\"><div class=\"mat-paginator-decrement\"></div></button>",
+                styles: [".mat-paginator{display:flex;align-items:center;justify-content:flex-end;min-height:56px;padding:0 8px}.mat-paginator-page-size{display:flex;align-items:center}.mat-paginator-page-size-label{margin:0 4px}.mat-paginator-page-size-select{padding-top:0;margin:0 4px}.mat-paginator-page-size-select .mat-select-trigger{min-width:56px}.mat-paginator-range-label{margin:0 32px}.mat-paginator-increment-button+.mat-paginator-increment-button{margin:0 0 0 8px}[dir=rtl] .mat-paginator-increment-button+.mat-paginator-increment-button{margin:0 8px 0 0}.mat-paginator-decrement,.mat-paginator-increment{width:8px;height:8px}.mat-paginator-decrement,[dir=rtl] .mat-paginator-increment{transform:rotate(45deg)}.mat-paginator-increment,[dir=rtl] .mat-paginator-decrement{transform:rotate(225deg)}.mat-paginator-decrement{margin-left:12px}[dir=rtl] .mat-paginator-decrement{margin-right:12px}.mat-paginator-increment{margin-left:16px}[dir=rtl] .mat-paginator-increment{margin-right:16px}"],
+                host: {
+                    'class': 'mat-paginator',
+                },
+                providers: [
+                    { provide: MATERIAL_COMPATIBILITY_MODE, useValue: false }
+                ],
+                changeDetection: ChangeDetectionStrategy.OnPush,
+                encapsulation: ViewEncapsulation.None,
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdPaginator.ctorParameters = () => [
+    { type: MdPaginatorIntl, },
+    { type: ChangeDetectorRef, },
+];
+MdPaginator.propDecorators = {
+    'pageIndex': [{ type: Input },],
+    'length': [{ type: Input },],
+    'pageSize': [{ type: Input },],
+    'pageSizeOptions': [{ type: Input },],
+    'page': [{ type: Output },],
+};
+
+class MdPaginatorModule {
+}
+MdPaginatorModule.decorators = [
+    { type: NgModule, args: [{
+                imports: [
+                    CommonModule,
+                    MdButtonModule,
+                    MdSelectModule,
+                    MdTooltipModule,
+                ],
+                exports: [MdPaginator],
+                declarations: [MdPaginator],
+                providers: [MdPaginatorIntl],
+            },] },
+];
+/**
+ * @nocollapse
+ */
+MdPaginatorModule.ctorParameters = () => [];
 
 const MATERIAL_MODULES = [
     MdAutocompleteModule,
@@ -18849,12 +22151,16 @@ const MATERIAL_MODULES = [
     MdCardModule,
     MdChipsModule,
     MdCheckboxModule,
+    MdDatepickerModule,
+    MdTableModule,
     MdDialogModule,
+    MdExpansionModule,
     MdGridListModule,
     MdIconModule,
     MdInputModule,
     MdListModule,
     MdMenuModule,
+    MdPaginatorModule,
     MdProgressBarModule,
     MdProgressSpinnerModule,
     MdRadioModule,
@@ -18864,77 +22170,23 @@ const MATERIAL_MODULES = [
     MdSliderModule,
     MdSlideToggleModule,
     MdSnackBarModule,
+    MdSortModule,
     MdTabsModule,
     MdToolbarModule,
     MdTooltipModule,
     OverlayModule,
     PortalModule,
-    RtlModule,
+    BidiModule,
     StyleModule,
     A11yModule,
     PlatformModule,
-    CompatibilityModule,
-    ObserveContentModule
+    MdCommonModule,
+    ObserversModule
 ];
-/**
- * @deprecated
- */
-class MaterialRootModule {
-}
-MaterialRootModule.decorators = [
-    { type: NgModule, args: [{
-                imports: [
-                    MdAutocompleteModule.forRoot(),
-                    MdButtonModule.forRoot(),
-                    MdCardModule.forRoot(),
-                    MdChipsModule.forRoot(),
-                    MdCheckboxModule.forRoot(),
-                    MdGridListModule.forRoot(),
-                    MdInputModule.forRoot(),
-                    MdListModule.forRoot(),
-                    MdProgressBarModule.forRoot(),
-                    MdProgressSpinnerModule.forRoot(),
-                    MdRippleModule.forRoot(),
-                    MdSelectModule.forRoot(),
-                    MdSidenavModule.forRoot(),
-                    MdTabsModule.forRoot(),
-                    MdToolbarModule.forRoot(),
-                    PortalModule.forRoot(),
-                    RtlModule.forRoot(),
-                    ObserveContentModule.forRoot(),
-                    // These modules include providers.
-                    A11yModule.forRoot(),
-                    MdButtonToggleModule.forRoot(),
-                    MdDialogModule.forRoot(),
-                    MdIconModule.forRoot(),
-                    MdMenuModule.forRoot(),
-                    MdRadioModule.forRoot(),
-                    MdSliderModule.forRoot(),
-                    MdSlideToggleModule.forRoot(),
-                    MdSnackBarModule.forRoot(),
-                    MdTooltipModule.forRoot(),
-                    PlatformModule.forRoot(),
-                    OverlayModule.forRoot(),
-                    CompatibilityModule.forRoot(),
-                ],
-                exports: MATERIAL_MODULES,
-            },] },
-];
-/**
- * @nocollapse
- */
-MaterialRootModule.ctorParameters = () => [];
 /**
  * @deprecated
  */
 class MaterialModule {
-    /**
-     * @deprecated
-     * @return {?}
-     */
-    static forRoot() {
-        return { ngModule: MaterialRootModule };
-    }
 }
 MaterialModule.decorators = [
     { type: NgModule, args: [{
@@ -18948,14 +22200,8 @@ MaterialModule.decorators = [
 MaterialModule.ctorParameters = () => [];
 
 /**
- * @module
- * @description
- * Entry point for all public APIs of Angular Material.
- */
-
-/**
  * Generated bundle index. Do not edit.
  */
 
-export { Dir, RtlModule, ObserveContentModule, ObserveContent, MdOptionModule, MdOption, Portal, BasePortalHost, ComponentPortal, TemplatePortal, PortalHostDirective, TemplatePortalDirective, PortalModule, DomPortalHost, Overlay, OVERLAY_PROVIDERS, OverlayContainer, FullscreenOverlayContainer, OverlayRef, OverlayState, ConnectedOverlayDirective, OverlayOrigin, OverlayModule, ScrollDispatcher, GestureConfig, LiveAnnouncer, LIVE_ANNOUNCER_ELEMENT_TOKEN, LIVE_ANNOUNCER_PROVIDER, InteractivityChecker, isFakeMousedownFromScreenReader, A11yModule, UniqueSelectionDispatcher, UNIQUE_SELECTION_DISPATCHER_PROVIDER, MdLineModule, MdLine, MdLineSetter, MdError, coerceBooleanProperty, coerceNumberProperty, CompatibilityModule, NoConflictStyleCompatibilityMode, MdCoreModule, PlatformModule, Platform, getSupportedInputTypes, GlobalPositionStrategy, ConnectedPositionStrategy, ConnectionPositionPair, ScrollableViewProperties, ConnectedOverlayPositionChange, MdRipple, MD_RIPPLE_GLOBAL_OPTIONS, RippleRef, RippleState, RIPPLE_FADE_IN_DURATION, RIPPLE_FADE_OUT_DURATION, MdRippleModule, SelectionModel, SelectionChange, FocusTrap, FocusTrapFactory, FocusTrapDeprecatedDirective, FocusTrapDirective, StyleModule, TOUCH_BUFFER_MS, FocusOriginMonitor, CdkMonitorFocus, FOCUS_ORIGIN_MONITOR_PROVIDER_FACTORY, FOCUS_ORIGIN_MONITOR_PROVIDER, applyCssTransform, UP_ARROW, DOWN_ARROW, RIGHT_ARROW, LEFT_ARROW, PAGE_UP, PAGE_DOWN, HOME, END, ENTER, SPACE, TAB, COMMA, ESCAPE, BACKSPACE, DELETE, MATERIAL_COMPATIBILITY_MODE, MdCompatibilityInvalidPrefixError, MAT_ELEMENTS_SELECTOR, MD_ELEMENTS_SELECTOR, MatPrefixRejector, MdPrefixRejector, AnimationCurves, AnimationDurations, MdSelectionModule, MdPseudoCheckbox, MaterialRootModule, MaterialModule, MdAutocompleteModule, MdAutocomplete, AUTOCOMPLETE_OPTION_HEIGHT, AUTOCOMPLETE_PANEL_HEIGHT, MD_AUTOCOMPLETE_VALUE_ACCESSOR, MdAutocompleteTrigger, MdButtonModule, MdButtonCssMatStyler, MdRaisedButtonCssMatStyler, MdIconButtonCssMatStyler, MdFabCssMatStyler, MdMiniFabCssMatStyler, MdButtonBase, _MdButtonMixinBase, MdButton, MdAnchor, MdButtonToggleModule, MD_BUTTON_TOGGLE_GROUP_VALUE_ACCESSOR, MdButtonToggleChange, MdButtonToggleGroup, MdButtonToggleGroupMultiple, MdButtonToggle, MdCardModule, MdCardContent, MdCardTitle, MdCardSubtitle, MdCardActions, MdCardFooter, MdCardSmImage, MdCardMdImage, MdCardLgImage, MdCardImage, MdCardXlImage, MdCardAvatar, MdCard, MdCardHeader, MdCardTitleGroup, MdChipsModule, MdChipList, MdChip, MdChipInput, MdChipRemove, MdCheckboxModule, MD_CHECKBOX_CONTROL_VALUE_ACCESSOR, TransitionCheckState, MdCheckboxChange, MdCheckbox, MdDialogModule, MD_DIALOG_DATA, MdDialog, MdDialogContainer, MdDialogClose, MdDialogTitle, MdDialogContent, MdDialogActions, MdDialogConfig, MdDialogRef, MdGridListModule, MdGridTile, MdGridList, MdIconModule, MdIconRegistry, MdIconInvalidNameError, MdIcon, ICON_REGISTRY_PROVIDER_FACTORY, ICON_REGISTRY_PROVIDER, MdInputModule, MdTextareaAutosize, MdPlaceholder, MdHint, MdErrorDirective, MdPrefix, MdSuffix, MdInputDirective, MdInputContainer, MdInputContainerPlaceholderConflictError, MdInputContainerUnsupportedTypeError, MdInputContainerDuplicatedHintError, MdInputContainerMissingMdInputError, MdListModule, MdListDivider, MdList, MdListCssMatStyler, MdNavListCssMatStyler, MdDividerCssMatStyler, MdListAvatarCssMatStyler, MdListIconCssMatStyler, MdListSubheaderCssMatStyler, MdListItem, MdMenuModule, fadeInItems, transformMenu, MdMenu, MdMenuItem, MdMenuTrigger, MdProgressBarModule, MdProgressBar, MdProgressSpinnerModule, PROGRESS_SPINNER_STROKE_WIDTH, MdProgressSpinnerCssMatStyler, MdProgressSpinner, MdSpinner, MdRadioModule, MD_RADIO_GROUP_CONTROL_VALUE_ACCESSOR, MdRadioChange, MdRadioGroup, MdRadioButton, MdSelectModule, fadeInContent, transformPanel, transformPlaceholder, SELECT_OPTION_HEIGHT, SELECT_PANEL_MAX_HEIGHT, SELECT_MAX_OPTIONS_DISPLAYED, SELECT_TRIGGER_HEIGHT, SELECT_OPTION_HEIGHT_ADJUSTMENT, SELECT_PANEL_PADDING_X, SELECT_MULTIPLE_PANEL_PADDING_X, SELECT_PANEL_PADDING_Y, SELECT_PANEL_VIEWPORT_PADDING, MdSelectChange, MdSelect, MdSidenavModule, MdDuplicatedSidenavError, MdSidenavToggleResult, MdSidenav, MdSidenavContainer, MdSliderModule, MD_SLIDER_VALUE_ACCESSOR, MdSliderChange, MdSlider, SliderRenderer, MdSlideToggleModule, MD_SLIDE_TOGGLE_VALUE_ACCESSOR, MdSlideToggleChange, MdSlideToggle, MdSnackBarModule, MdSnackBar, SHOW_ANIMATION, HIDE_ANIMATION, MdSnackBarContainer, MdSnackBarConfig, MdSnackBarRef, SimpleSnackBar, MdTabsModule, MdInkBar, MdTabBody, MdTabHeader, MdTabLabelWrapper, MdTab, MdTabLabel, MdTabChangeEvent, MdTabGroup, MdTabNavBar, MdTabLink, MdTabLinkRipple, MdToolbarModule, MdToolbarRow, MdToolbar, MdTooltipModule, TOUCHEND_HIDE_DELAY, SCROLL_THROTTLE_MS, MdTooltip, TooltipComponent, LIVE_ANNOUNCER_PROVIDER_FACTORY as ɵf, mixinDisabled as ɵq, UNIQUE_SELECTION_DISPATCHER_PROVIDER_FACTORY as ɵg, OVERLAY_CONTAINER_PROVIDER as ɵb, OVERLAY_CONTAINER_PROVIDER_FACTORY as ɵa, OverlayPositionBuilder as ɵo, VIEWPORT_RULER_PROVIDER as ɵn, VIEWPORT_RULER_PROVIDER_FACTORY as ɵm, ViewportRuler as ɵl, SCROLL_DISPATCHER_PROVIDER as ɵd, SCROLL_DISPATCHER_PROVIDER_FACTORY as ɵc, Scrollable as ɵp, RippleRenderer as ɵe, MdGridAvatarCssMatStyler as ɵi, MdGridTileFooterCssMatStyler as ɵk, MdGridTileHeaderCssMatStyler as ɵj, MdGridTileText as ɵh };
+export { VERSION, coerceBooleanProperty, coerceNumberProperty, ObserversModule, ObserveContent, Dir, Directionality, BidiModule, Portal, BasePortalHost, ComponentPortal, TemplatePortal, PortalHostDirective, TemplatePortalDirective, PortalModule, DomPortalHost, GestureConfig, LiveAnnouncer, LIVE_ANNOUNCER_ELEMENT_TOKEN, LIVE_ANNOUNCER_PROVIDER, InteractivityChecker, isFakeMousedownFromScreenReader, A11yModule, UniqueSelectionDispatcher, UNIQUE_SELECTION_DISPATCHER_PROVIDER, MdLineModule, MdLine, MdLineSetter, CompatibilityModule, NoConflictStyleCompatibilityMode, MdCommonModule, MATERIAL_SANITY_CHECKS, MD_PLACEHOLDER_GLOBAL_OPTIONS, MD_ERROR_GLOBAL_OPTIONS, defaultErrorStateMatcher, showOnDirtyErrorStateMatcher, MdCoreModule, MdOptionModule, MdOptionSelectionChange, MdOption, MdOptgroupBase, _MdOptgroupMixinBase, MdOptgroup, PlatformModule, Platform, getSupportedInputTypes, OVERLAY_PROVIDERS, OverlayModule, Overlay, OverlayContainer, FullscreenOverlayContainer, OverlayRef, OverlayState, ConnectedOverlayDirective, OverlayOrigin, ViewportRuler, GlobalPositionStrategy, ConnectedPositionStrategy, ConnectionPositionPair, ScrollableViewProperties, ConnectedOverlayPositionChange, Scrollable, ScrollDispatcher, ScrollStrategyOptions, RepositionScrollStrategy, CloseScrollStrategy, NoopScrollStrategy, BlockScrollStrategy, ScrollDispatchModule, MdRipple, MD_RIPPLE_GLOBAL_OPTIONS, RippleRef, RippleState, RIPPLE_FADE_IN_DURATION, RIPPLE_FADE_OUT_DURATION, MdRippleModule, SelectionModel, SelectionChange, FocusTrap, FocusTrapFactory, FocusTrapDeprecatedDirective, FocusTrapDirective, StyleModule, TOUCH_BUFFER_MS, FocusOriginMonitor, CdkMonitorFocus, FOCUS_ORIGIN_MONITOR_PROVIDER_FACTORY, FOCUS_ORIGIN_MONITOR_PROVIDER, applyCssTransform, UP_ARROW, DOWN_ARROW, RIGHT_ARROW, LEFT_ARROW, PAGE_UP, PAGE_DOWN, HOME, END, ENTER, SPACE, TAB, ESCAPE, BACKSPACE, DELETE, A, Z, MATERIAL_COMPATIBILITY_MODE, getMdCompatibilityInvalidPrefixError, MAT_ELEMENTS_SELECTOR, MD_ELEMENTS_SELECTOR, MatPrefixRejector, MdPrefixRejector, AnimationCurves, AnimationDurations, MdSelectionModule, MdPseudoCheckbox, NativeDateModule, MdNativeDateModule, DateAdapter, MD_DATE_FORMATS, NativeDateAdapter, MD_NATIVE_DATE_FORMATS, MaterialModule, MdAutocompleteModule, MdAutocomplete, AUTOCOMPLETE_OPTION_HEIGHT, AUTOCOMPLETE_PANEL_HEIGHT, MD_AUTOCOMPLETE_SCROLL_STRATEGY, MD_AUTOCOMPLETE_SCROLL_STRATEGY_PROVIDER_FACTORY, MD_AUTOCOMPLETE_SCROLL_STRATEGY_PROVIDER, MD_AUTOCOMPLETE_VALUE_ACCESSOR, getMdAutocompleteMissingPanelError, MdAutocompleteTrigger, MdButtonModule, MdButtonCssMatStyler, MdRaisedButtonCssMatStyler, MdIconButtonCssMatStyler, MdFab, MdMiniFab, MdButtonBase, _MdButtonMixinBase, MdButton, MdAnchor, MdButtonToggleModule, MdButtonToggleGroupBase, _MdButtonToggleGroupMixinBase, MD_BUTTON_TOGGLE_GROUP_VALUE_ACCESSOR, MdButtonToggleChange, MdButtonToggleGroup, MdButtonToggleGroupMultiple, MdButtonToggle, MdCardModule, MdCardContent, MdCardTitle, MdCardSubtitle, MdCardActions, MdCardFooter, MdCardImage, MdCardSmImage, MdCardMdImage, MdCardLgImage, MdCardXlImage, MdCardAvatar, MdCard, MdCardHeader, MdCardTitleGroup, MdChipsModule, MdChipList, MdChipBase, _MdChipMixinBase, MdBasicChip, MdChip, MdChipRemove, MdChipInput, MdCheckboxModule, MD_CHECKBOX_CONTROL_VALUE_ACCESSOR, TransitionCheckState, MdCheckboxChange, MdCheckboxBase, _MdCheckboxMixinBase, MdCheckbox, _MdCheckboxRequiredValidator, MD_CHECKBOX_REQUIRED_VALIDATOR, MdCheckboxRequiredValidator, MdDatepickerModule, MdCalendar, MdCalendarCell, MdCalendarBody, MD_DATEPICKER_SCROLL_STRATEGY, MD_DATEPICKER_SCROLL_STRATEGY_PROVIDER_FACTORY, MD_DATEPICKER_SCROLL_STRATEGY_PROVIDER, MdDatepickerContent, MdDatepicker, MD_DATEPICKER_VALUE_ACCESSOR, MD_DATEPICKER_VALIDATORS, MdDatepickerInputEvent, MdDatepickerInput, MdDatepickerIntl, MdDatepickerToggle, MdMonthView, MdYearView, MdDialogModule, MD_DIALOG_DATA, MD_DIALOG_SCROLL_STRATEGY, MD_DIALOG_SCROLL_STRATEGY_PROVIDER_FACTORY, MD_DIALOG_SCROLL_STRATEGY_PROVIDER, MdDialog, throwMdDialogContentAlreadyAttachedError, MdDialogContainer, MdDialogClose, MdDialogTitle, MdDialogContent, MdDialogActions, MdDialogConfig, MdDialogRef, MdExpansionModule, CdkAccordion, MdAccordion, AccordionItem, MdExpansionPanel, MdExpansionPanelActionRow, MdExpansionPanelHeader, MdExpansionPanelDescription, MdExpansionPanelTitle, MdGridListModule, MdGridTile, MdGridList, MdIconModule, MdIconBase, _MdIconMixinBase, MdIcon, getMdIconNameNotFoundError, getMdIconNoHttpProviderError, getMdIconFailedToSanitizeError, MdIconRegistry, ICON_REGISTRY_PROVIDER_FACTORY, ICON_REGISTRY_PROVIDER, MdInputModule, MdTextareaAutosize, MdPlaceholder, MdHint, MdErrorDirective, MdPrefix, MdSuffix, MdInputDirective, MdInputContainer, getMdInputContainerPlaceholderConflictError, getMdInputContainerUnsupportedTypeError, getMdInputContainerDuplicatedHintError, getMdInputContainerMissingMdInputError, MdListModule, MdListBase, _MdListMixinBase, MdListItemBase, _MdListItemMixinBase, MdListDivider, MdList, MdListCssMatStyler, MdNavListCssMatStyler, MdDividerCssMatStyler, MdListAvatarCssMatStyler, MdListIconCssMatStyler, MdListSubheaderCssMatStyler, MdListItem, MdMenuModule, fadeInItems, transformMenu, MdMenu, MD_MENU_DEFAULT_OPTIONS, MdMenuItem, MdMenuTrigger, MdPaginatorModule, PageEvent, MdPaginator, MdPaginatorIntl, MdProgressBarModule, MdProgressBar, MdProgressSpinnerModule, PROGRESS_SPINNER_STROKE_WIDTH, MdProgressSpinnerCssMatStyler, MdProgressSpinnerBase, _MdProgressSpinnerMixinBase, MdProgressSpinner, MdSpinner, MdRadioModule, MD_RADIO_GROUP_CONTROL_VALUE_ACCESSOR, MdRadioChange, MdRadioGroupBase, _MdRadioGroupMixinBase, MdRadioGroup, MdRadioButtonBase, _MdRadioButtonMixinBase, MdRadioButton, MdSelectModule, fadeInContent, transformPanel, transformPlaceholder, SELECT_ITEM_HEIGHT, SELECT_PANEL_MAX_HEIGHT, SELECT_MAX_OPTIONS_DISPLAYED, SELECT_TRIGGER_HEIGHT, SELECT_OPTION_HEIGHT_ADJUSTMENT, SELECT_PANEL_PADDING_X, SELECT_PANEL_INDENT_PADDING_X, SELECT_MULTIPLE_PANEL_PADDING_X, SELECT_PANEL_PADDING_Y, SELECT_PANEL_VIEWPORT_PADDING, MD_SELECT_SCROLL_STRATEGY, MD_SELECT_SCROLL_STRATEGY_PROVIDER_FACTORY, MD_SELECT_SCROLL_STRATEGY_PROVIDER, MdSelectChange, MdSelectBase, _MdSelectMixinBase, MdSelectTrigger, MdSelect, MdSidenavModule, throwMdDuplicatedSidenavError, MdSidenavToggleResult, MdSidenav, MdSidenavContainer, MdSliderModule, MD_SLIDER_VALUE_ACCESSOR, MdSliderChange, MdSliderBase, _MdSliderMixinBase, MdSlider, MdSlideToggleModule, MD_SLIDE_TOGGLE_VALUE_ACCESSOR, MdSlideToggleChange, MdSlideToggleBase, _MdSlideToggleMixinBase, MdSlideToggle, MdSnackBarModule, MdSnackBar, SHOW_ANIMATION, HIDE_ANIMATION, MdSnackBarContainer, MD_SNACK_BAR_DATA, MdSnackBarConfig, MdSnackBarRef, SimpleSnackBar, MdSortModule, MdSortHeader, MdSortHeaderIntl, MdSort, MdTableModule, _MdCellDef, _MdHeaderCellDef, _MdColumnDef, _MdHeaderCell, _MdCell, MdCellDef, MdHeaderCellDef, MdColumnDef, MdHeaderCell, MdCell, _MdTable, MdTable, _MdHeaderRowDef, _MdCdkRowDef, _MdHeaderRow, _MdRow, MdHeaderRowDef, MdRowDef, MdHeaderRow, MdRow, MdTabsModule, MdInkBar, MdTabBody, MdTabHeader, MdTabLabelWrapper, MdTab, MdTabLabel, MdTabNav, MdTabLink, MdTabChangeEvent, MdTabGroupBase, _MdTabGroupMixinBase, MdTabGroup, MdTabNavBase, _MdTabNavMixinBase, MdTabLinkBase, _MdTabLinkMixinBase, MdToolbarModule, MdToolbarRow, MdToolbarBase, _MdToolbarMixinBase, MdToolbar, MdTooltipModule, TOUCHEND_HIDE_DELAY, SCROLL_THROTTLE_MS, TOOLTIP_PANEL_CLASS, getMdTooltipInvalidPositionError, MD_TOOLTIP_SCROLL_STRATEGY, MD_TOOLTIP_SCROLL_STRATEGY_PROVIDER_FACTORY, MD_TOOLTIP_SCROLL_STRATEGY_PROVIDER, MdTooltip, TooltipComponent, mixinColor as ɵbd, mixinDisableRipple as ɵbe, mixinDisabled as ɵbc, UNIQUE_SELECTION_DISPATCHER_PROVIDER_FACTORY as ɵk, OVERLAY_CONTAINER_PROVIDER as ɵb, OVERLAY_CONTAINER_PROVIDER_FACTORY as ɵa, MD_CONNECTED_OVERLAY_SCROLL_STRATEGY as ɵc, MD_CONNECTED_OVERLAY_SCROLL_STRATEGY_PROVIDER as ɵe, MD_CONNECTED_OVERLAY_SCROLL_STRATEGY_PROVIDER_FACTORY as ɵd, OverlayPositionBuilder as ɵbb, VIEWPORT_RULER_PROVIDER as ɵg, VIEWPORT_RULER_PROVIDER_FACTORY as ɵf, SCROLL_DISPATCHER_PROVIDER as ɵi, SCROLL_DISPATCHER_PROVIDER_FACTORY as ɵh, RippleRenderer as ɵj, EXPANSION_PANEL_ANIMATION_TIMING as ɵl, MdGridAvatarCssMatStyler as ɵn, MdGridTileFooterCssMatStyler as ɵp, MdGridTileHeaderCssMatStyler as ɵo, MdGridTileText as ɵm, MdMenuItemBase as ɵq, _MdMenuItemMixinBase as ɵr, MD_MENU_SCROLL_STRATEGY as ɵs, MD_MENU_SCROLL_STRATEGY_PROVIDER as ɵu, MD_MENU_SCROLL_STRATEGY_PROVIDER_FACTORY as ɵt, MdTabBase as ɵz, _MdTabMixinBase as ɵba, MdTabHeaderBase as ɵv, _MdTabHeaderMixinBase as ɵw, MdTabLabelWrapperBase as ɵx, _MdTabLabelWrapperMixinBase as ɵy };
 //# sourceMappingURL=material.js.map

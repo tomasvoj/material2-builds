@@ -1,7 +1,16 @@
-import { AfterContentInit, AfterViewInit, ChangeDetectorRef, ElementRef, EventEmitter, QueryList, Renderer } from '@angular/core';
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+import { AfterContentChecked, AfterContentInit, AfterViewInit, ChangeDetectorRef, DoCheck, ElementRef, OnChanges, OnDestroy, QueryList, Renderer2 } from '@angular/core';
+import { Platform } from '../core';
 import { FormGroupDirective, NgControl, NgForm } from '@angular/forms';
-/** Type for the available floatPlaceholder values. */
-export declare type FloatPlaceholderType = 'always' | 'never' | 'auto';
+import { FloatPlaceholderType, PlaceholderOptions } from '../core/placeholder/placeholder-options';
+import { ErrorOptions, ErrorStateMatcher } from '../core/error/error-options';
+import { Subject } from 'rxjs/Subject';
 /**
  * The placeholder directive. The content can declare this to implement more
  * complex placeholders.
@@ -10,11 +19,14 @@ export declare class MdPlaceholder {
 }
 /** Hint text to be shown underneath the input. */
 export declare class MdHint {
+    /** Whether to align the hint label at the start or end of the line. */
     align: 'start' | 'end';
+    /** Unique ID for the hint. Used for the aria-describedby on the input. */
     id: string;
 }
 /** Single error message to be shown underneath the input. */
 export declare class MdErrorDirective {
+    id: string;
 }
 /** Prefix to be placed the the front of the input. */
 export declare class MdPrefix {
@@ -23,21 +35,34 @@ export declare class MdPrefix {
 export declare class MdSuffix {
 }
 /** Marker for the input element that `MdInputContainer` is wrapping. */
-export declare class MdInputDirective {
+export declare class MdInputDirective implements OnChanges, OnDestroy, DoCheck {
     private _elementRef;
     private _renderer;
+    private _platform;
     _ngControl: NgControl;
+    private _parentForm;
+    private _parentFormGroup;
     /** Variables used as cache for getters and setters. */
     private _type;
     private _placeholder;
     private _disabled;
     private _required;
+    private _readonly;
     private _id;
-    private _cachedUid;
+    private _uid;
+    private _errorOptions;
+    private _previousNativeValue;
+    /** Whether the input is in an error state. */
+    _isErrorState: boolean;
     /** Whether the element is focused or not. */
     focused: boolean;
     /** Sets the aria-describedby attribute on the input for improved a11y. */
     ariaDescribedby: string;
+    /**
+     * Stream that emits whenever the state of the input changes. This allows for other components
+     * (mostly `md-input-container`) that depend on the properties of `mdInput` to update their view.
+     */
+    _stateChanges: Subject<void>;
     /** Whether the element is disabled. */
     disabled: any;
     /** Unique id of the element. */
@@ -48,24 +73,34 @@ export declare class MdInputDirective {
     required: any;
     /** Input type of the element. */
     type: string;
+    /** Whether the element is readonly. */
+    readonly: any;
+    /** A function used to control when error messages are shown. */
+    errorStateMatcher: ErrorStateMatcher;
     /** The input element's value. */
     value: string;
-    /**
-     * Emits an event when the placeholder changes so that the `md-input-container` can re-validate.
-     */
-    _placeholderChange: EventEmitter<string>;
+    /** Whether the input is empty. */
     readonly empty: boolean;
-    private readonly _uid;
     private _neverEmptyInputTypes;
-    constructor(_elementRef: ElementRef, _renderer: Renderer, _ngControl: NgControl);
+    constructor(_elementRef: ElementRef, _renderer: Renderer2, _platform: Platform, _ngControl: NgControl, _parentForm: NgForm, _parentFormGroup: FormGroupDirective, errorOptions: ErrorOptions);
+    ngOnChanges(): void;
+    ngOnDestroy(): void;
+    ngDoCheck(): void;
+    _onFocus(): void;
     /** Focuses the input element. */
     focus(): void;
-    _onFocus(): void;
-    _onBlur(): void;
+    /** Callback for the cases where the focused state of the input changes. */
+    _focusChanged(isFocused: boolean): void;
     _onInput(): void;
+    /** Re-evaluates the error state. This is only relevant with @angular/forms. */
+    private _updateErrorState();
+    /** Does some manual dirty checking on the native input `value` property. */
+    private _dirtyCheckNativeValue();
     /** Make sure the input is a supported type. */
     private _validateType();
+    /** Checks whether the input type isn't one of the types that are never empty. */
     private _isNeverEmpty();
+    /** Checks whether the input is invalid based on the native validation. */
     private _isBadInput();
     /** Determines if the component host is a textarea. If not recognizable it returns false. */
     private _isTextarea();
@@ -73,18 +108,15 @@ export declare class MdInputDirective {
 /**
  * Container for text inputs that applies Material Design styling and behavior.
  */
-export declare class MdInputContainer implements AfterViewInit, AfterContentInit {
+export declare class MdInputContainer implements AfterViewInit, AfterContentInit, AfterContentChecked {
     _elementRef: ElementRef;
     private _changeDetectorRef;
-    private _parentForm;
-    private _parentFormGroup;
-    /** Alignment of the input container's content. */
-    align: 'start' | 'end';
+    private _placeholderOptions;
     /** Color of the input divider, based on the theme. */
     color: 'primary' | 'accent' | 'warn';
-    /** @deprecated Use color instead. */
-    dividerColor: "accent" | "primary" | "warn";
-    /** Whether we should hide the required marker. */
+    /** @deprecated Use `color` instead. */
+    dividerColor: "primary" | "accent" | "warn";
+    /** Whether the required marker should be hidden. */
     hideRequiredMarker: any;
     private _hideRequiredMarker;
     /** Whether the floating label should always float or not. */
@@ -100,14 +132,18 @@ export declare class MdInputContainer implements AfterViewInit, AfterContentInit
     /** Whether the placeholder should always float, never float or float as the user types. */
     floatPlaceholder: FloatPlaceholderType;
     private _floatPlaceholder;
+    /** Reference to the input's underline element. */
+    underlineRef: ElementRef;
+    _connectionContainerRef: ElementRef;
     _mdInputChild: MdInputDirective;
     _placeholderChild: MdPlaceholder;
     _errorChildren: QueryList<MdErrorDirective>;
     _hintChildren: QueryList<MdHint>;
     _prefixChildren: QueryList<MdPrefix>;
     _suffixChildren: QueryList<MdSuffix>;
-    constructor(_elementRef: ElementRef, _changeDetectorRef: ChangeDetectorRef, _parentForm: NgForm, _parentFormGroup: FormGroupDirective);
+    constructor(_elementRef: ElementRef, _changeDetectorRef: ChangeDetectorRef, placeholderOptions: PlaceholderOptions);
     ngAfterContentInit(): void;
+    ngAfterContentChecked(): void;
     ngAfterViewInit(): void;
     /** Determines whether a class from the NgControl should be forwarded to the host element. */
     _shouldForward(prop: string): boolean;
@@ -115,8 +151,6 @@ export declare class MdInputContainer implements AfterViewInit, AfterContentInit
     _hasPlaceholder(): boolean;
     /** Focuses the underlying input. */
     _focusInput(): void;
-    /** Whether the input container is in an error state. */
-    _isErrorState(): boolean;
     /** Determines whether to display hints or errors. */
     _getDisplayedMessages(): 'error' | 'hint';
     /**
@@ -138,4 +172,8 @@ export declare class MdInputContainer implements AfterViewInit, AfterContentInit
      * of the currently-specified hints, as well as a generated id for the hint label.
      */
     private _syncAriaDescribedby();
+    /**
+     * Throws an error if the container's input child was removed.
+     */
+    protected _validateInputChild(): void;
 }

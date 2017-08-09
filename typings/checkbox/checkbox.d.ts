@@ -1,6 +1,16 @@
-import { ChangeDetectorRef, ElementRef, EventEmitter, Renderer, AfterViewInit, OnDestroy } from '@angular/core';
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+import { AfterViewInit, ChangeDetectorRef, ElementRef, EventEmitter, OnDestroy, Renderer2 } from '@angular/core';
 import { ControlValueAccessor } from '@angular/forms';
-import { MdRipple, FocusOriginMonitor } from '../core';
+import { FocusOriginMonitor, MdRipple } from '../core';
+import { CanDisable } from '../core/common-behaviors/disabled';
+import { CanColor } from '../core/common-behaviors/color';
+import { CanDisableRipple } from '../core/common-behaviors/disable-ripple';
 /**
  * Provider Expression that allows md-checkbox to register as a ControlValueAccessor.
  * This allows it to support [(ngModel)].
@@ -28,6 +38,13 @@ export declare class MdCheckboxChange {
     /** The new `checked` value of the checkbox. */
     checked: boolean;
 }
+/** @docs-private */
+export declare class MdCheckboxBase {
+    _renderer: Renderer2;
+    _elementRef: ElementRef;
+    constructor(_renderer: Renderer2, _elementRef: ElementRef);
+}
+export declare const _MdCheckboxMixinBase: (new (...args: any[]) => CanColor) & (new (...args: any[]) => CanDisableRipple) & (new (...args: any[]) => CanDisable) & typeof MdCheckboxBase;
 /**
  * A material design checkbox component. Supports all of the functionality of an HTML5 checkbox,
  * and exposes a similar API. A MdCheckbox can be either checked, unchecked, indeterminate, or
@@ -36,9 +53,7 @@ export declare class MdCheckboxChange {
  * have the checkbox be accessible, you may supply an [aria-label] input.
  * See: https://www.google.com/design/spec/components/selection-controls.html
  */
-export declare class MdCheckbox implements ControlValueAccessor, AfterViewInit, OnDestroy {
-    private _renderer;
-    private _elementRef;
+export declare class MdCheckbox extends _MdCheckboxMixinBase implements ControlValueAccessor, AfterViewInit, OnDestroy, CanColor, CanDisable, CanDisableRipple {
     private _changeDetectorRef;
     private _focusOriginMonitor;
     /**
@@ -49,14 +64,11 @@ export declare class MdCheckbox implements ControlValueAccessor, AfterViewInit, 
     /**
      * Users can specify the `aria-labelledby` attribute which will be forwarded to the input element
      */
-    ariaLabelledby: string;
-    /** A unique id for the checkbox. If one is not supplied, it is auto-generated. */
+    ariaLabelledby: string | null;
+    private _uniqueId;
+    /** A unique id for the checkbox input. If none is supplied, it will be auto-generated. */
     id: string;
-    /** Whether the ripple effect on click should be disabled. */
-    private _disableRipple;
-    /** Whether the ripple effect for this checkbox is disabled. */
-    disableRipple: boolean;
-    /** ID of the native input element inside `<md-checkbox>` */
+    /** Returns the unique id for the visual hidden input. */
     readonly inputId: string;
     private _required;
     /** Whether the checkbox is required. */
@@ -68,13 +80,10 @@ export declare class MdCheckbox implements ControlValueAccessor, AfterViewInit, 
     align: 'start' | 'end';
     /** Whether the label should appear after or before the checkbox. Defaults to 'after' */
     labelPosition: 'before' | 'after';
-    private _disabled;
-    /** Whether the checkbox is disabled. */
-    disabled: boolean;
     /** Tabindex value that is passed to the underlying input element. */
     tabIndex: number;
     /** Name value will be applied to the input element if present */
-    name: string;
+    name: string | null;
     /** Event emitted when the checkbox's `checked` value changes. */
     change: EventEmitter<MdCheckboxChange>;
     /** Event emitted when the checkbox's `indeterminate` value changes. */
@@ -83,6 +92,7 @@ export declare class MdCheckbox implements ControlValueAccessor, AfterViewInit, 
     value: string;
     /** The native `<input type="checkbox"> element */
     _inputElement: ElementRef;
+    /** Called when the checkbox is blurred. Needed to properly implement ControlValueAccessor. */
     _ripple: MdRipple;
     /**
      * Called when the checkbox is blurred. Needed to properly implement ControlValueAccessor.
@@ -93,11 +103,10 @@ export declare class MdCheckbox implements ControlValueAccessor, AfterViewInit, 
     private _currentCheckState;
     private _checked;
     private _indeterminate;
-    private _color;
     private _controlValueAccessorChangeFn;
     /** Reference to the focused state ripple. */
     private _focusRipple;
-    constructor(_renderer: Renderer, _elementRef: ElementRef, _changeDetectorRef: ChangeDetectorRef, _focusOriginMonitor: FocusOriginMonitor);
+    constructor(renderer: Renderer2, elementRef: ElementRef, _changeDetectorRef: ChangeDetectorRef, _focusOriginMonitor: FocusOriginMonitor);
     ngAfterViewInit(): void;
     ngOnDestroy(): void;
     /**
@@ -111,11 +120,9 @@ export declare class MdCheckbox implements ControlValueAccessor, AfterViewInit, 
      * set to false.
      */
     indeterminate: boolean;
-    /** The color of the button. Can be `primary`, `accent`, or `warn`. */
-    color: string;
-    _updateColor(newColor: string): void;
-    _setElementColor(color: string, isAdd: boolean): void;
     _isRippleDisabled(): boolean;
+    /** Method being called whenever the label text changes. */
+    _onLabelTextChange(): void;
     /**
      * Sets the model value. Implemented as part of ControlValueAccessor.
      * @param value Value to be set to the model.

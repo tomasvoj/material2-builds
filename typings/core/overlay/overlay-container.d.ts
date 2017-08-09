@@ -1,3 +1,10 @@
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
 import { Optional } from '@angular/core';
 /**
  * The OverlayContainer is the container in which all overlays will load.
@@ -23,7 +30,9 @@ export declare class OverlayContainer {
      */
     protected _createContainer(): void;
 }
+/** @docs-private */
 export declare function OVERLAY_CONTAINER_PROVIDER_FACTORY(parentContainer: OverlayContainer): OverlayContainer;
+/** @docs-private */
 export declare const OVERLAY_CONTAINER_PROVIDER: {
     provide: typeof OverlayContainer;
     deps: Optional[][];
